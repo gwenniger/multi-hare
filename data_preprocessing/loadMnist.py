@@ -1,4 +1,16 @@
-exec(open("shared_imports.py").read())
+import os.path
+import torchvision.datasets as dset
+import torchvision.transforms as transforms
+import torch
+import util.ImageVisualization
+
+
+# http://docs.python-guide.org/en/latest/writing/structure/
+
+# see: https://stackoverflow.com/questions/2668909/how-to-find-the-real-user-home-directory-using-python
+project_root = os.path.expanduser('~') + "/AI/handwriting-recognition/"
+
+#exec(open(project_root + "shared_imports.py").read())
 
 
 ## load mnist dataset
@@ -25,6 +37,6 @@ test_loader = torch.utils.data.DataLoader(
 print('==>>> total trainning batch number: {}'.format(len(train_loader)))
 print('==>>> total testing batch number: {}'.format(len(test_loader)))
 
-classes = ('0','1','2','3','4','5','6','7','8','9')
+classes = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9')
 
-show_random_batch_from_image_loader_with_class_labels(train_loader,classes)
+util.ImageVisualization.show_random_batch_from_image_loader_with_class_labels(train_loader,classes)
