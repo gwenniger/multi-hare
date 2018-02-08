@@ -2,7 +2,7 @@ import os.path
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
 import torch
-import util.ImageVisualization
+import util.image_visualization
 
 
 # http://docs.python-guide.org/en/latest/writing/structure/
@@ -39,4 +39,4 @@ print('==>>> total testing batch number: {}'.format(len(test_loader)))
 
 classes = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9')
 
-util.ImageVisualization.show_random_batch_from_image_loader_with_class_labels(train_loader,classes)
+util.image_visualization.show_random_batch_from_image_loader_with_class_labels(train_loader, classes)
