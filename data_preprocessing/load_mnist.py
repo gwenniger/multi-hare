@@ -3,7 +3,9 @@ import torchvision.datasets as dset
 import torchvision.transforms as transforms
 import torch
 import util.image_visualization
-
+import matplotlib.pyplot as plt
+import torchvision
+from util.image_input_transformer import ImageInputTransformer
 
 # http://docs.python-guide.org/en/latest/writing/structure/
 
@@ -39,4 +41,16 @@ print('==>>> total testing batch number: {}'.format(len(test_loader)))
 
 classes = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9')
 
-util.image_visualization.show_random_batch_from_image_loader_with_class_labels(train_loader, classes)
+#util.image_visualization.show_random_batch_from_image_loader_with_class_labels(train_loader, classes)
+
+images_iteration = iter(train_loader)
+images, labels = images_iteration.next()
+# Show the first image
+image = images[0]
+print("image: " + str(image))
+#util.image_visualization.imshow(torchvision.utils.make_grid(image))
+#plt.show()
+transformed_image = ImageInputTransformer.create_row_diagonal_offset_tensor(image)
+print("transformed_image: " + str(transformed_image))
+util.image_visualization.imshow(torchvision.utils.make_grid(transformed_image))
+plt.show()
