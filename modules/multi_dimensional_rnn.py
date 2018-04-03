@@ -11,7 +11,7 @@ from torch.nn.modules.module import Module
 from torch.nn.parameter import Parameter
 from torch.nn.utils.rnn import PackedSequence
 from torch.autograd import Variable
-
+import torch.nn.functional as F
 
 
 class MDRNNCellBase(Module):
@@ -104,9 +104,6 @@ class MDRNNCell(MDRNNCellBase):
         self.hidden_size = hidden_size
         self.bias = bias
         self.nonlinearity = nonlinearity
-
-        # TODO: Fix use of th nonlinearity which is currently not being used at all
-
         self.ih = torch.nn.Linear(input_size, hidden_size, bias=bias)
         self.h1h = torch.nn.Linear(hidden_size, hidden_size, bias=bias)
         self.h2h = torch.nn.Linear(hidden_size, hidden_size, bias=bias)
@@ -127,9 +124,12 @@ class MDRNNCell(MDRNNCellBase):
         self.check_forward_input(input)
         self.check_forward_hidden(input, h1, h2)
         if self.nonlinearity == "tanh":
-            func = self._backend.RNNTanhCell
+            func = F.tanh
         elif self.nonlinearity == "relu":
-            func = self._backend.RNNReLUCell
+            #func = self._backend.RNNReLUCell
+            func = F.relu
+        elif self.nonlinearity == "sigmoid":
+            func = F.sigmoid
         else:
             raise RuntimeError(
                 "Unknown nonlinearity: {}".format(self.nonlinearity))
@@ -140,7 +140,8 @@ class MDRNNCell(MDRNNCellBase):
         #h_total = torch.add
         #total = torch.add(h_total, 1, input_total)
         total = input_total + h1h_total + h2h_total
-        h_activation = torch.sigmoid(total)
+        h_activation = func(total)
+        #h_activation = torch.sigmoid(total)
 
         return h_activation
 
@@ -153,7 +154,7 @@ class MDRNNCell(MDRNNCellBase):
 
 def main():
     print("Testing the MultDimensionalRNN Cell... ")
-    mdrnn = MDRNNCell(10, 5)
+    mdrnn = MDRNNCell(10, 5, nonlinearity="relu")
     input = Variable(torch.randn(6, 3, 10))
 
     # print("Input: " + str(input))
