@@ -1,0 +1,26 @@
+TODO list (high level)
+
+1. MDRNN Cell - Done (But may need further testing)
+
+2. Image Transformation function - shift the it-row by i pixels - Done
+
+3. Create a network of MDRNN Cells with height equal to the height of the image 
+that can be used to scan the image in parallel, one transformed image colum at a time
+(what about padding for the cells on the boundary?)
+
+4. Create a method that, using the network of step 3, computes the MDRNN activation for 
+   each pixel. Save these activations to a "context vector / image representation vector".
+
+5. Train a classifier using the representation computed in 4. Use it for MNIST prediction
+
+6. Repeat step 4 in 4 different directions, combine the 4 representations. This is now 
+   the multi-directional multi-dimensional RNN. See how classification performance improves.
+
+7. Implement the Multi-dimensional LSTM, analogous to the Multi-dimensional RNN implementation.
+
+8. Repeat the previous steps with the Multi-dimensional LSTM cell.
+
+9. Combine the Multi-Dimensional LSTM image representations with convolutional network components 
+   and other network components into a more complex neural network.
+
+10. Add ab attention mechanism.
