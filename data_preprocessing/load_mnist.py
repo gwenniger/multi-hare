@@ -36,7 +36,7 @@ test_loader = torch.utils.data.DataLoader(
                 batch_size=batch_size,
                 shuffle=False)
 
-print('==>>> total trainning batch number: {}'.format(len(train_loader)))
+print('==>>> total training batch number: {}'.format(len(train_loader)))
 print('==>>> total testing batch number: {}'.format(len(test_loader)))
 
 classes = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9')
