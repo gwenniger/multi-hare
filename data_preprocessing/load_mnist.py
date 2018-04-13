@@ -25,7 +25,7 @@ def get_train_loader():
     #trans = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
     train_set = dset.MNIST(root=root, train=True, transform=trans, download=download)
 
-    batch_size = 1
+    batch_size = 3
 
     train_loader = torch.utils.data.DataLoader(
         dataset=train_set,

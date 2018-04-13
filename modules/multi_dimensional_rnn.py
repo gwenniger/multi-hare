@@ -204,7 +204,7 @@ class MultiDimensionalRNN(torch.nn.Module):
         #print("skewed image columns: " + str(skewed_image_columns))
         #print("skewed image rows: " + str(skewed_image_rows))
 
-        # print("skewed_image: " + str(skewed_image))
+        print("skewed_image: " + str(skewed_image))
 
         # The image is 3-dimensional, but the convolution somehow
         # requires 4-dimensional input (why?) Seems pretty odd, but see also
