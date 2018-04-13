@@ -204,13 +204,13 @@ class MultiDimensionalRNN(torch.nn.Module):
         #print("skewed image columns: " + str(skewed_image_columns))
         #print("skewed image rows: " + str(skewed_image_rows))
 
-        print("skewed_image: " + str(skewed_image))
+        #print("skewed_image: " + str(skewed_image))
 
         # The image is 3-dimensional, but the convolution somehow
         # requires 4-dimensional input (why?) Seems pretty odd, but see also
         # http://pytorch.org/tutorials/beginner/blitz/neural_networks_tutorial.html
         # http://pytorch.org/docs/master/torch.html#torch.unsqueeze
-        skewed_image_four_dim = torch.unsqueeze(skewed_image, 0)
+        skewed_image_four_dim = torch.unsqueeze(skewed_image, 1)
         skewed_image_variable = Variable(skewed_image_four_dim)
         input_matrix = self.input_convolution(skewed_image_variable)
         # print("input_matrix: " + str(input_matrix))
@@ -233,7 +233,7 @@ class MultiDimensionalRNN(torch.nn.Module):
             # print("input_column: " + str(input_column))
             # print("state_plus_input: " + str(state_plus_input))
             activation_column = self.get_activation_function()(state_plus_input)
-            # print("activation: " + str(activation_column))
+            #print("activation: " + str(activation_column))
             previous_state_column = activation_column
             activations.append(activation_column)
 
@@ -247,10 +247,12 @@ class MultiDimensionalRNN(torch.nn.Module):
         #print("activations_as_tensor: " + str(activations_as_tensor))
 
         activations_unskewed = activations_as_tensor[:, 0, 0:original_image_columns]
-        #print("activations_unskewed:" + str(activations_unskewed))
+        activations_unskewed = torch.unsqueeze(activations_unskewed, 1)
+        #print("activations_unskewed before:" + str(activations_unskewed))
         for row_number in range(1, skewed_image_rows):
             activations = activations_as_tensor[:, row_number, row_number: (original_image_columns + row_number)]
-            activations_unskewed = torch.cat((activations_unskewed,activations), 0)
+            activations = torch.unsqueeze(activations, 1)
+            activations_unskewed = torch.cat((activations_unskewed, activations), 1)
         #print("activations_unskewed: " + str(activations_unskewed))
 
         #return activations_unskewed
@@ -307,6 +309,23 @@ def test_mdrnn():
     multi_dimensional_rnn.forward(image)
 
 
+def evaluate_mdrnn(multi_dimensional_rnn):
+    correct = 0
+    total = 0
+    test_loader = data_preprocessing.load_mnist.get_test_loader()
+    for data in test_loader:
+        images, labels = data
+        #outputs = multi_dimensional_rnn(Variable(images))  # For "Net" (Le Net)
+        outputs = multi_dimensional_rnn(images)
+        _, predicted = torch.max(outputs.data, 1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum()
+
+    print('Accuracy of the network on the 10000 test images: %d %%' % (
+            100 * correct / total))
+
+
+
 def train_mdrnn():
     import torch.optim as optim
 
@@ -342,6 +361,7 @@ def train_mdrnn():
 
 
             # forward + backward + optimize
+            #outputs = multi_dimensional_rnn(Variable(inputs))  # For "Net" (Le Net)
             outputs = multi_dimensional_rnn(inputs)
             #print("outputs: " + str(outputs))
             #print("labels: " + str(labels))
@@ -359,6 +379,8 @@ def train_mdrnn():
 
     print('Finished Training')
 
+    # Run evaluation
+    evaluate_mdrnn(multi_dimensional_rnn)
 
 def main():
     # test_mdrnn_cell()

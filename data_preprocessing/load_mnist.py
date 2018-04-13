@@ -25,7 +25,7 @@ def get_train_loader():
     #trans = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
     train_set = dset.MNIST(root=root, train=True, transform=trans, download=download)
 
-    batch_size = 3
+    batch_size = 30
 
     train_loader = torch.utils.data.DataLoader(
         dataset=train_set,
@@ -48,10 +48,12 @@ def get_test_loader():
     root = project_root + '/data'
     download = False  # download MNIST dataset or not
 
-    trans = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
+    # Scaling to size 32*32
+    trans = transforms.Compose([transforms.Scale((32, 32)), transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
+    #trans = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
     test_set = dset.MNIST(root=root, train=False, transform=trans)
 
-    batch_size = 100
+    batch_size = 30
 
     test_loader = torch.utils.data.DataLoader(
         dataset=test_set,
