@@ -17,6 +17,7 @@ from util.image_input_transformer import ImageInputTransformer
 import data_preprocessing.load_mnist
 import torch.nn as nn
 import torchvision.transforms as transforms
+import time
 
 
 class MDRNNCellBase(Module):
@@ -335,6 +336,9 @@ def train_mdrnn():
     optimizer = optim.SGD(multi_dimensional_rnn.parameters(), lr=0.001, momentum=0.9)
 
     trainloader = data_preprocessing.load_mnist.get_train_loader()
+
+    start = time.time()
+
     for epoch in range(2):  # loop over the dataset multiple times
 
         running_loss = 0.0
@@ -373,8 +377,11 @@ def train_mdrnn():
             running_loss += loss.data[0]
             #if i % 2000 == 1999:  # print every 2000 mini-batches
             if i % 200 == 199:  # print every 200 mini-batches
+                end = time.time()
+                running_time = end - start
                 print('[%d, %5d] loss: %.3f' %
-                      (epoch + 1, i + 1, running_loss / 2000))
+                      (epoch + 1, i + 1, running_loss / 2000) +
+                      " Running time: " + str(running_time))
                 running_loss = 0.0
 
     print('Finished Training')
