@@ -18,7 +18,7 @@ import data_preprocessing.load_mnist
 import torch.nn as nn
 import torchvision.transforms as transforms
 import time
-
+import util.tensor_flipping
 
 class MDRNNCellBase(Module):
 
@@ -159,7 +159,7 @@ class MDRNNCell(MDRNNCellBase):
 
 
 class MultiDimensionalRNN(torch.nn.Module):
-    def __init__(self, nonlinearity="tanh"):
+    def __init__(self, batch_size, nonlinearity="tanh"):
         super(MultiDimensionalRNN, self).__init__()
         self.input_channels = 1
         self.output_channels = 1
@@ -168,12 +168,16 @@ class MultiDimensionalRNN(torch.nn.Module):
                                            padding=1)
         self.input_convolution = nn.Conv2d(self.input_channels,
                                            self.output_channels, 1)
-        self.fc3 = nn.Linear(1024, 10)
+        # self.fc3 = nn.Linear(1024, 10)
+        # For multi-directional rnn
+        self.fc3 = nn.Linear(1024 * 4, 10)
         self.nonlinearity = nonlinearity
+        self.batch_size = batch_size
+        self.selection_tensor = Variable(self.create_torch_indices_selection_tensor(batch_size)).cuda()
 
     @staticmethod
-    def create_multi_dimensional_rnn(nonlinearity="tanh"):
-        return MultiDimensionalRNN(nonlinearity)
+    def create_multi_dimensional_rnn(batch_size, nonlinearity="tanh"):
+        return MultiDimensionalRNN(batch_size, nonlinearity)
 
     def get_activation_function(self):
         if self.nonlinearity == "tanh":
@@ -188,24 +192,23 @@ class MultiDimensionalRNN(torch.nn.Module):
                 "Unknown nonlinearity: {}".format(self.nonlinearity))
         return activation_function
 
-    # Input tensor x is an image
-    def forward(self, x):
+    def compute_multi_dimensional_rnn_one_direction(self, x):
         # Step 1: Create a skewed version of the input image
-        #skewed_image = ImageInputTransformer.create_row_diagonal_offset_tensor(x)
-        skewed_image = ImageInputTransformer.create_row_diagonal_offset_tensors(x)
+        # skewed_image = ImageInputTransformer.create_row_diagonal_offset_tensor(x)
+        skewed_image = ImageInputTransformer.create_row_diagonal_offset_tensors(x).cuda()
 
         image_height = x.size(1)
         previous_state_column = Variable(torch.zeros(self.input_channels,
                                                      self.output_channels,
-                                                     image_height))
+                                                     image_height)).cuda()
         # print("image_height: " + str(image_height))
         original_image_columns = x.size(2)
         skewed_image_rows = skewed_image.size(1)
         skewed_image_columns = skewed_image.size(2)
-        #print("skewed image columns: " + str(skewed_image_columns))
-        #print("skewed image rows: " + str(skewed_image_rows))
+        # print("skewed image columns: " + str(skewed_image_columns))
+        # print("skewed image rows: " + str(skewed_image_rows))
 
-        #print("skewed_image: " + str(skewed_image))
+        # print("skewed_image: " + str(skewed_image))
 
         # The image is 3-dimensional, but the convolution somehow
         # requires 4-dimensional input (why?) Seems pretty odd, but see also
@@ -234,7 +237,7 @@ class MultiDimensionalRNN(torch.nn.Module):
             # print("input_column: " + str(input_column))
             # print("state_plus_input: " + str(state_plus_input))
             activation_column = self.get_activation_function()(state_plus_input)
-            #print("activation: " + str(activation_column))
+            # print("activation: " + str(activation_column))
             previous_state_column = activation_column
             activations.append(activation_column)
 
@@ -245,23 +248,139 @@ class MultiDimensionalRNN(torch.nn.Module):
         for column_number in range(1, skewed_image_columns):
             activations_column_transposed = torch.transpose(activations[column_number], 1, 2)
             activations_as_tensor = torch.cat((activations_as_tensor, activations_column_transposed), 2)
-        #print("activations_as_tensor: " + str(activations_as_tensor))
+        # print("activations_as_tensor: " + str(activations_as_tensor))
 
         activations_unskewed = activations_as_tensor[:, 0, 0:original_image_columns]
         activations_unskewed = torch.unsqueeze(activations_unskewed, 1)
-        #print("activations_unskewed before:" + str(activations_unskewed))
+        # print("activations_unskewed before:" + str(activations_unskewed))
         for row_number in range(1, skewed_image_rows):
             activations = activations_as_tensor[:, row_number, row_number: (original_image_columns + row_number)]
             activations = torch.unsqueeze(activations, 1)
             activations_unskewed = torch.cat((activations_unskewed, activations), 1)
-        #print("activations_unskewed: " + str(activations_unskewed))
+        # print("activations_unskewed: " + str(activations_unskewed))
+        return activations_unskewed
 
-        #return activations_unskewed
+    def forward_one_directional_multi_dimensional_rnn(self, x):
+        activations_unskewed = self.compute_multi_dimensional_rnn_one_direction(x)
         activations_one_dimensional = activations_unskewed.view(-1, 1024)
-        #print("activations_one_dimensional: " + str(activations_one_dimensional))
+        # print("activations_one_dimensional: " + str(activations_one_dimensional))
         # It is nescessary to output a tensor of size 10, for 10 different output classes
         result = self.fc3(activations_one_dimensional)
         return result
+
+    # This function is slow because all four function calls for 4 directions are
+    # executed sequentially. It isn't entirely clear how to optimize this.
+    # See the discussion at:
+    # https://discuss.pytorch.org/t/is-there-a-way-to-parallelize-independent-sequential-steps/3360
+    def forward_multi_directional_multi_dimensional_rnn(self, x):
+        #print("list(x.size()): " + str(list(x.size())))
+
+        # Original order
+        activations_unskewed_direction_one = self.compute_multi_dimensional_rnn_one_direction(x)
+        activations_one_dimensional_one = activations_unskewed_direction_one.view(-1, 1024)
+
+        # Flipping 2nd dimension
+        activations_unskewed_direction_two = self.compute_multi_dimensional_rnn_one_direction(
+            util.tensor_flipping.flip(x, 2))
+        activations_one_dimensional_two = activations_unskewed_direction_two.view(-1, 1024)
+
+        #print("activations_one_dimensional_two: " + str(activations_one_dimensional_two))
+
+        # Flipping 3th dimension
+        activations_unskewed_direction_three = self.compute_multi_dimensional_rnn_one_direction(
+            util.tensor_flipping.flip(x, 3))
+        activations_one_dimensional_three = activations_unskewed_direction_three.view(-1, 1024)
+
+        # Flipping 2nd and 3th dimension combined
+        activations_unskewed_direction_four = self.compute_multi_dimensional_rnn_one_direction(
+            util.tensor_flipping.flip(util.tensor_flipping.flip(x, 2), 3))
+        activations_one_dimensional_four = activations_unskewed_direction_four.view(-1, 1024)
+
+        activations_combined = torch.cat((activations_one_dimensional_one, activations_one_dimensional_two,
+                                         activations_one_dimensional_three, activations_one_dimensional_four), 1)
+
+        #print("activations_combined: " + str(activations_combined))
+
+        # print("activations_one_dimensional: " + str(activations_one_dimensional))
+        # It is nescessary to output a tensor of size 10, for 10 different output classes
+        result = self.fc3(activations_combined)
+        return result
+
+
+    def create_indices_list(self, number_of_examples):
+        result = []
+        for i in range(0, number_of_examples):
+            result.append(i)
+            result.append(number_of_examples + i)
+            result.append(number_of_examples * 2 + i)
+            result.append(number_of_examples * 3 + i)
+        return result
+
+    def create_torch_indices_selection_tensor(self, number_of_examples):
+        indices = self.create_indices_list(number_of_examples)
+        result = torch.LongTensor(indices)
+        return result
+
+    # This function is slow because all four function calls for 4 directions are
+    # executed sequentially. It isn't entirely clear how to optimize this.
+    # See the discussion at:
+    # https://discuss.pytorch.org/t/is-there-a-way-to-parallelize-independent-sequential-steps/3360
+    def forward_multi_directional_multi_dimensional_rnn_fast(self, x):
+        # print("list(x.size()): " + str(list(x.size())))
+
+        x_direction_two = util.tensor_flipping.flip(x, 2)
+        x_direction_three = util.tensor_flipping.flip(x, 3)
+        x_direction_four = util.tensor_flipping.flip(util.tensor_flipping.flip(x, 2), 3)
+        x_multiple_directions = torch.cat((x, x_direction_two, x_direction_three, x_direction_four), 0)
+
+        number_of_examples = x.size(0)
+        #print("number of examples: " + str(number_of_examples))
+
+        # Original order
+        activations_unskewed = self.compute_multi_dimensional_rnn_one_direction(x_multiple_directions)
+        if number_of_examples == self.batch_size:
+            selection_tensor = self.selection_tensor
+        else:
+            selection_tensor = Variable(self.create_torch_indices_selection_tensor(number_of_examples)).cuda()
+        #print("activations_unskewed: " + str(activations_unskewed))
+        #print("selection_tensor: " + str(selection_tensor))
+
+        # Using tor.index_select we can bring together the activations of the four
+        # different rotations, while avoiding use of a for loop, making the whole thing
+        # hopefully faster
+        activations_selected = torch.index_select(activations_unskewed, 0, selection_tensor)
+        #print("activations_selected: " + str(activations_selected))
+
+        #activations_rearranged = torch.cat((activations_unskewed[0, :, :],
+        #                                     activations_unskewed[number_of_examples, :, :],
+        #                                     activations_unskewed[number_of_examples * 2, :, :],
+        #                                     activations_unskewed[number_of_examples * 3, :, :],), 0)
+        #activations_rearranged = activations_rearranged.unsqueeze(0)
+        #print("activations_rearranged: " + str(activations_rearranged))
+        #for i in range(1, number_of_examples):
+        #    activations_rearranged_row = torch.cat((activations_unskewed[i, :, :],
+        #                                         activations_unskewed[number_of_examples + 1, :, :],
+        #                                         activations_unskewed[number_of_examples * 2 + i, :, :],
+        #                                         activations_unskewed[number_of_examples * 3 + i, :, :],), 0)
+        #    activations_rearranged_row = activations_rearranged_row.unsqueeze(0)
+        #    activations_rearranged = torch.cat((activations_rearranged, activations_rearranged_row), 0)
+
+        #print("activations_rearranged: " + str(activations_rearranged))
+        activations_one_dimensional = activations_selected.view(-1, 32 * 32 * 4)
+        #activations_one_dimensional = activations_rearranged.view(-1, 32 * 32 * 4)
+
+        # print("activations_combined: " + str(activations_combined))
+
+        # print("activations_one_dimensional: " + str(activations_one_dimensional))
+        # It is nescessary to output a tensor of size 10, for 10 different output classes
+        result = self.fc3(activations_one_dimensional)
+        return result
+
+    # Input tensor x is a batch of image tensors
+    def forward(self, x):
+        #return self.forward_multi_directional_multi_dimensional_rnn(x)
+        return self.forward_multi_directional_multi_dimensional_rnn_fast(x)
+        #return self.forward_one_directional_multi_dimensional_rnn(x)
 
 
 class Net(nn.Module):
@@ -306,7 +425,7 @@ def test_mdrnn_cell():
 
 def test_mdrnn():
     image = data_preprocessing.load_mnist.get_first_image()
-    multi_dimensional_rnn = MultiDimensionalRNN.create_multi_dimensional_rnn(nonlinearity="sigmoid")
+    multi_dimensional_rnn = MultiDimensionalRNN.create_multi_dimensional_rnn(32, nonlinearity="sigmoid").cuda()
     multi_dimensional_rnn.forward(image)
 
 
@@ -320,7 +439,7 @@ def evaluate_mdrnn(multi_dimensional_rnn):
         outputs = multi_dimensional_rnn(images)
         _, predicted = torch.max(outputs.data, 1)
         total += labels.size(0)
-        correct += (predicted == labels).sum()
+        correct += (predicted == labels.cuda()).sum()
 
     print('Accuracy of the network on the 10000 test images: %d %%' % (
             100 * correct / total))
@@ -331,7 +450,7 @@ def train_mdrnn():
     import torch.optim as optim
 
     criterion = nn.CrossEntropyLoss()
-    multi_dimensional_rnn = MultiDimensionalRNN.create_multi_dimensional_rnn(nonlinearity="sigmoid")
+    multi_dimensional_rnn = MultiDimensionalRNN.create_multi_dimensional_rnn(32, nonlinearity="sigmoid").cuda()
     #multi_dimensional_rnn = Net()
     optimizer = optim.SGD(multi_dimensional_rnn.parameters(), lr=0.001, momentum=0.9)
 
@@ -355,7 +474,7 @@ def train_mdrnn():
             #inputs = LRTrans(inputs)
 
             # wrap them in Variable
-            labels = Variable(labels)
+            labels = Variable(labels).cuda()
             #labels, inputs = Variable(labels), Variable(inputs)
 
             # zero the parameter gradients

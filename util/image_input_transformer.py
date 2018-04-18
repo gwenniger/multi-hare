@@ -96,6 +96,7 @@ class ImageInputTransformer:
                                      image_tensors[:, 0, y, :]), 1)
             else:
                 new_row = image_tensors[:, 0, y, :]
+
             if tailing_zeros > 0:
                 tailing_zeros_tensor = torch.zeros(number_of_image_tensors, tailing_zeros)
                 #print("new tailing_zeros_tensor: " + str(tailing_zeros_tensor))
