@@ -8,7 +8,7 @@ import torchvision
 from util.image_input_transformer import ImageInputTransformer
 
 
-def get_train_loader():
+def get_train_loader(batch_size):
     # http://docs.python-guide.org/en/latest/writing/structure/
 
     # see: https://stackoverflow.com/questions/2668909/how-to-find-the-real-user-home-directory-using-python
@@ -25,8 +25,6 @@ def get_train_loader():
     #trans = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
     train_set = dset.MNIST(root=root, train=True, transform=trans, download=download)
 
-    batch_size = 32
-
     train_loader = torch.utils.data.DataLoader(
         dataset=train_set,
         batch_size=batch_size,
@@ -34,7 +32,7 @@ def get_train_loader():
     return train_loader
 
 
-def get_test_loader():
+def get_test_loader(batch_size):
     # http://docs.python-guide.org/en/latest/writing/structure/
 
     # see: https://stackoverflow.com/questions/2668909/how-to-find-the-real-user-home-directory-using-python
@@ -52,8 +50,6 @@ def get_test_loader():
     trans = transforms.Compose([transforms.Scale((32, 32)), transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
     #trans = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
     test_set = dset.MNIST(root=root, train=False, transform=trans)
-
-    batch_size = 30
 
     test_loader = torch.utils.data.DataLoader(
         dataset=test_set,
