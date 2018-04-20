@@ -160,7 +160,8 @@ class MDRNNCell(MDRNNCellBase):
 
 
 class MultiDimensionalRNNBase(torch.nn.Module):
-    def __init__(self, batch_size, nonlinearity="tanh"):
+    def __init__(self, batch_size,  compute_multi_directional: bool,
+                 nonlinearity="tanh",):
         super(MultiDimensionalRNNBase, self).__init__()
 
         self.batch_size = batch_size
@@ -170,26 +171,11 @@ class MultiDimensionalRNNBase(torch.nn.Module):
         self.selection_tensor = Variable(self.create_torch_indices_selection_tensor(batch_size))
         if MultiDimensionalRNNBase.use_cuda():
             self.selection_tensor = self.selection_tensor.cuda()
+        self.compute_multi_directional = compute_multi_directional
 
     @staticmethod
     def use_cuda():
         return torch.cuda.is_available()
-
-class MultiDimensionalRNN(MultiDimensionalRNNBase):
-    def __init__(self, batch_size, nonlinearity="tanh"):
-        super(MultiDimensionalRNN, self).__init__(batch_size, nonlinearity)
-        self.state_convolution = nn.Conv1d(self.input_channels,
-                                           self.output_channels, 2,
-                                           padding=1)
-        self.input_convolution = nn.Conv2d(self.input_channels,
-                                           self.output_channels, 1)
-        # self.fc3 = nn.Linear(1024, 10)
-        # For multi-directional rnn
-        self.fc3 = nn.Linear(1024 * 4, 10)
-
-    @staticmethod
-    def create_multi_dimensional_rnn(batch_size, nonlinearity="tanh"):
-        return MultiDimensionalRNN(batch_size, nonlinearity)
 
     def get_activation_function(self):
         if self.nonlinearity == "tanh":
@@ -204,17 +190,57 @@ class MultiDimensionalRNN(MultiDimensionalRNNBase):
                 "Unknown nonlinearity: {}".format(self.nonlinearity))
         return activation_function
 
+    @staticmethod
+    def create_indices_list(number_of_examples):
+        result = []
+        for i in range(0, number_of_examples):
+            result.append(i)
+            result.append(number_of_examples + i)
+            result.append(number_of_examples * 2 + i)
+            result.append(number_of_examples * 3 + i)
+        return result
+
+    @staticmethod
+    def create_torch_indices_selection_tensor(number_of_examples):
+        indices = MultiDimensionalRNNBase.create_indices_list(number_of_examples)
+        result = torch.LongTensor(indices)
+        return result
+
+
+class MultiDimensionalRNN(MultiDimensionalRNNBase):
+    def __init__(self, batch_size, compute_multi_directional: bool,
+                 nonlinearity="tanh"):
+        super(MultiDimensionalRNN, self).__init__(batch_size,
+                                                  compute_multi_directional,
+                                                  nonlinearity)
+        self.state_convolution = nn.Conv1d(self.input_channels,
+                                           self.output_channels, 2,
+                                           padding=1)
+        self.input_convolution = nn.Conv2d(self.input_channels,
+                                           self.output_channels, 1)
+        # self.fc3 = nn.Linear(1024, 10)
+        # For multi-directional rnn
+        if self.compute_multi_directional:
+            self.fc3 = nn.Linear(1024 * 4, 10)
+        else:
+            self.fc3 = nn.Linear(1024, 10)
+
+    @staticmethod
+    def create_multi_dimensional_rnn(batch_size,  compute_multi_directional: bool,
+                                     nonlinearity="tanh"):
+        return MultiDimensionalRNN(batch_size, compute_multi_directional, nonlinearity)
+
     def compute_multi_dimensional_rnn_one_direction(self, x):
         # Step 1: Create a skewed version of the input image
         # skewed_image = ImageInputTransformer.create_row_diagonal_offset_tensor(x)
         skewed_image = ImageInputTransformer.create_row_diagonal_offset_tensors(x)
         image_height = x.size(1)
-        previous_state_column = Variable(torch.zeros(self.input_channels,
+        previous_hidden_state_column = Variable(torch.zeros(self.input_channels,
                                                      self.output_channels,
                                                      image_height))
         if MultiDimensionalRNNBase.use_cuda():
             skewed_image = skewed_image.cuda()
-            previous_state_column = previous_state_column.cuda()
+            previous_hidden_state_column = previous_hidden_state_column.cuda()
 
         # print("image_height: " + str(image_height))
         original_image_columns = x.size(2)
@@ -241,7 +267,7 @@ class MultiDimensionalRNN(MultiDimensionalRNNBase):
 
         for column_number in range(0, skewed_image_columns):
             # Compute convolution on previous state column vector padded with zeros
-            state_column_both_sides_padding = self.state_convolution(previous_state_column)
+            state_column_both_sides_padding = self.state_convolution(previous_hidden_state_column)
             # Throw away the last element, which comes from padding on the bottom, as
             # there seems to be no way in pytorch to get the padding only on one side
             state_column = state_column_both_sides_padding[:, :, 0:image_height]
@@ -253,7 +279,7 @@ class MultiDimensionalRNN(MultiDimensionalRNNBase):
             # print("state_plus_input: " + str(state_plus_input))
             activation_column = self.get_activation_function()(state_plus_input)
             # print("activation: " + str(activation_column))
-            previous_state_column = activation_column
+            previous_hidden_state_column = activation_column
             activations.append(activation_column)
 
         # How to unskew the activation matrix, and retrieve an activation
@@ -321,20 +347,6 @@ class MultiDimensionalRNN(MultiDimensionalRNNBase):
         result = self.fc3(activations_combined)
         return result
 
-    def create_indices_list(self, number_of_examples):
-        result = []
-        for i in range(0, number_of_examples):
-            result.append(i)
-            result.append(number_of_examples + i)
-            result.append(number_of_examples * 2 + i)
-            result.append(number_of_examples * 3 + i)
-        return result
-
-    def create_torch_indices_selection_tensor(self, number_of_examples):
-        indices = self.create_indices_list(number_of_examples)
-        result = torch.LongTensor(indices)
-        return result
-
     # This function is slow because all four function calls for 4 directions are
     # executed sequentially. It isn't entirely clear how to optimize this.
     # See the discussion at:
@@ -355,7 +367,8 @@ class MultiDimensionalRNN(MultiDimensionalRNNBase):
         if number_of_examples == self.batch_size:
             selection_tensor = self.selection_tensor
         else:
-            selection_tensor = Variable(self.create_torch_indices_selection_tensor(number_of_examples))
+            selection_tensor = Variable(MultiDimensionalRNNBase.create_torch_indices_selection_tensor(
+                number_of_examples))
             if MultiDimensionalRNNBase.use_cuda():
                 selection_tensor = selection_tensor.cuda()
 
@@ -395,9 +408,11 @@ class MultiDimensionalRNN(MultiDimensionalRNNBase):
 
     # Input tensor x is a batch of image tensors
     def forward(self, x):
-        #return self.forward_multi_directional_multi_dimensional_rnn(x)
-        return self.forward_multi_directional_multi_dimensional_rnn_fast(x)
-        #return self.forward_one_directional_multi_dimensional_rnn(x)
+        if self.compute_multi_directional:
+            # return self.forward_multi_directional_multi_dimensional_rnn(x)
+            return self.forward_multi_directional_multi_dimensional_rnn_fast(x)
+        else:
+            return self.forward_one_directional_multi_dimensional_rnn(x)
 
 
 class Net(nn.Module):
@@ -469,12 +484,14 @@ def evaluate_mdrnn(multi_dimensional_rnn, batch_size):
 
 
 
-def train_mdrnn(batch_size):
+def train_mdrnn(batch_size, compute_multi_directional: bool):
     import torch.optim as optim
 
     criterion = nn.CrossEntropyLoss()
-    multi_dimensional_rnn = MultiDimensionalRNN.create_multi_dimensional_rnn(batch_size, nonlinearity="sigmoid")
-    multi_dimensional_rnn = MultiDimensionalRNN.create_multi_dimensional_rnn(batch_size, nonlinearity="sigmoid")
+    multi_dimensional_rnn = MultiDimensionalRNN.create_multi_dimensional_rnn(batch_size,
+                                                                             compute_multi_directional,
+                                                                             nonlinearity="sigmoid",
+                                                                             )
     #multi_dimensional_rnn = Net()
 
     if MultiDimensionalRNNBase.use_cuda():
@@ -486,7 +503,7 @@ def train_mdrnn(batch_size):
 
     start = time.time()
 
-    for epoch in range(2):  # loop over the dataset multiple times
+    for epoch in range(4):  # loop over the dataset multiple times
 
         running_loss = 0.0
         for i, data in enumerate(trainloader, 0):
@@ -543,7 +560,8 @@ def main():
     # test_mdrnn_cell()
     #test_mdrnn()
     batch_size = 128
-    train_mdrnn(batch_size)
+    compute_multi_directional = True
+    train_mdrnn(batch_size, compute_multi_directional)
 
 
 if __name__ == "__main__":
