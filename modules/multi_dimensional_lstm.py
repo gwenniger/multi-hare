@@ -81,9 +81,12 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         previous_hidden_state_column = Variable(torch.zeros(self.input_channels,
                                                             self.output_channels,
                                                             image_height))
+        # Todo: I'm confused about the dimensions of previous_memory_state
+        # and previous_hidden_state: why the latter has dimension equal to
+        # batch size but for the former it doesn't seem to matter
         previous_memory_state_column = Variable(torch.ones(self.input_channels,
-                                                            self.output_channels,
-                                                            image_height))
+                                                           self.output_channels,
+                                                           image_height))
 
         if MultiDimensionalRNNBase.use_cuda():
             previous_hidden_state_column = previous_hidden_state_column.cuda()
@@ -97,6 +100,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         input_gate_input_matrix = self.input_gate_input_convolution(skewed_images_variable)
         forget_gate_one_input_matrix = self.forget_gate_one_input_convolution(skewed_images_variable)
         forget_gate_two_input_matrix = self.forget_gate_two_input_convolution(skewed_images_variable)
+        output_gate_input_matrix = self.output_gate_input_convolution(skewed_images_variable)
 
         activations = list([])
 
@@ -170,13 +174,25 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                 forget_gate_one_activation_multiplied_with_previous_memory_state + \
                 forget_gate_two_activation_multiplied_with_previous_memory_state
 
+            new_memory_state_activation_column = F.tanh(new_memory_state)
+
             ### TODO Implement output gate etc
+            # Compute the sum of weighted inputs of the ouput gate
+            output_gate_weighted_states_plus_input = self. \
+                compute_weighted_input_output_gate(previous_hidden_state_column, new_memory_state,
+                                                  column_number, output_gate_input_matrix,
+                                                  image_height)
+
+            output_gate_activation_column = F.sigmoid(output_gate_weighted_states_plus_input)
 
             # print("input_column: " + str(input_column))
             # print("state_plus_input: " + str(state_plus_input))
-            activation_column = self.get_activation_function()(input_state_plus_input)
+            activation_column = torch.mul(new_memory_state_activation_column, output_gate_activation_column)
+            #activation_column = self.get_activation_function()(input_state_plus_input)
             # print("activation column: " + str(activation_column))
+
             previous_hidden_state_column = activation_column
+            previous_memory_state_column = new_memory_state
             activations.append(activation_column)
 
         original_image_columns = x.size(2)
@@ -185,24 +201,46 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                                                                     original_image_columns,
                                                                                     skewed_image_columns,
                                                                                             skewed_image_rows)
-        #print("activations_unskewed: " + str(activations_unskewed))
+        # print("activations_unskewed: " + str(activations_unskewed))
         return activations_unskewed
 
-    def compute_weighted_input_input_gate(self, previous_hidden_state_column, previous_memory_state_column,
+    def compute_weighted_input_both_memory_gate(self, previous_hidden_state_column, previous_memory_state_column,
                                           column_number, input_gate_input_matrix,
+                                          hidden_state_convolution,
+                                          memory_state_convolution,
                                           image_height):
         input_gate_hidden_state_column = MultiDimensionalRNNBase. \
-            compute_state_convolution_and_remove_bottom_padding(self.input_gate_hidden_state_convolution,
+            compute_state_convolution_and_remove_bottom_padding(hidden_state_convolution,
                                                                 previous_hidden_state_column,
                                                                 image_height)
         input_gate_memory_state_column = MultiDimensionalRNNBase. \
-            compute_state_convolution_and_remove_bottom_padding(self.input_gate_memory_state_convolution,
+            compute_state_convolution_and_remove_bottom_padding(memory_state_convolution,
                                                                 previous_memory_state_column,
                                                                 image_height)
         input_gate_input_column = input_gate_input_matrix[:, :, :, column_number]
         input_gate_weighted_states_plus_weighted_input = input_gate_input_column + input_gate_hidden_state_column + \
-                                                         input_gate_memory_state_column
+            input_gate_memory_state_column
         return input_gate_weighted_states_plus_weighted_input
+
+    def compute_weighted_input_input_gate(self, previous_hidden_state_column, previous_memory_state_column,
+                                          column_number, input_gate_input_matrix,
+                                          image_height):
+        return self.compute_weighted_input_both_memory_gate(previous_hidden_state_column, previous_memory_state_column,
+                                          column_number, input_gate_input_matrix,
+                                          self.input_hidden_state_convolution,
+                                          self.input_gate_memory_state_convolution,
+                                          image_height)
+
+    def compute_weighted_input_output_gate(self, previous_hidden_state_column, previous_memory_state_column,
+                                          column_number, input_gate_input_matrix,
+                                          image_height):
+        return self.compute_weighted_input_both_memory_gate(previous_hidden_state_column, previous_memory_state_column,
+                                          column_number, input_gate_input_matrix,
+                                          self.output_gate_hidden_state_convolution,
+                                          self.output_gate_memory_state_convolution,
+                                          image_height)
+
+
 
     def compute_weighted_input_forget_gate(self, forget_gate_hidden_state_convolution,
                                            forget_gate_memory_state_convolution,
@@ -228,7 +266,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         if memory_state_index == 1:
             previous_memory_state_column_shifted = previous_memory_state_column.clone()
             height = previous_memory_state_column.size(2)
-            zeros_padding = Variable(torch.zeros(1, 1, 1))
+            zeros_padding = Variable(torch.zeros(previous_memory_state_column.size(0), 1, 1))
             if self.use_cuda():
                 zeros_padding = zeros_padding.cuda()
             skip_first_sub_tensor = previous_memory_state_column_shifted[:, :, 0:(height - 1)]
