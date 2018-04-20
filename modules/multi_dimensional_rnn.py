@@ -297,7 +297,9 @@ class MultiDimensionalRNN(MultiDimensionalRNNBase):
         # http://pytorch.org/tutorials/beginner/blitz/neural_networks_tutorial.html
         # http://pytorch.org/docs/master/torch.html#torch.unsqueeze
         skewed_images_variable = MultiDimensionalRNNBase.create_skewed_images_variable_four_dim(x)
-        image_height = x.size(1)
+        image_height = x.size(2)
+        number_of_examples = x.size(0)
+        # print("image height: " + str(image_height))
         previous_hidden_state_column = Variable(torch.zeros(self.input_channels,
                                                      self.output_channels,
                                                      image_height))
@@ -318,7 +320,7 @@ class MultiDimensionalRNN(MultiDimensionalRNNBase):
             state_column = MultiDimensionalRNNBase.compute_state_convolution_and_remove_bottom_padding(
                 self.hidden_state_convolution, previous_hidden_state_column, image_height)
 
-            #print("state_column.size(): " + str(state_column.size()))
+            # print("state_column.size(): " + str(state_column.size()))
             state_plus_input = MultiDimensionalRNNBase.compute_state_plus_input(input_matrix,
                                                                                 column_number,
                                                                                 state_column)
@@ -334,7 +336,7 @@ class MultiDimensionalRNN(MultiDimensionalRNNBase):
         activations_unskewed = MultiDimensionalRNNBase.\
             extract_unskewed_activations(activations, original_image_columns,
                                          skewed_image_columns, skewed_image_rows)
-        print("activations_unskewed: " + str(activations_unskewed))
+        # print("activations_unskewed: " + str(activations_unskewed))
         return activations_unskewed
 
     def forward_one_directional_multi_dimensional_rnn(self, x):
@@ -350,7 +352,7 @@ class MultiDimensionalRNN(MultiDimensionalRNNBase):
     # See the discussion at:
     # https://discuss.pytorch.org/t/is-there-a-way-to-parallelize-independent-sequential-steps/3360
     def forward_multi_directional_multi_dimensional_rnn(self, x):
-        #print("list(x.size()): " + str(list(x.size())))
+        print("list(x.size()): " + str(list(x.size())))
 
         # Original order
         activations_unskewed_direction_one = self.compute_multi_dimensional_rnn_one_direction(x)
