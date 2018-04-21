@@ -19,10 +19,6 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                                  self.hidden_states_size, 1)
 
         self.input_hidden_state_update_block = StateUpdateBlock(hidden_states_size)
-        # This is necessary to make sure things are stored on the same gpu, otherwise
-        # pytorch doesn't realizes these convolutions are part of this module
-        self.state_convolutions = nn.ModuleList(
-            self.input_hidden_state_update_block.get_state_convolutions_as_list())
 
         # Input gate
         self.input_gate_input_convolution = nn.Conv2d(self.input_channels,
@@ -32,32 +28,24 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         self.input_gate_memory_state_update_block = StateUpdateBlock(hidden_states_size)
 
 
-        FORGET_GATE_BIAS_INIT = 1
 
         # Forget gate 1
         self.forget_gate_one_input_convolution = nn.Conv2d(self.input_channels,
                                                            self.hidden_states_size, 1)
-        #self.forget_gate_one_input_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
-
         self.forget_gate_one_hidden_state_update_block = StateUpdateBlock(hidden_states_size)
-
         self.forget_gate_one_memory_state_convolution = nn.Conv1d(self.hidden_states_size,
                                                                   self.hidden_states_size, 1)
 
-        self.forget_gate_one_memory_state_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
 
 
         # Forget gate 2
         self.forget_gate_two_input_convolution = nn.Conv2d(self.input_channels,
                                                            self.hidden_states_size, 1)
-
         self.forget_gate_two_hidden_state_update_block = StateUpdateBlock(hidden_states_size)
-
 
         #self.forget_gate_two_hidden_state_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
         self.forget_gate_two_memory_state_convolution = nn.Conv1d(self.hidden_states_size,
                                                                   self.hidden_states_size, 1)
-        self.forget_gate_two_memory_state_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
 
         # Output gate
         self.output_gate_input_convolution = nn.Conv2d(self.input_channels,
@@ -68,18 +56,39 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         self.output_gate_memory_state_convolution = nn.Conv1d(self.hidden_states_size,
                                                                   self.hidden_states_size, 1)
 
-        self.state_convolutions.extend(self.input_gate_hidden_state_update_block.get_state_convolutions_as_list())
-        self.state_convolutions.extend(self.input_gate_memory_state_update_block.get_state_convolutions_as_list())
-        self.state_convolutions.extend(self.forget_gate_one_hidden_state_update_block.get_state_convolutions_as_list())
-        self.state_convolutions.extend(self.forget_gate_two_hidden_state_update_block.get_state_convolutions_as_list())
-        self.state_convolutions.extend(self.output_gate_hidden_state_update_block.get_state_convolutions_as_list())
-        # self.state_convolutions.extend(self.output_gate_memory_state_update_block.get_state_convolutions_as_list())
-
         # For multi-directional rnn
         if self.compute_multi_directional:
             self.fc3 = nn.Linear(self.number_of_output_dimensions(), 10)
         else:
             self.fc3 = nn.Linear(self.number_of_output_dimensions(), 10)
+
+        # Set initial bias for the forget gates to one, since it is known to give better results
+        self.set_bias_forget_gates_to_one()
+
+        self.state_convolutions = nn.ModuleList([])
+        self.register_parameters_to_assure_same_gpu_is_used()
+
+    def set_bias_forget_gates_to_one(self):
+        FORGET_GATE_BIAS_INIT = 1
+        self.forget_gate_one_input_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
+        self.forget_gate_one_hidden_state_update_block.set_bias_for_convolutions(FORGET_GATE_BIAS_INIT)
+        self.forget_gate_one_memory_state_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
+
+        self.forget_gate_two_input_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
+        self.forget_gate_two_hidden_state_update_block.set_bias_for_convolutions(FORGET_GATE_BIAS_INIT)
+        self.forget_gate_two_memory_state_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
+
+    def register_parameters_to_assure_same_gpu_is_used(self):
+        # This is necessary to make sure things are stored on the same gpu, otherwise
+        # pytorch doesn't realizes these convolutions are part of this module
+        # See: # https://discuss.pytorch.org/t/runtime-error-tensors-are-on-different-gpus/2100/8
+        self.state_convolutions.extend(self.input_hidden_state_update_block.get_state_convolutions_as_list())
+        self.state_convolutions.extend(self.input_gate_hidden_state_update_block.get_state_convolutions_as_list())
+        self.state_convolutions.extend(self.input_gate_memory_state_update_block.get_state_convolutions_as_list())
+        self.state_convolutions.extend(self.forget_gate_one_hidden_state_update_block.get_state_convolutions_as_list())
+        self.state_convolutions.extend(self.forget_gate_two_hidden_state_update_block.get_state_convolutions_as_list())
+        self.state_convolutions.extend(self.output_gate_hidden_state_update_block.get_state_convolutions_as_list())
+
 
     @staticmethod
     def create_multi_dimensional_lstm(hidden_states_size:int ,batch_size:int , compute_multi_directional: bool,

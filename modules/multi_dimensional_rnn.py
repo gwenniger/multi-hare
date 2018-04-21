@@ -399,6 +399,10 @@ class StateUpdateBlock():
     def get_state_convolutions_as_list(self):
         return [self.state_one_convolution, self.state_two_convolution]
 
+    def set_bias_for_convolutions(self, bias_value):
+        self.state_one_convolution.bias.data.fill_(bias_value)
+        self.state_two_convolution.bias.data.fill_(bias_value)
+
 class MultiDimensionalRNN(MultiDimensionalRNNBase):
     def __init__(self, hidden_states_size, batch_size, compute_multi_directional: bool,
                  nonlinearity="tanh"):
