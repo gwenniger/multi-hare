@@ -63,15 +63,16 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
     import torch.optim as optim
 
     criterion = nn.CrossEntropyLoss()
-    multi_dimensional_rnn = MultiDimensionalRNN.create_multi_dimensional_rnn(hidden_states_size,
-                                                                             batch_size,
-                                                                             compute_multi_directional,
-                                                                             nonlinearity="sigmoid",
-                                                                             )
-    #multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm(batch_size,
+    #multi_dimensional_rnn = MultiDimensionalRNN.create_multi_dimensional_rnn(hidden_states_size,
+    #                                                                           batch_size,
     #                                                                           compute_multi_directional,
-    #                                                                           nonlinearity="sigmoid",
-    #                                                                          )
+    #                                                                           nonlinearity="sigmoid")
+
+    multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm(hidden_states_size,
+                                                                               batch_size,
+                                                                               compute_multi_directional,
+                                                                               nonlinearity="sigmoid")
+
     #multi_dimensional_rnn = Net()
 
     if MultiDimensionalRNNBase.use_cuda():
@@ -126,11 +127,13 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
             # print statistics
             running_loss += loss.data[0]
             #if i % 2000 == 1999:  # print every 2000 mini-batches
-            if i % 200 == 199:  # print every 200 mini-batches
+            # See: https://stackoverflow.com/questions/5598181/python-multiple-prints-on-the-same-line
+            #print(str(i)+",", end="", flush=True)
+            if i % 100 == 99:  # print every 100 mini-batches
                 end = time.time()
                 running_time = end - start
                 print('[%d, %5d] loss: %.3f' %
-                      (epoch + 1, i + 1, running_loss / 2000) +
+                      (epoch + 1, i + 1, running_loss / 100) +
                       " Running time: " + str(running_time))
                 running_loss = 0.0
 
@@ -142,9 +145,9 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
 def main():
     # test_mdrnn_cell()
     #test_mdrnn()
-    hidden_states_size = 64
+    hidden_states_size = 5
     batch_size = 128
-    compute_multi_directional = True
+    compute_multi_directional = False
     train_mdrnn(hidden_states_size, batch_size,  compute_multi_directional)
 
 

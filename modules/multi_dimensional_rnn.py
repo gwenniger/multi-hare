@@ -290,8 +290,7 @@ class MultiDimensionalRNNBase(torch.nn.Module):
     def extract_unskewed_activations(activations,
                                      original_image_columns: int,
                                      skewed_image_columns: int,
-                                     skewed_image_rows: int,
-                                     hidden_states_size: int):
+                                     skewed_image_rows: int):
 
         # print("original image columns: " + str(original_image_columns))
 
@@ -334,9 +333,9 @@ class MultiDimensionalRNNBase(torch.nn.Module):
         return state_column
 
     @staticmethod
-    def compute_state_plus_input(input_matrix, column_number, state_column):
+    def compute_states_plus_input(input_matrix, column_number, state_columns_combined):
         input_column = input_matrix[:, :, :, column_number]
-        state_plus_input = state_column + input_column
+        state_plus_input = state_columns_combined + input_column
         # print("input_column: " + str(input_column))
         # print("state_plus_input: " + str(state_plus_input))
         return state_plus_input
@@ -348,6 +347,57 @@ class MultiDimensionalRNNBase(torch.nn.Module):
         return result
 
 
+class StateUpdateBlock():
+    def __init__(self, hidden_states_size: int):
+        self.hidden_states_size = hidden_states_size
+        self.state_one_convolution = nn.Conv1d(self.hidden_states_size,
+                                                      self.hidden_states_size, 1)
+        self.state_two_convolution = nn.Conv1d(self.hidden_states_size,
+                                                      self.hidden_states_size, 1)
+
+    @staticmethod
+    def get_previous_state_column_static(previous_state_column, state_index: int,
+                                         hidden_states_size: int):
+        # print("previous memory state column: " + str(previous_memory_state_column))
+        if state_index == 100:
+            previous_memory_state_column_shifted = previous_state_column.clone()
+            height = previous_state_column.size(2)
+            zeros_padding = Variable(torch.zeros(previous_state_column.size(0), hidden_states_size, 1))
+            if MultiDimensionalRNNBase.use_cuda():
+                zeros_padding = zeros_padding.cuda()
+            skip_first_sub_tensor = previous_memory_state_column_shifted[:, :, 0:(height - 1)]
+            # print("zeros padding" + str(zeros_padding))
+            # print("skip_first_sub_tensor: " + str(skip_first_sub_tensor))
+            previous_memory_state_column_shifted = torch. \
+                cat((zeros_padding, skip_first_sub_tensor), 2)
+            # print("Returning previous_memory_state_column_shifted: " + str(previous_memory_state_column_shifted))
+            return previous_memory_state_column_shifted
+        return previous_state_column
+
+    def get_previous_state_column(self, previous_state_column, state_index: int):
+        return StateUpdateBlock.get_previous_state_column_static(previous_state_column,
+                                                                 state_index,
+                                                                 self.hidden_states_size)
+
+    @staticmethod
+    def compute_weighted_state_input_static(state_convolution, previous_state_column,
+                                            state_index: int, hidden_states_size):
+        return state_convolution(StateUpdateBlock.
+                                 get_previous_state_column_static(previous_state_column, state_index,
+                                                                  hidden_states_size))
+
+    def compute_weighted_state_input(self, state_convolution, previous_state_column,
+                                     state_index: int):
+        return state_convolution(self.get_previous_state_column(previous_state_column, state_index))
+
+    def compute_weighted_states_input(self, previous_state_column):
+        state_one_result = self.state_one_convolution(self.get_previous_state_column(previous_state_column, 1))
+        state_two_result = self.state_two_convolution(self.get_previous_state_column(previous_state_column, 2))
+        result = state_one_result + state_two_result
+        return result
+
+    def get_state_convolutions_as_list(self):
+        return [self.state_one_convolution, self.state_two_convolution]
 
 class MultiDimensionalRNN(MultiDimensionalRNNBase):
     def __init__(self, hidden_states_size, batch_size, compute_multi_directional: bool,
@@ -355,9 +405,11 @@ class MultiDimensionalRNN(MultiDimensionalRNNBase):
         super(MultiDimensionalRNN, self).__init__(hidden_states_size, batch_size,
                                                   compute_multi_directional,
                                                   nonlinearity)
-        self.hidden_state_convolution = nn.Conv1d(self.hidden_states_size,
-                                                  self.hidden_states_size, 2,
-                                                  padding=1)
+        self.state_update_block = StateUpdateBlock(hidden_states_size)
+        # This is necessary to make sure things are stored on the same gpu, otherwise
+        # pytorch doesn't realizes these convolutions are part of this module
+        self.state_convolutions = nn.ModuleList(self.state_update_block.get_state_convolutions_as_list())
+
         self.input_convolution = nn.Conv2d(self.input_channels,
                                            self.hidden_states_size, 1)
         # self.fc3 = nn.Linear(1024, 10)
@@ -380,7 +432,7 @@ class MultiDimensionalRNN(MultiDimensionalRNNBase):
         # skewed_image = ImageInputTransformer.create_row_diagonal_offset_tensor(x)
 
         # The image is 3-dimensional, but the convolution somehow
-        # requires 4-dimensional input. Why? This is probably because
+        # requires 4-dimensional input. Whdevice=gpus[0])y? This is probably because
         # one extra dimension is for channels, and the fourth dimension is for
         # doing multiple examples in a mini-batch in parallel
         # http://pytorch.org/tutorials/beginner/blitz/neural_networks_tutorial.html
@@ -406,13 +458,12 @@ class MultiDimensionalRNN(MultiDimensionalRNNBase):
 
         for column_number in range(0, skewed_image_columns):
             # Compute convolution on previous state column vector padded with zeros
-            state_column = MultiDimensionalRNNBase.compute_state_convolution_and_remove_bottom_padding(
-                self.hidden_state_convolution, previous_hidden_state_column, image_height)
+            state_columns_combined = self.state_update_block.compute_weighted_states_input(previous_hidden_state_column)
 
             # print("state_column.size(): " + str(state_column.size()))
-            state_plus_input = MultiDimensionalRNNBase.compute_state_plus_input(input_matrix,
-                                                                                column_number,
-                                                                                state_column)
+            state_plus_input = MultiDimensionalRNNBase.compute_states_plus_input(input_matrix,
+                                                                                 column_number,
+                                                                                 state_columns_combined)
             activation_column = self.get_activation_function()(state_plus_input)
             #print("activation column: " + str(activation_column))
             previous_hidden_state_column = activation_column
@@ -426,8 +477,7 @@ class MultiDimensionalRNN(MultiDimensionalRNNBase):
         #print("activations: " + str(activations))
         activations_unskewed = MultiDimensionalRNNBase.\
             extract_unskewed_activations(activations, original_image_columns,
-                                         skewed_image_columns, skewed_image_rows,
-                                         self.hidden_states_size)
+                                         skewed_image_columns, skewed_image_rows)
         #print("activations_unskewed: " + str(activations_unskewed))
         return activations_unskewed
 
