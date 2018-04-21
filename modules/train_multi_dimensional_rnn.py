@@ -59,34 +59,34 @@ def evaluate_mdrnn(multi_dimensional_rnn, batch_size):
             100 * correct / total))
 
 
-def train_mdrnn(batch_size, compute_multi_directional: bool):
+def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional: bool):
     import torch.optim as optim
 
     criterion = nn.CrossEntropyLoss()
-    #multi_dimensional_rnn = MultiDimensionalRNN.create_multi_dimensional_rnn(batch_size,
-    #                                                                         compute_multi_directional,
-    #                                                                         nonlinearity="sigmoid",
-    #                                                                         )
-    multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm(batch_size,
-                                                                               compute_multi_directional,
-                                                                               nonlinearity="sigmoid",
-                                                                              )
+    multi_dimensional_rnn = MultiDimensionalRNN.create_multi_dimensional_rnn(hidden_states_size,
+                                                                             batch_size,
+                                                                             compute_multi_directional,
+                                                                             nonlinearity="sigmoid",
+                                                                             )
+    #multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm(batch_size,
+    #                                                                           compute_multi_directional,
+    #                                                                           nonlinearity="sigmoid",
+    #                                                                          )
     #multi_dimensional_rnn = Net()
 
     if MultiDimensionalRNNBase.use_cuda():
         multi_dimensional_rnn = multi_dimensional_rnn.cuda()
 
-
-    #optimizer = optim.SGD(multi_dimensional_rnn.parameters(), lr=0.001, momentum=0.9)
+    optimizer = optim.SGD(multi_dimensional_rnn.parameters(), lr=0.001, momentum=0.9)
 
     # Faster learning
-    optimizer = optim.SGD(multi_dimensional_rnn.parameters(), lr=0.01, momentum=0.9)
+    #optimizer = optim.SGD(multi_dimensional_rnn.parameters(), lr=0.01, momentum=0.9)
 
     trainloader = data_preprocessing.load_mnist.get_train_loader(batch_size)
 
     start = time.time()
 
-    for epoch in range(4):  # loop over the dataset multiple times
+    for epoch in range(2):  # loop over the dataset multiple times
 
         running_loss = 0.0
         for i, data in enumerate(trainloader, 0):
@@ -117,7 +117,7 @@ def train_mdrnn(batch_size, compute_multi_directional: bool):
             # forward + backward + optimize
             #outputs = multi_dimensional_rnn(Variable(inputs))  # For "Net" (Le Net)
             outputs = multi_dimensional_rnn(inputs)
-            #print("outputs: " + str(outputs))
+            # print("outputs: " + str(outputs))
             #print("labels: " + str(labels))
             loss = criterion(outputs, labels)
             loss.backward()
@@ -142,9 +142,10 @@ def train_mdrnn(batch_size, compute_multi_directional: bool):
 def main():
     # test_mdrnn_cell()
     #test_mdrnn()
+    hidden_states_size = 128
     batch_size = 128
     compute_multi_directional = False
-    train_mdrnn(batch_size, compute_multi_directional)
+    train_mdrnn(hidden_states_size, batch_size,  compute_multi_directional)
 
 
 if __name__ == "__main__":

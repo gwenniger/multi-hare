@@ -15,57 +15,57 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                                   nonlinearity)
         # Input
         self.input_input_convolution = nn.Conv2d(self.input_channels,
-                                                 self.output_channels, 1)
+                                                 self.hidden_states_size, 1)
         self.input_hidden_state_convolution = nn.Conv1d(self.input_channels,
-                                                        self.output_channels, 2,
+                                                        self.hidden_states_size, 2,
                                                         padding=1)
 
         # Input gate
         self.input_gate_input_convolution = nn.Conv2d(self.input_channels,
-                                                      self.output_channels, 1)
+                                                      self.hidden_states_size, 1)
         self.input_gate_hidden_state_convolution = nn.Conv1d(self.input_channels,
-                                                             self.output_channels, 2,
+                                                             self.hidden_states_size, 2,
                                                              padding=1)
         self.input_gate_memory_state_convolution = nn.Conv1d(self.input_channels,
-                                                             self.output_channels, 2,
+                                                             self.hidden_states_size, 2,
                                                              padding=1)
 
         FORGET_GATE_BIAS_INIT = 1
 
         # Forget gate 1
         self.forget_gate_one_input_convolution = nn.Conv2d(self.input_channels,
-                                                           self.output_channels, 1)
+                                                           self.hidden_states_size, 1)
         self.forget_gate_one_input_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
         self.forget_gate_one_hidden_state_convolution = nn.Conv1d(self.input_channels,
-                                                                  self.output_channels, 2,
+                                                                  self.hidden_states_size, 2,
                                                                   padding=1)
         self.forget_gate_one_hidden_state_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
         self.forget_gate_one_memory_state_convolution = nn.Conv1d(self.input_channels,
-                                                                  self.output_channels, 1)
+                                                                  self.hidden_states_size, 1)
         self.forget_gate_one_memory_state_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
 
 
         # Forget gate 2
         self.forget_gate_two_input_convolution = nn.Conv2d(self.input_channels,
-                                                           self.output_channels, 1)
+                                                           self.hidden_states_size, 1)
         self.forget_gate_two_input_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
         self.forget_gate_two_hidden_state_convolution = nn.Conv1d(self.input_channels,
-                                                                  self.output_channels, 2,
+                                                                  self.hidden_states_size, 2,
                                                                   padding=1)
         self.forget_gate_two_hidden_state_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
         self.forget_gate_two_memory_state_convolution = nn.Conv1d(self.input_channels,
-                                                                  self.output_channels, 1)
+                                                                  self.hidden_states_size, 1)
         self.forget_gate_two_memory_state_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
 
         # Output gate
         self.output_gate_input_convolution = nn.Conv2d(self.input_channels,
-                                                           self.output_channels, 1)
+                                                       self.hidden_states_size, 1)
         self.output_gate_hidden_state_convolution = nn.Conv1d(self.input_channels,
-                                                                  self.output_channels, 2,
-                                                                  padding=1)
+                                                              self.hidden_states_size, 2,
+                                                              padding=1)
         self.output_gate_memory_state_convolution = nn.Conv1d(self.input_channels,
-                                                                  self.output_channels, 2,
-                                                                  padding = 1)
+                                                              self.hidden_states_size, 2,
+                                                              padding = 1)
 
 
         # self.fc3 = nn.Linear(1024, 10)
@@ -88,14 +88,14 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         image_height = x.size(2)
         # print("image height: " + str(image_height))
         previous_hidden_state_column = Variable(torch.zeros(self.input_channels,
-                                                            self.output_channels,
+                                                            self.hidden_states_size,
                                                             image_height))
         # Todo: I'm confused about the dimensions of previous_memory_state
         # and previous_hidden_state: why the latter has dimension equal to
         # batch size but for the former it doesn't seem to matter
         previous_memory_state_column = Variable(torch.zeros(self.input_channels,
-                                                           self.output_channels,
-                                                           image_height))
+                                                            self.hidden_states_size,
+                                                            image_height))
 
         if MultiDimensionalRNNBase.use_cuda():
             previous_hidden_state_column = previous_hidden_state_column.cuda()

@@ -155,14 +155,15 @@ class MDRNNCell(MDRNNCellBase):
 
 
 class MultiDimensionalRNNBase(torch.nn.Module):
-    def __init__(self, batch_size,  compute_multi_directional: bool,
+    def __init__(self, hidden_states_size: int,
+                 batch_size,  compute_multi_directional: bool,
                  nonlinearity="tanh",):
         super(MultiDimensionalRNNBase, self).__init__()
 
         self.batch_size = batch_size
         self.nonlinearity = nonlinearity
         self.input_channels = 1
-        self.output_channels = 1
+        self.hidden_states_size = hidden_states_size
         self.selection_tensor = Variable(self.create_torch_indices_selection_tensor(batch_size))
         if MultiDimensionalRNNBase.use_cuda():
             self.selection_tensor = self.selection_tensor.cuda()
@@ -289,27 +290,33 @@ class MultiDimensionalRNNBase(torch.nn.Module):
     def extract_unskewed_activations(activations,
                                      original_image_columns: int,
                                      skewed_image_columns: int,
-                                     skewed_image_rows: int):
+                                     skewed_image_rows: int,
+                                     hidden_states_size: int):
 
         # print("original image columns: " + str(original_image_columns))
 
         # How to unskew the activation matrix, and retrieve an activation
         # matrix of the original image size?
-        activations_column_transposed = torch.transpose(activations[0], 1, 2)
-        activations_as_tensor = activations_column_transposed
+        activations_column = activations[0]
+        # Columns will be horizontally concatenated, add extra dimension for this concatenation
+        activations_column_unsqueezed = torch.unsqueeze(activations_column, 3)
+        activations_as_tensor = activations_column_unsqueezed
         for column_number in range(1, skewed_image_columns):
-            activations_column_transposed = torch.transpose(activations[column_number], 1, 2)
-            activations_as_tensor = torch.cat((activations_as_tensor, activations_column_transposed), 2)
+            # print("activations[column_number]: " + str(activations[column_number]))
+            activations_column = activations[column_number]
+            # print("activations column: " + str(activations_column))
+            activations_column_unsqueezed = torch.unsqueeze(activations_column, 3)
+            activations_as_tensor = torch.cat((activations_as_tensor, activations_column_unsqueezed), 3)
         # print("activations_as_tensor: " + str(activations_as_tensor))
 
-        activations_unskewed = activations_as_tensor[:, 0, 0:original_image_columns]
-        activations_unskewed = torch.unsqueeze(activations_unskewed, 1)
+        activations_unskewed = activations_as_tensor[:, :, 0, 0:original_image_columns]
+        activations_unskewed = torch.unsqueeze(activations_unskewed, 2)
         # print("activations_unskewed before:" + str(activations_unskewed))
         for row_number in range(1, skewed_image_rows):
-            activations = activations_as_tensor[:, row_number, row_number: (original_image_columns + row_number)]
-            activations = torch.unsqueeze(activations, 1)
+            activations = activations_as_tensor[:, :, row_number, row_number: (original_image_columns + row_number)]
+            activations = torch.unsqueeze(activations, 2)
             # print("activations:" + str(activations))
-            activations_unskewed = torch.cat((activations_unskewed, activations), 1)
+            activations_unskewed = torch.cat((activations_unskewed, activations), 2)
         # print("activations_unskewed: " + str(activations_unskewed))
         return activations_unskewed
 
@@ -317,6 +324,8 @@ class MultiDimensionalRNNBase(torch.nn.Module):
     def compute_state_convolution_and_remove_bottom_padding(convolution_layer,
                                                             previous_state_column,
                                                             image_height):
+        # print("previous_state_column: " + str(previous_state_column))
+
         # Compute convolution on previous state column vector padded with zeros
         state_column_both_sides_padding = convolution_layer(previous_state_column)
         # Throw away the last element, which comes from padding on the bottom, as
@@ -334,27 +343,28 @@ class MultiDimensionalRNNBase(torch.nn.Module):
 
 
 class MultiDimensionalRNN(MultiDimensionalRNNBase):
-    def __init__(self, batch_size, compute_multi_directional: bool,
+    def __init__(self, hidden_states_size, batch_size, compute_multi_directional: bool,
                  nonlinearity="tanh"):
-        super(MultiDimensionalRNN, self).__init__(batch_size,
+        super(MultiDimensionalRNN, self).__init__(hidden_states_size, batch_size,
                                                   compute_multi_directional,
                                                   nonlinearity)
-        self.hidden_state_convolution = nn.Conv1d(self.input_channels,
-                                                  self.output_channels, 2,
+        self.hidden_state_convolution = nn.Conv1d(self.hidden_states_size,
+                                                  self.hidden_states_size, 2,
                                                   padding=1)
         self.input_convolution = nn.Conv2d(self.input_channels,
-                                           self.output_channels, 1)
+                                           self.hidden_states_size, 1)
         # self.fc3 = nn.Linear(1024, 10)
         # For multi-directional rnn
         if self.compute_multi_directional:
-            self.fc3 = nn.Linear(1024 * 4, 10)
+            self.fc3 = nn.Linear(1024 * 4 * self.hidden_states_size, 10)
         else:
-            self.fc3 = nn.Linear(1024, 10)
+            self.fc3 = nn.Linear(1024 * self.hidden_states_size, 10)
 
     @staticmethod
-    def create_multi_dimensional_rnn(batch_size,  compute_multi_directional: bool,
+    def create_multi_dimensional_rnn(hidden_states_size: int, batch_size: int,  compute_multi_directional: bool,
                                      nonlinearity="tanh"):
-        return MultiDimensionalRNN(batch_size, compute_multi_directional, nonlinearity)
+        return MultiDimensionalRNN(hidden_states_size, batch_size, compute_multi_directional,
+                                   nonlinearity)
 
     def compute_multi_dimensional_rnn_one_direction(self, x):
         # Step 1: Create a skewed version of the input image
@@ -371,8 +381,8 @@ class MultiDimensionalRNN(MultiDimensionalRNNBase):
         number_of_examples = x.size(0)
         # print("image height: " + str(image_height))
         previous_hidden_state_column = Variable(torch.zeros(self.input_channels,
-                                                     self.output_channels,
-                                                     image_height))
+                                                            self.hidden_states_size,
+                                                            image_height))
         if MultiDimensionalRNNBase.use_cuda():
             previous_hidden_state_column = previous_hidden_state_column.cuda()
 
@@ -395,23 +405,26 @@ class MultiDimensionalRNN(MultiDimensionalRNNBase):
                                                                                 column_number,
                                                                                 state_column)
             activation_column = self.get_activation_function()(state_plus_input)
-            # print("activation: " + str(activation_column))
+            #print("activation column: " + str(activation_column))
             previous_hidden_state_column = activation_column
             activations.append(activation_column)
+            #print("activations length: " + str(len(activations)))
 
         original_image_columns = x.size(2)
         skewed_image_rows = skewed_images_variable.size(2)
         #print("Skewed image rows: " + str(skewed_image_rows))
 
+        #print("activations: " + str(activations))
         activations_unskewed = MultiDimensionalRNNBase.\
             extract_unskewed_activations(activations, original_image_columns,
-                                         skewed_image_columns, skewed_image_rows)
-        # print("activations_unskewed: " + str(activations_unskewed))
+                                         skewed_image_columns, skewed_image_rows,
+                                         self.hidden_states_size)
+        #print("activations_unskewed: " + str(activations_unskewed))
         return activations_unskewed
 
     def forward_one_directional_multi_dimensional_rnn(self, x):
         activations_unskewed = self.compute_multi_dimensional_rnn_one_direction(x)
-        activations_one_dimensional = activations_unskewed.view(-1, 1024)
+        activations_one_dimensional = activations_unskewed.view(-1, 1024 * self.hidden_states_size)
         # print("activations_one_dimensional: " + str(activations_one_dimensional))
         # It is nescessary to output a tensor of size 10, for 10 different output classes
         result = self.fc3(activations_one_dimensional)
