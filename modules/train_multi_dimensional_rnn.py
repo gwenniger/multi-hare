@@ -68,7 +68,7 @@ def train_mdrnn(batch_size, compute_multi_directional: bool):
     #                                                                         nonlinearity="sigmoid",
     #                                                                         )
     multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm(batch_size,
-                                                                               False,
+                                                                               compute_multi_directional,
                                                                                nonlinearity="sigmoid",
                                                                               )
     #multi_dimensional_rnn = Net()
@@ -76,7 +76,11 @@ def train_mdrnn(batch_size, compute_multi_directional: bool):
     if MultiDimensionalRNNBase.use_cuda():
         multi_dimensional_rnn = multi_dimensional_rnn.cuda()
 
-    optimizer = optim.SGD(multi_dimensional_rnn.parameters(), lr=0.001, momentum=0.9)
+
+    #optimizer = optim.SGD(multi_dimensional_rnn.parameters(), lr=0.001, momentum=0.9)
+
+    # Faster learning
+    optimizer = optim.SGD(multi_dimensional_rnn.parameters(), lr=0.01, momentum=0.9)
 
     trainloader = data_preprocessing.load_mnist.get_train_loader(batch_size)
 
@@ -139,7 +143,7 @@ def main():
     # test_mdrnn_cell()
     #test_mdrnn()
     batch_size = 128
-    compute_multi_directional = True
+    compute_multi_directional = False
     train_mdrnn(batch_size, compute_multi_directional)
 
 

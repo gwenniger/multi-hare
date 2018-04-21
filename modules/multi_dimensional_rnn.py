@@ -13,6 +13,7 @@ from util.image_input_transformer import ImageInputTransformer
 import torch.nn as nn
 import time
 import util.tensor_flipping
+from abc import ABCMeta, abstractmethod
 
 
 class MDRNNCellBase(Module):
@@ -166,6 +167,75 @@ class MultiDimensionalRNNBase(torch.nn.Module):
         if MultiDimensionalRNNBase.use_cuda():
             self.selection_tensor = self.selection_tensor.cuda()
         self.compute_multi_directional = compute_multi_directional
+
+    # This function is slow because all four function calls for 4 directions are
+    # executed sequentially. It isn't entirely clear how to optimize this.
+    # See the discussion at:
+    # https://discuss.pytorch.org/t/is-there-a-way-to-parallelize-independent-sequential-steps/3360
+    def forward_multi_directional_multi_dimensional_function_fast(self, x):
+        # print("list(x.size()): " + str(list(x.size())))
+
+        x_direction_two = util.tensor_flipping.flip(x, 2)
+        x_direction_three = util.tensor_flipping.flip(x, 3)
+        x_direction_four = util.tensor_flipping.flip(util.tensor_flipping.flip(x, 2), 3)
+        x_multiple_directions = torch.cat((x, x_direction_two, x_direction_three, x_direction_four), 0)
+
+        number_of_examples = x.size(0)
+        # print("number of examples: " + str(number_of_examples))
+
+        # Original order
+        activations_unskewed = self._compute_multi_dimensional_function_one_direction(x_multiple_directions)
+        if number_of_examples == self.batch_size:
+            selection_tensor = self.selection_tensor
+        else:
+            selection_tensor = Variable(MultiDimensionalRNNBase.create_torch_indices_selection_tensor(
+                number_of_examples))
+            if MultiDimensionalRNNBase.use_cuda():
+                selection_tensor = selection_tensor.cuda()
+
+        # print("activations_unskewed: " + str(activations_unskewed))
+        # print("selection_tensor: " + str(selection_tensor))
+
+        # Using tor.index_select we can bring together the activations of the four
+        # different rotations, while avoiding use of a for loop, making the whole thing
+        # hopefully faster
+        activations_selected = torch.index_select(activations_unskewed, 0, selection_tensor)
+        # print("activations_selected: " + str(activations_selected))
+
+        # activations_rearranged = torch.cat((activations_unskewed[0, :, :],
+        #                                     activations_unskewed[number_of_examples, :, :],
+        #                                     activations_unskewed[number_of_examples * 2, :, :],
+        #                                     activations_unskewed[number_of_examples * 3, :, :],), 0)
+        # activations_rearranged = activations_rearranged.unsqueeze(0)
+        # print("activations_rearranged: " + str(activations_rearranged))
+        # for i in range(1, number_of_examples):
+        #    activations_rearranged_row = torch.cat((activations_unskewed[i, :, :],
+        #                                         activations_unskewed[number_of_examples + 1, :, :],
+        #                                         activations_unskewed[number_of_examples * 2 + i, :, :],
+        #                                         activations_unskewed[number_of_examples * 3 + i, :, :],), 0)
+        #    activations_rearranged_row = activations_rearranged_row.unsqueeze(0)
+        #    activations_rearranged = torch.cat((activations_rearranged, activations_rearranged_row), 0)
+
+        # print("activations_rearranged: " + str(activations_rearranged))
+        activations_one_dimensional = activations_selected.view(-1, 32 * 32 * 4)
+        # activations_one_dimensional = activations_rearranged.view(-1, 32 * 32 * 4)
+
+        # print("activations_combined: " + str(activations_combined))
+
+        # print("activations_one_dimensional: " + str(activations_one_dimensional))
+        # It is nescessary to output a tensor of size 10, for 10 different output classes
+        result = self._final_activation_function(activations_one_dimensional)
+        return result
+
+    # Needs to be implemented in the subclasses
+    @abstractmethod
+    def _final_activation_function(self, final_activation_function_input):
+        raise RuntimeError("not implemented")
+
+    # Needs to be implemented in the subclasses
+    @abstractmethod
+    def _compute_multi_dimensional_function_one_direction(self, function_input):
+        raise RuntimeError("not implemented")
 
     @staticmethod
     def use_cuda():
@@ -385,73 +455,22 @@ class MultiDimensionalRNN(MultiDimensionalRNNBase):
         result = self.fc3(activations_combined)
         return result
 
-    # This function is slow because all four function calls for 4 directions are
-    # executed sequentially. It isn't entirely clear how to optimize this.
-    # See the discussion at:
-    # https://discuss.pytorch.org/t/is-there-a-way-to-parallelize-independent-sequential-steps/3360
-    def forward_multi_directional_multi_dimensional_rnn_fast(self, x):
-        # print("list(x.size()): " + str(list(x.size())))
 
-        x_direction_two = util.tensor_flipping.flip(x, 2)
-        x_direction_three = util.tensor_flipping.flip(x, 3)
-        x_direction_four = util.tensor_flipping.flip(util.tensor_flipping.flip(x, 2), 3)
-        x_multiple_directions = torch.cat((x, x_direction_two, x_direction_three, x_direction_four), 0)
-
-        number_of_examples = x.size(0)
-        #print("number of examples: " + str(number_of_examples))
-
-        # Original order
-        activations_unskewed = self.compute_multi_dimensional_rnn_one_direction(x_multiple_directions)
-        if number_of_examples == self.batch_size:
-            selection_tensor = self.selection_tensor
-        else:
-            selection_tensor = Variable(MultiDimensionalRNNBase.create_torch_indices_selection_tensor(
-                number_of_examples))
-            if MultiDimensionalRNNBase.use_cuda():
-                selection_tensor = selection_tensor.cuda()
-
-        #print("activations_unskewed: " + str(activations_unskewed))
-        #print("selection_tensor: " + str(selection_tensor))
-
-        # Using tor.index_select we can bring together the activations of the four
-        # different rotations, while avoiding use of a for loop, making the whole thing
-        # hopefully faster
-        activations_selected = torch.index_select(activations_unskewed, 0, selection_tensor)
-        #print("activations_selected: " + str(activations_selected))
-
-        #activations_rearranged = torch.cat((activations_unskewed[0, :, :],
-        #                                     activations_unskewed[number_of_examples, :, :],
-        #                                     activations_unskewed[number_of_examples * 2, :, :],
-        #                                     activations_unskewed[number_of_examples * 3, :, :],), 0)
-        #activations_rearranged = activations_rearranged.unsqueeze(0)
-        #print("activations_rearranged: " + str(activations_rearranged))
-        #for i in range(1, number_of_examples):
-        #    activations_rearranged_row = torch.cat((activations_unskewed[i, :, :],
-        #                                         activations_unskewed[number_of_examples + 1, :, :],
-        #                                         activations_unskewed[number_of_examples * 2 + i, :, :],
-        #                                         activations_unskewed[number_of_examples * 3 + i, :, :],), 0)
-        #    activations_rearranged_row = activations_rearranged_row.unsqueeze(0)
-        #    activations_rearranged = torch.cat((activations_rearranged, activations_rearranged_row), 0)
-
-        #print("activations_rearranged: " + str(activations_rearranged))
-        activations_one_dimensional = activations_selected.view(-1, 32 * 32 * 4)
-        #activations_one_dimensional = activations_rearranged.view(-1, 32 * 32 * 4)
-
-        # print("activations_combined: " + str(activations_combined))
-
-        # print("activations_one_dimensional: " + str(activations_one_dimensional))
-        # It is nescessary to output a tensor of size 10, for 10 different output classes
-        result = self.fc3(activations_one_dimensional)
-        return result
 
     # Input tensor x is a batch of image tensors
     def forward(self, x):
         if self.compute_multi_directional:
             # return self.forward_multi_directional_multi_dimensional_rnn(x)
-            return self.forward_multi_directional_multi_dimensional_rnn_fast(x)
+            return self.forward_multi_directional_multi_dimensional_function_fast(x)
         else:
             return self.forward_one_directional_multi_dimensional_rnn(x)
 
+    def _final_activation_function(self, final_activation_function_input):
+        return self.fc3(final_activation_function_input)
+
+    # Needs to be implemented in the subclasses
+    def _compute_multi_dimensional_function_one_direction(self, function_input):
+        return self.compute_multi_dimensional_rnn_one_direction(function_input)
 
 class Net(nn.Module):
     def __init__(self):
