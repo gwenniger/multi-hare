@@ -218,7 +218,7 @@ class MultiDimensionalRNNBase(torch.nn.Module):
         #    activations_rearranged = torch.cat((activations_rearranged, activations_rearranged_row), 0)
 
         # print("activations_rearranged: " + str(activations_rearranged))
-        activations_one_dimensional = activations_selected.view(-1, 32 * 32 * 4)
+        activations_one_dimensional = activations_selected.view(-1, self.number_of_output_dimensions())
         # activations_one_dimensional = activations_rearranged.view(-1, 32 * 32 * 4)
 
         # print("activations_combined: " + str(activations_combined))
@@ -341,6 +341,13 @@ class MultiDimensionalRNNBase(torch.nn.Module):
         # print("state_plus_input: " + str(state_plus_input))
         return state_plus_input
 
+    def number_of_output_dimensions(self):
+        result = 1024 * self.hidden_states_size
+        if self.compute_multi_directional:
+            result = result * 4
+        return result
+
+
 
 class MultiDimensionalRNN(MultiDimensionalRNNBase):
     def __init__(self, hidden_states_size, batch_size, compute_multi_directional: bool,
@@ -356,9 +363,11 @@ class MultiDimensionalRNN(MultiDimensionalRNNBase):
         # self.fc3 = nn.Linear(1024, 10)
         # For multi-directional rnn
         if self.compute_multi_directional:
-            self.fc3 = nn.Linear(1024 * 4 * self.hidden_states_size, 10)
+            self.fc3 = nn.Linear(self.number_of_output_dimensions(), 10)
         else:
-            self.fc3 = nn.Linear(1024 * self.hidden_states_size, 10)
+            self.fc3 = nn.Linear(self.number_of_output_dimensions(), 10)
+
+
 
     @staticmethod
     def create_multi_dimensional_rnn(hidden_states_size: int, batch_size: int,  compute_multi_directional: bool,
@@ -424,7 +433,7 @@ class MultiDimensionalRNN(MultiDimensionalRNNBase):
 
     def forward_one_directional_multi_dimensional_rnn(self, x):
         activations_unskewed = self.compute_multi_dimensional_rnn_one_direction(x)
-        activations_one_dimensional = activations_unskewed.view(-1, 1024 * self.hidden_states_size)
+        activations_one_dimensional = activations_unskewed.view(-1, self.number_of_output_dimensions())
         # print("activations_one_dimensional: " + str(activations_one_dimensional))
         # It is nescessary to output a tensor of size 10, for 10 different output classes
         result = self.fc3(activations_one_dimensional)
@@ -479,6 +488,7 @@ class MultiDimensionalRNN(MultiDimensionalRNNBase):
             return self.forward_one_directional_multi_dimensional_rnn(x)
 
     def _final_activation_function(self, final_activation_function_input):
+        # print("final_activation_function_input: " + str(final_activation_function_input))
         return self.fc3(final_activation_function_input)
 
     # Needs to be implemented in the subclasses

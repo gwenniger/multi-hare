@@ -16,17 +16,17 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         # Input
         self.input_input_convolution = nn.Conv2d(self.input_channels,
                                                  self.hidden_states_size, 1)
-        self.input_hidden_state_convolution = nn.Conv1d(self.input_channels,
+        self.input_hidden_state_convolution = nn.Conv1d(self.hidden_states_size,
                                                         self.hidden_states_size, 2,
                                                         padding=1)
 
         # Input gate
         self.input_gate_input_convolution = nn.Conv2d(self.input_channels,
                                                       self.hidden_states_size, 1)
-        self.input_gate_hidden_state_convolution = nn.Conv1d(self.input_channels,
+        self.input_gate_hidden_state_convolution = nn.Conv1d(self.hidden_states_size,
                                                              self.hidden_states_size, 2,
                                                              padding=1)
-        self.input_gate_memory_state_convolution = nn.Conv1d(self.input_channels,
+        self.input_gate_memory_state_convolution = nn.Conv1d(self.hidden_states_size,
                                                              self.hidden_states_size, 2,
                                                              padding=1)
 
@@ -36,11 +36,11 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         self.forget_gate_one_input_convolution = nn.Conv2d(self.input_channels,
                                                            self.hidden_states_size, 1)
         self.forget_gate_one_input_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
-        self.forget_gate_one_hidden_state_convolution = nn.Conv1d(self.input_channels,
+        self.forget_gate_one_hidden_state_convolution = nn.Conv1d(self.hidden_states_size,
                                                                   self.hidden_states_size, 2,
                                                                   padding=1)
         self.forget_gate_one_hidden_state_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
-        self.forget_gate_one_memory_state_convolution = nn.Conv1d(self.input_channels,
+        self.forget_gate_one_memory_state_convolution = nn.Conv1d(self.hidden_states_size,
                                                                   self.hidden_states_size, 1)
         self.forget_gate_one_memory_state_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
 
@@ -49,31 +49,29 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         self.forget_gate_two_input_convolution = nn.Conv2d(self.input_channels,
                                                            self.hidden_states_size, 1)
         self.forget_gate_two_input_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
-        self.forget_gate_two_hidden_state_convolution = nn.Conv1d(self.input_channels,
+        self.forget_gate_two_hidden_state_convolution = nn.Conv1d(self.hidden_states_size,
                                                                   self.hidden_states_size, 2,
                                                                   padding=1)
         self.forget_gate_two_hidden_state_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
-        self.forget_gate_two_memory_state_convolution = nn.Conv1d(self.input_channels,
+        self.forget_gate_two_memory_state_convolution = nn.Conv1d(self.hidden_states_size,
                                                                   self.hidden_states_size, 1)
         self.forget_gate_two_memory_state_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
 
         # Output gate
         self.output_gate_input_convolution = nn.Conv2d(self.input_channels,
                                                        self.hidden_states_size, 1)
-        self.output_gate_hidden_state_convolution = nn.Conv1d(self.input_channels,
+        self.output_gate_hidden_state_convolution = nn.Conv1d(self.hidden_states_size,
                                                               self.hidden_states_size, 2,
                                                               padding=1)
-        self.output_gate_memory_state_convolution = nn.Conv1d(self.input_channels,
+        self.output_gate_memory_state_convolution = nn.Conv1d(self.hidden_states_size,
                                                               self.hidden_states_size, 2,
-                                                              padding = 1)
+                                                              padding=1)
 
-
-        # self.fc3 = nn.Linear(1024, 10)
         # For multi-directional rnn
         if self.compute_multi_directional:
-            self.fc3 = nn.Linear(1024 * 4, 10)
+            self.fc3 = nn.Linear(self.number_of_output_dimensions(), 10)
         else:
-            self.fc3 = nn.Linear(1024, 10)
+            self.fc3 = nn.Linear(self.number_of_output_dimensions(), 10)
 
     @staticmethod
     def create_multi_dimensional_lstm(batch_size, compute_multi_directional: bool,

@@ -142,9 +142,9 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
 def main():
     # test_mdrnn_cell()
     #test_mdrnn()
-    hidden_states_size = 128
+    hidden_states_size = 64
     batch_size = 128
-    compute_multi_directional = False
+    compute_multi_directional = True
     train_mdrnn(hidden_states_size, batch_size,  compute_multi_directional)
 
 
