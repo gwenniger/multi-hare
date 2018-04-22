@@ -1,5 +1,6 @@
 from modules.multi_dimensional_rnn import MultiDimensionalRNN
 from modules.multi_dimensional_rnn import MultiDimensionalRNNBase
+import util.tensor_flipping
 import torch
 from torch.autograd import Variable
 import torch.nn.functional as F
@@ -8,12 +9,11 @@ import torch.nn as nn
 from modules.multi_dimensional_rnn import StateUpdateBlock
 
 
-class MultiDimensionalLSTM(MultiDimensionalRNNBase):
-    def __init__(self, hidden_states_size, batch_size, compute_multi_directional: bool,
-                 nonlinearity="tanh"):
-        super(MultiDimensionalLSTM, self).__init__(hidden_states_size, batch_size,
-                                                   compute_multi_directional,
-                                                   nonlinearity)
+class MultiDimensionalLSTMParametersOneDirection():
+    def __init__(self, hidden_states_size, input_channels):
+        self.input_channels = input_channels
+        self.hidden_states_size = hidden_states_size
+
         # Input
         self.input_input_convolution = nn.Conv2d(self.input_channels,
                                                  self.hidden_states_size, 1)
@@ -56,38 +56,77 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         self.output_gate_memory_state_convolution = nn.Conv1d(self.hidden_states_size,
                                                                   self.hidden_states_size, 1)
 
+    def get_all_parameters_as_list(self):
+        result = list([])
+        result.append(self.input_input_convolution)
+        result.append(self.input_gate_input_convolution)
+        result.append(self.forget_gate_one_input_convolution)
+        result.append(self.forget_gate_two_input_convolution)
+        result.append(self.output_gate_input_convolution)
+        result.append(self.output_gate_memory_state_convolution)
+        result.append(self.forget_gate_one_memory_state_convolution)
+        result.append(self.forget_gate_two_memory_state_convolution)
+        result.extend(self.input_hidden_state_update_block.get_state_convolutions_as_list())
+        result.extend(self.input_gate_hidden_state_update_block.get_state_convolutions_as_list())
+        result.extend(self.input_gate_memory_state_update_block.get_state_convolutions_as_list())
+        result.extend(self.forget_gate_one_hidden_state_update_block.get_state_convolutions_as_list())
+        result.extend(self.forget_gate_two_hidden_state_update_block.get_state_convolutions_as_list())
+        result.extend(self.output_gate_hidden_state_update_block.get_state_convolutions_as_list())
+
+        return result
+
+
+class MultiDimensionalLSTM(MultiDimensionalRNNBase):
+
+    def __init__(self, hidden_states_size, batch_size, compute_multi_directional: bool,
+                 nonlinearity="tanh"):
+        super(MultiDimensionalLSTM, self).__init__(hidden_states_size, batch_size,
+                                                  compute_multi_directional,
+                                                  nonlinearity)
+
+        self.mdlstm_direction_one_parameters = \
+            MultiDimensionalLSTMParametersOneDirection(self.hidden_states_size, self.input_channels)
+
         # For multi-directional rnn
         if self.compute_multi_directional:
             self.fc3 = nn.Linear(self.number_of_output_dimensions(), 10)
+            self.mdlstm_direction_two_parameters = \
+                MultiDimensionalLSTMParametersOneDirection(self.hidden_states_size, self.input_channels)
+            self.mdlstm_direction_three_parameters = \
+                MultiDimensionalLSTMParametersOneDirection(self.hidden_states_size, self.input_channels)
+            self.mdlstm_direction_four_parameters = \
+                MultiDimensionalLSTMParametersOneDirection(self.hidden_states_size, self.input_channels)
+
+            self.set_bias_forget_gates_to_one(self.mdlstm_direction_two_parameters)
+            self.set_bias_forget_gates_to_one(self.mdlstm_direction_three_parameters)
+            self.set_bias_forget_gates_to_one(self.mdlstm_direction_four_parameters)
         else:
             self.fc3 = nn.Linear(self.number_of_output_dimensions(), 10)
 
         # Set initial bias for the forget gates to one, since it is known to give better results
-        self.set_bias_forget_gates_to_one()
+        self.set_bias_forget_gates_to_one(self.mdlstm_direction_one_parameters)
 
         self.state_convolutions = nn.ModuleList([])
         self.register_parameters_to_assure_same_gpu_is_used()
 
-    def set_bias_forget_gates_to_one(self):
-        FORGET_GATE_BIAS_INIT = 1
-        self.forget_gate_one_input_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
-        self.forget_gate_one_hidden_state_update_block.set_bias_for_convolutions(FORGET_GATE_BIAS_INIT)
-        self.forget_gate_one_memory_state_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
 
-        self.forget_gate_two_input_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
-        self.forget_gate_two_hidden_state_update_block.set_bias_for_convolutions(FORGET_GATE_BIAS_INIT)
-        self.forget_gate_two_memory_state_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
+    def set_bias_forget_gates_to_one(self, mdlstm_parameters):
+        FORGET_GATE_BIAS_INIT = 1
+        #self.forget_gate_one_input_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
+        #self.forget_gate_one_hidden_state_update_block.set_bias_for_convolutions(FORGET_GATE_BIAS_INIT)
+        mdlstm_parameters.forget_gate_one_memory_state_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
+
+        #self.forget_gate_two_input_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
+        #self.forget_gate_two_hidden_state_update_block.set_bias_for_convolutions(FORGET_GATE_BIAS_INIT)
+        mdlstm_parameters.forget_gate_two_memory_state_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
 
     def register_parameters_to_assure_same_gpu_is_used(self):
-        # This is necessary to make sure things are stored on the same gpu, otherwise
-        # pytorch doesn't realizes these convolutions are part of this module
-        # See: # https://discuss.pytorch.org/t/runtime-error-tensors-are-on-different-gpus/2100/8
-        self.state_convolutions.extend(self.input_hidden_state_update_block.get_state_convolutions_as_list())
-        self.state_convolutions.extend(self.input_gate_hidden_state_update_block.get_state_convolutions_as_list())
-        self.state_convolutions.extend(self.input_gate_memory_state_update_block.get_state_convolutions_as_list())
-        self.state_convolutions.extend(self.forget_gate_one_hidden_state_update_block.get_state_convolutions_as_list())
-        self.state_convolutions.extend(self.forget_gate_two_hidden_state_update_block.get_state_convolutions_as_list())
-        self.state_convolutions.extend(self.output_gate_hidden_state_update_block.get_state_convolutions_as_list())
+        self.state_convolutions.extend(self.mdlstm_direction_one_parameters.get_all_parameters_as_list())
+
+        if self.compute_multi_directional:
+            self.state_convolutions.extend(self.mdlstm_direction_two_parameters.get_all_parameters_as_list())
+            self.state_convolutions.extend(self.mdlstm_direction_three_parameters.get_all_parameters_as_list())
+            self.state_convolutions.extend(self.mdlstm_direction_four_parameters.get_all_parameters_as_list())
 
 
     @staticmethod
@@ -95,7 +134,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                      nonlinearity="tanh"):
         return MultiDimensionalLSTM(hidden_states_size, batch_size, compute_multi_directional, nonlinearity)
 
-    def compute_multi_dimensional_lstm_one_direction(self, x):
+    def compute_multi_dimensional_lstm_one_direction(self, mdlstm_parameters, x):
         # Step 1: Create a skewed version of the input image
         # skewed_image = ImageInputTransformer.create_row_diagonal_offset_tensor(x)
         skewed_images_variable = MultiDimensionalRNNBase.create_skewed_images_variable_four_dim(x)
@@ -118,13 +157,13 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
         skewed_image_columns = skewed_images_variable.size(3)
 
-        input_input_matrix = self.input_input_convolution(skewed_images_variable)
+        input_input_matrix = mdlstm_parameters.input_input_convolution(skewed_images_variable)
         # print("input_matrix: " + str(input_matrix))
 
-        input_gate_input_matrix = self.input_gate_input_convolution(skewed_images_variable)
-        forget_gate_one_input_matrix = self.forget_gate_one_input_convolution(skewed_images_variable)
-        forget_gate_two_input_matrix = self.forget_gate_two_input_convolution(skewed_images_variable)
-        output_gate_input_matrix = self.output_gate_input_convolution(skewed_images_variable)
+        input_gate_input_matrix = mdlstm_parameters.input_gate_input_convolution(skewed_images_variable)
+        forget_gate_one_input_matrix = mdlstm_parameters.forget_gate_one_input_convolution(skewed_images_variable)
+        forget_gate_two_input_matrix = mdlstm_parameters.forget_gate_two_input_convolution(skewed_images_variable)
+        output_gate_input_matrix = mdlstm_parameters.output_gate_input_convolution(skewed_images_variable)
 
         activations = list([])
 
@@ -133,7 +172,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         for column_number in range(0, skewed_image_columns):
             # Compute convolution on previous state column vector padded with zeros
             # Compute convolution on previous state column vector padded with zeros
-            input_hidden_state_column = self.input_hidden_state_update_block.\
+            input_hidden_state_column = mdlstm_parameters.input_hidden_state_update_block.\
                 compute_weighted_states_input(previous_hidden_state_column)
 
             # print("state_column.size(): " + str(state_column.size()))
@@ -141,8 +180,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                                                                        input_hidden_state_column)
 
             # Compute the sum of weighted inputs of the input gate
-            input_gate_weighted_states_plus_input = self.\
-                compute_weighted_input_input_gate(previous_hidden_state_column, previous_memory_state_column,
+            input_gate_weighted_states_plus_input = MultiDimensionalLSTM.\
+                compute_weighted_input_input_gate(mdlstm_parameters, previous_hidden_state_column, previous_memory_state_column,
                                                   column_number, input_gate_input_matrix)
 
 
@@ -159,8 +198,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                                  self.hidden_states_size)
 
             forget_gate_one_weighted_stated_plus_input = self.compute_weighted_input_forget_gate(
-                self.forget_gate_one_hidden_state_update_block,
-                self.forget_gate_one_memory_state_convolution,
+                mdlstm_parameters.forget_gate_one_hidden_state_update_block,
+                mdlstm_parameters.forget_gate_one_memory_state_convolution,
                 previous_hidden_state_column, previous_memory_state_column,
                 column_number, forget_gate_one_input_matrix,
                 1)
@@ -179,8 +218,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                                  self.hidden_states_size)
 
             forget_gate_two_weighted_stated_plus_input = self.compute_weighted_input_forget_gate(
-                self.forget_gate_two_hidden_state_update_block,
-                self.forget_gate_two_memory_state_convolution,
+                mdlstm_parameters.forget_gate_two_hidden_state_update_block,
+                mdlstm_parameters.forget_gate_two_memory_state_convolution,
                 previous_hidden_state_column, previous_memory_state_column,
                 column_number, forget_gate_two_input_matrix,
                 2)
@@ -220,7 +259,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
             # Compute the sum of weighted inputs of the ouput gate
             output_gate_weighted_states_plus_input = self. \
-                compute_weighted_input_output_gate(previous_hidden_state_column, new_memory_state,
+                compute_weighted_input_output_gate(mdlstm_parameters, previous_hidden_state_column, new_memory_state,
                                                    column_number, output_gate_input_matrix)
 
 
@@ -250,7 +289,48 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         # print("activations_unskewed: " + str(activations_unskewed))
         return activations_unskewed
 
-    def compute_weighted_input_both_memory_gate(self, previous_hidden_state_column, previous_memory_state_column,
+        # This function is slow because all four function calls for 4 directions are
+        # executed sequentially. It isn't entirely clear how to optimize this.
+        # See the discussion at:
+        # https://discuss.pytorch.org/t/is-there-a-way-to-parallelize-independent-sequential-steps/3360
+
+    def forward_multi_directional_multi_dimensional_lstm(self, x):
+        # print("list(x.size()): " + str(list(x.size())))
+
+        # Original order
+        activations_unskewed_direction_one = self.\
+            compute_multi_dimensional_lstm_one_direction(self.mdlstm_direction_one_parameters, x)
+        activations_one_dimensional_one = activations_unskewed_direction_one.view(-1, 1024 * self.hidden_states_size)
+
+        # Flipping 2nd dimension
+        activations_unskewed_direction_two = self.compute_multi_dimensional_lstm_one_direction(
+            self.mdlstm_direction_two_parameters, util.tensor_flipping.flip(x, 2))
+        activations_one_dimensional_two = activations_unskewed_direction_two.view(-1, 1024 * self.hidden_states_size)
+
+        # print("activations_one_dimensional_two: " + str(activations_one_dimensional_two))
+
+        # Flipping 3th dimension
+        activations_unskewed_direction_three = self.compute_multi_dimensional_lstm_one_direction(
+            self.mdlstm_direction_three_parameters, util.tensor_flipping.flip(x, 3))
+        activations_one_dimensional_three = activations_unskewed_direction_three.view(-1, 1024 * self.hidden_states_size)
+
+        # Flipping 2nd and 3th dimension combined
+        activations_unskewed_direction_four = self.compute_multi_dimensional_lstm_one_direction(
+            self.mdlstm_direction_four_parameters, util.tensor_flipping.flip(util.tensor_flipping.flip(x, 2), 3))
+        activations_one_dimensional_four = activations_unskewed_direction_four.view(-1, 1024 * self.hidden_states_size)
+
+        activations_combined = torch.cat((activations_one_dimensional_one, activations_one_dimensional_two,
+                                          activations_one_dimensional_three, activations_one_dimensional_four), 1)
+
+        # print("activations_combined: " + str(activations_combined))
+
+        # print("activations_one_dimensional: " + str(activations_one_dimensional))
+        # It is nescessary to output a tensor of size 10, for 10 different output classes
+        result = self.fc3(activations_combined)
+        return result
+
+    @staticmethod
+    def compute_weighted_input_both_memory_gate(previous_hidden_state_column, previous_memory_state_column,
                                                 column_number, input_gate_input_matrix,
                                                 hidden_state_update_block,
                                                 memory_state_update_block):
@@ -263,18 +343,19 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             input_gate_memory_state_column
         return input_gate_weighted_states_plus_weighted_input
 
-    def compute_weighted_input_input_gate(self, previous_hidden_state_column, previous_memory_state_column,
+    @staticmethod
+    def compute_weighted_input_input_gate(mdlstm_parameters, previous_hidden_state_column, previous_memory_state_column,
                                           column_number, input_gate_input_matrix):
-        return self.compute_weighted_input_both_memory_gate(previous_hidden_state_column, previous_memory_state_column,
+        return MultiDimensionalLSTM.compute_weighted_input_both_memory_gate(previous_hidden_state_column, previous_memory_state_column,
                                                             column_number, input_gate_input_matrix,
-                                                            self.input_gate_hidden_state_update_block,
-                                                            self.input_gate_memory_state_update_block)
+                                                            mdlstm_parameters.input_gate_hidden_state_update_block,
+                                                            mdlstm_parameters.input_gate_memory_state_update_block)
 
-    def compute_weighted_input_output_gate(self, previous_hidden_state_column, previous_memory_state_column,
+    def compute_weighted_input_output_gate(self, mdlstm_parameters, previous_hidden_state_column, previous_memory_state_column,
                                            column_number, output_gate_input_matrix):
         return self.compute_weighted_input_forget_gate(
-                self.output_gate_hidden_state_update_block,
-                self.output_gate_memory_state_convolution,
+                mdlstm_parameters.output_gate_hidden_state_update_block,
+                mdlstm_parameters.output_gate_memory_state_convolution,
                 previous_hidden_state_column, previous_memory_state_column,
                 column_number, output_gate_input_matrix,
                 2)
@@ -304,7 +385,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         return forget_gate_weighted_states_plus_weighted_input
 
     def forward_one_directional_multi_dimensional_lstm(self, x):
-        activations_unskewed = self.compute_multi_dimensional_lstm_one_direction(x)
+        activations_unskewed = self.compute_multi_dimensional_lstm_one_direction(self.mdlstm_direction_one_parameters, x)
         activations_one_dimensional = activations_unskewed.view(-1, self.number_of_output_dimensions())
         # print("activations_one_dimensional: " + str(activations_one_dimensional))
         # It is necessary to output a tensor of size 10, for 10 different output classes
@@ -316,11 +397,14 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
     # Needs to be implemented in the subclasses
     def _compute_multi_dimensional_function_one_direction(self, function_input):
-        return self.compute_multi_dimensional_lstm_one_direction(function_input)
+        return self.compute_multi_dimensional_lstm_one_direction(self.mdlstm_direction_one_parameters, function_input)
 
     # Input tensor x is a batch of image tensors
     def forward(self, x):
         if self.compute_multi_directional:
-            return self.forward_multi_directional_multi_dimensional_function_fast(x)
+            # With distinct parameters for every direction
+            return self.forward_multi_directional_multi_dimensional_lstm(x)
+            # With same paramters for every direction
+            #return self.forward_multi_directional_multi_dimensional_function_fast(x)
         else:
             return self.forward_one_directional_multi_dimensional_lstm(x)
