@@ -36,8 +36,6 @@ class MultiDimensionalLSTMParametersOneDirection():
         self.forget_gate_one_memory_state_convolution = nn.Conv1d(self.hidden_states_size,
                                                                   self.hidden_states_size, 1)
 
-
-
         # Forget gate 2
         self.forget_gate_two_input_convolution = nn.Conv2d(self.input_channels,
                                                            self.hidden_states_size, 1)

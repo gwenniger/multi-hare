@@ -536,8 +536,6 @@ class MultiDimensionalRNNFast(MultiDimensionalRNNAbstract):
             compute_summed_outputs_every_pair(previous_state_column)[0]
 
 
-
-
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()

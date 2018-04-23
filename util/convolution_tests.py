@@ -60,6 +60,12 @@ def test_padding():
     result3 = F.pad(matrix, (0, 0, 4, 0))
     print("result3: " + str(result3))
 
+    matrix2 = Variable(torch.FloatTensor([[1, 1], [2, 2]]))
+    print("matrix2 before: " + str(matrix2))
+    matrix2[:, 0] = matrix2[:, 0] + matrix2[:, 0]
+    print("matrix2 after: " + str(matrix2))
+
+
 
 def main():
     #test_convolution_one()
