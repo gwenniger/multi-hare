@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.autograd as autograd
-
+from torch.autograd import Variable
+import torch.nn.functional as F
 
 class ConvolutationTests:
 
@@ -44,11 +45,26 @@ def test_convolution_with_padding():
     output = m(input_values)
     print("output: " + str(output))
 
+def test_padding():
+    input = Variable(torch.rand(1, 1, 4))  # 1D (N, C, L)
+    input_2d = input.unsqueeze(2)  # add a fake height
+    result1 = F.pad(input_2d, (2, 0, 0, 0)).view(1, 1, -1)  # left padding (and remove height)
+    print("result1: " + str(result1))
+    result2 = F.pad(input_2d, (0, 2, 0, 0)).view(1, 1, -1)  # right padding (and remove height)
+    print("result2: " + str(result2))
+
+    matrix = Variable(torch.FloatTensor([[1, 1], [2, 2]]))
+    matrix = matrix.unsqueeze(0)
+    matrix = matrix.unsqueeze(0)
+    print("matrix: " + str(matrix))
+    result3 = F.pad(matrix, (0, 0, 4, 0))
+    print("result3: " + str(result3))
 
 
 def main():
     #test_convolution_one()
-    test_convolution_with_padding()
+    #test_convolution_with_padding()
+    test_padding()
 
 
 if __name__ == "__main__":

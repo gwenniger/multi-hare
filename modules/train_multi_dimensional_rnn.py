@@ -7,8 +7,10 @@ import time
 from modules.multi_dimensional_rnn import MDRNNCell
 from modules.multi_dimensional_rnn import MultiDimensionalRNNBase
 from modules.multi_dimensional_rnn import MultiDimensionalRNN
+from modules.multi_dimensional_rnn import MultiDimensionalRNNFast
 from modules.multi_dimensional_lstm import MultiDimensionalLSTM
 import data_preprocessing.load_mnist
+from util.utils import Utils
 
 
 def test_mdrnn_cell():
@@ -64,18 +66,22 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
 
     criterion = nn.CrossEntropyLoss()
     #multi_dimensional_rnn = MultiDimensionalRNN.create_multi_dimensional_rnn(hidden_states_size,
+    #                                                                         batch_size,
+    #                                                                         compute_multi_directional,
+    #                                                                         nonlinearity="sigmoid")
+    multi_dimensional_rnn = MultiDimensionalRNNFast.create_multi_dimensional_rnn_fast(hidden_states_size,
+                                                                                      batch_size,
+                                                                                      compute_multi_directional,
+                                                                                      nonlinearity="sigmoid")
+
+    #multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm(hidden_states_size,
     #                                                                           batch_size,
     #                                                                           compute_multi_directional,
-    #                                                                           nonlinearity="sigmoid")
-
-    multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm(hidden_states_size,
-                                                                               batch_size,
-                                                                               compute_multi_directional,
-                                                                               nonlinearity="sigmoid")
+    #                                                                          nonlinearity="sigmoid")
 
     #multi_dimensional_rnn = Net()
 
-    if MultiDimensionalRNNBase.use_cuda():
+    if Utils.use_cuda():
         multi_dimensional_rnn = multi_dimensional_rnn.cuda()
 
     optimizer = optim.SGD(multi_dimensional_rnn.parameters(), lr=0.001, momentum=0.9)
@@ -104,7 +110,7 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
 
             # wrap them in Variable
             labels = Variable(labels)
-            if MultiDimensionalRNNBase.use_cuda():
+            if Utils.use_cuda():
                 labels = labels.cuda()
 
             #labels, inputs = Variable(labels), Variable(inputs)
@@ -145,9 +151,9 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
 def main():
     # test_mdrnn_cell()
     #test_mdrnn()
-    hidden_states_size = 32
+    hidden_states_size = 5
     batch_size = 128
-    compute_multi_directional = True
+    compute_multi_directional = False
     train_mdrnn(hidden_states_size, batch_size,  compute_multi_directional)
 
 

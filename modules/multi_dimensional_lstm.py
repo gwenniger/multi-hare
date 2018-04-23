@@ -6,7 +6,7 @@ from torch.autograd import Variable
 import torch.nn.functional as F
 import torch.nn
 import torch.nn as nn
-from modules.multi_dimensional_rnn import StateUpdateBlock
+from modules.state_update_block import StateUpdateBlock
 
 
 class MultiDimensionalLSTMParametersOneDirection():

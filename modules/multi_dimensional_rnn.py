@@ -11,10 +11,10 @@ import torch.nn.functional as F
 import torch.nn
 from util.image_input_transformer import ImageInputTransformer
 import torch.nn as nn
-import time
 import util.tensor_flipping
-from abc import ABCMeta, abstractmethod
-
+from abc import abstractmethod
+from modules.state_update_block import StateUpdateBlock
+from modules.parallel_multiple_state_weightings_computation import ParallelMultipleStateWeightingsComputation
 
 class MDRNNCellBase(Module):
 
@@ -347,73 +347,12 @@ class MultiDimensionalRNNBase(torch.nn.Module):
         return result
 
 
-class StateUpdateBlock():
-    def __init__(self, hidden_states_size: int):
-        self.hidden_states_size = hidden_states_size
-        self.state_one_convolution = nn.Conv1d(self.hidden_states_size,
-                                                      self.hidden_states_size, 1)
-        self.state_two_convolution = nn.Conv1d(self.hidden_states_size,
-                                                      self.hidden_states_size, 1)
-
-    @staticmethod
-    def get_previous_state_column_static(previous_state_column, state_index: int,
-                                         hidden_states_size: int):
-        # print("previous memory state column: " + str(previous_memory_state_column))
-        if state_index == 100:
-            previous_memory_state_column_shifted = previous_state_column.clone()
-            height = previous_state_column.size(2)
-            zeros_padding = Variable(torch.zeros(previous_state_column.size(0), hidden_states_size, 1))
-            if MultiDimensionalRNNBase.use_cuda():
-                zeros_padding = zeros_padding.cuda()
-            skip_first_sub_tensor = previous_memory_state_column_shifted[:, :, 0:(height - 1)]
-            # print("zeros padding" + str(zeros_padding))
-            # print("skip_first_sub_tensor: " + str(skip_first_sub_tensor))
-            previous_memory_state_column_shifted = torch. \
-                cat((zeros_padding, skip_first_sub_tensor), 2)
-            # print("Returning previous_memory_state_column_shifted: " + str(previous_memory_state_column_shifted))
-            return previous_memory_state_column_shifted
-        return previous_state_column
-
-    def get_previous_state_column(self, previous_state_column, state_index: int):
-        return StateUpdateBlock.get_previous_state_column_static(previous_state_column,
-                                                                 state_index,
-                                                                 self.hidden_states_size)
-
-    @staticmethod
-    def compute_weighted_state_input_static(state_convolution, previous_state_column,
-                                            state_index: int, hidden_states_size):
-        return state_convolution(StateUpdateBlock.
-                                 get_previous_state_column_static(previous_state_column, state_index,
-                                                                  hidden_states_size))
-
-    def compute_weighted_state_input(self, state_convolution, previous_state_column,
-                                     state_index: int):
-        return state_convolution(self.get_previous_state_column(previous_state_column, state_index))
-
-    def compute_weighted_states_input(self, previous_state_column):
-        state_one_result = self.state_one_convolution(self.get_previous_state_column(previous_state_column, 1))
-        state_two_result = self.state_two_convolution(self.get_previous_state_column(previous_state_column, 2))
-        result = state_one_result + state_two_result
-        return result
-
-    def get_state_convolutions_as_list(self):
-        return [self.state_one_convolution, self.state_two_convolution]
-
-    def set_bias_for_convolutions(self, bias_value):
-        self.state_one_convolution.bias.data.fill_(bias_value)
-        self.state_two_convolution.bias.data.fill_(bias_value)
-
-class MultiDimensionalRNN(MultiDimensionalRNNBase):
+class MultiDimensionalRNNAbstract(MultiDimensionalRNNBase):
     def __init__(self, hidden_states_size, batch_size, compute_multi_directional: bool,
                  nonlinearity="tanh"):
-        super(MultiDimensionalRNN, self).__init__(hidden_states_size, batch_size,
+        super(MultiDimensionalRNNAbstract, self).__init__(hidden_states_size, batch_size,
                                                   compute_multi_directional,
                                                   nonlinearity)
-        self.state_update_block = StateUpdateBlock(hidden_states_size)
-        # This is necessary to make sure things are stored on the same gpu, otherwise
-        # pytorch doesn't realizes these convolutions are part of this module
-        self.state_convolutions = nn.ModuleList(self.state_update_block.get_state_convolutions_as_list())
-
         self.input_convolution = nn.Conv2d(self.input_channels,
                                            self.hidden_states_size, 1)
         # self.fc3 = nn.Linear(1024, 10)
@@ -423,13 +362,12 @@ class MultiDimensionalRNN(MultiDimensionalRNNBase):
         else:
             self.fc3 = nn.Linear(self.number_of_output_dimensions(), 10)
 
-
-
-    @staticmethod
-    def create_multi_dimensional_rnn(hidden_states_size: int, batch_size: int,  compute_multi_directional: bool,
-                                     nonlinearity="tanh"):
-        return MultiDimensionalRNN(hidden_states_size, batch_size, compute_multi_directional,
-                                   nonlinearity)
+    # Needs to be implemented in the subclasses
+    # This method compute the state update for the two input dimension and
+    # returns the summed result
+    @abstractmethod
+    def _compute_weighted_states_input_summed(self, previous_state_column):
+        raise RuntimeError("not implemented")
 
     def compute_multi_dimensional_rnn_one_direction(self, x):
         # Step 1: Create a skewed version of the input image
@@ -462,7 +400,7 @@ class MultiDimensionalRNN(MultiDimensionalRNNBase):
 
         for column_number in range(0, skewed_image_columns):
             # Compute convolution on previous state column vector padded with zeros
-            state_columns_combined = self.state_update_block.compute_weighted_states_input(previous_hidden_state_column)
+            state_columns_combined = self._compute_weighted_states_input_summed(previous_hidden_state_column)
 
             # print("state_column.size(): " + str(state_column.size()))
             state_plus_input = MultiDimensionalRNNBase.compute_states_plus_input(input_matrix,
@@ -531,8 +469,6 @@ class MultiDimensionalRNN(MultiDimensionalRNNBase):
         result = self.fc3(activations_combined)
         return result
 
-
-
     # Input tensor x is a batch of image tensors
     def forward(self, x):
         if self.compute_multi_directional:
@@ -545,9 +481,62 @@ class MultiDimensionalRNN(MultiDimensionalRNNBase):
         # print("final_activation_function_input: " + str(final_activation_function_input))
         return self.fc3(final_activation_function_input)
 
-    # Needs to be implemented in the subclasses
     def _compute_multi_dimensional_function_one_direction(self, function_input):
         return self.compute_multi_dimensional_rnn_one_direction(function_input)
+
+
+class MultiDimensionalRNN(MultiDimensionalRNNAbstract):
+    def __init__(self, hidden_states_size, batch_size, compute_multi_directional: bool,
+                 nonlinearity="tanh"):
+        super(MultiDimensionalRNN, self).__init__(hidden_states_size, batch_size,
+                                                  compute_multi_directional,
+                                                  nonlinearity)
+        self.state_update_block = StateUpdateBlock(hidden_states_size)
+        # This is necessary to make sure things are stored on the same gpu, otherwise
+        # pytorch doesn't realizes these convolutions are part of this module
+        self.state_convolutions = nn.ModuleList(self.state_update_block.get_state_convolutions_as_list())
+
+    @staticmethod
+    def create_multi_dimensional_rnn(hidden_states_size: int, batch_size: int, compute_multi_directional: bool,
+                                     nonlinearity="tanh"):
+        return MultiDimensionalRNN(hidden_states_size, batch_size, compute_multi_directional,
+                                   nonlinearity)
+
+    # This method compute the state update for the two input dimension and
+    # returns the summed result
+    def _compute_weighted_states_input_summed(self, previous_state_column):
+        return self.state_update_block.compute_weighted_states_input(previous_state_column)
+
+
+class MultiDimensionalRNNFast(MultiDimensionalRNNAbstract):
+    def __init__(self, hidden_states_size, batch_size, compute_multi_directional: bool,
+                 nonlinearity="tanh"):
+        super(MultiDimensionalRNNFast, self).__init__(hidden_states_size, batch_size,
+                                                  compute_multi_directional,
+                                                  nonlinearity)
+        self.parallel_multiple_state_weighting_computation = \
+            ParallelMultipleStateWeightingsComputation.\
+            create_parallel_multiple_state_weighting_computation(self.hidden_states_size, 2)
+
+        # This is necessary to make sure things are stored on the same gpu, otherwise
+        # pytorch doesn't realizes these convolutions are part of this module
+        self.state_convolutions = nn.ModuleList(
+            self.parallel_multiple_state_weighting_computation.get_state_convolutions_as_list())
+
+    @staticmethod
+    def create_multi_dimensional_rnn_fast(hidden_states_size: int, batch_size: int, compute_multi_directional: bool,
+                                     nonlinearity="tanh"):
+        return MultiDimensionalRNNFast(hidden_states_size, batch_size, compute_multi_directional,
+                                   nonlinearity)
+
+    # This method compute the state update for the two input dimension and
+    # returns the summed result
+    def _compute_weighted_states_input_summed(self, previous_state_column):
+        return self.parallel_multiple_state_weighting_computation.\
+            compute_summed_outputs_every_pair(previous_state_column)[0]
+
+
+
 
 class Net(nn.Module):
     def __init__(self):
