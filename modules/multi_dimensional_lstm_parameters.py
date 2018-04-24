@@ -45,9 +45,45 @@ class MultiDimensionalLSTMParametersOneDirection():
         self.output_gate_memory_state_convolution = nn.Conv1d(self.hidden_states_size,
                                                                   self.hidden_states_size, 1)
 
+        self.previous_hidden_state_column = None
+        self.previous_memory_state_column = None
+
     @staticmethod
     def create_multi_dimensional_lstm_parameters_one_direction(hidden_states_size, input_channels):
         return MultiDimensionalLSTMParametersOneDirection(hidden_states_size, input_channels)
+
+    def prepare_computation_next_column_functions(self, previous_hidden_state_column,
+                                                  previous_memory_state_column):
+        self.previous_hidden_state_column = previous_hidden_state_column
+        self.previous_memory_state_column = previous_memory_state_column
+
+    def get_input_gate_hidden_state_column(self):
+        input_gate_hidden_state_column = self.input_gate_hidden_state_update_block. \
+            compute_weighted_states_input(self.previous_hidden_state_column)
+        return input_gate_hidden_state_column
+
+    def get_input_gate_memory_state_column(self):
+        input_gate_memory_state_column = self.input_gate_memory_state_update_block. \
+            compute_weighted_states_input(self.previous_memory_state_column)
+        return input_gate_memory_state_column
+
+    def get_forget_gate_one_hidden_state_column(self):
+        forget_gate_one_hidden_state_column = \
+            self.forget_gate_one_hidden_state_update_block.compute_weighted_states_input(
+                self.previous_hidden_state_column)
+        return forget_gate_one_hidden_state_column
+
+    def get_forget_gate_two_hidden_state_column(self):
+        forget_gate_two_hidden_state_column = \
+            self.forget_gate_two_hidden_state_update_block.compute_weighted_states_input(
+                self.previous_hidden_state_column)
+        return forget_gate_two_hidden_state_column
+
+    def get_output_gate_hidden_state_column(self):
+        output_gate_hidden_state_column = \
+            self.output_gate_hidden_state_update_block.compute_weighted_states_input(
+                self.previous_hidden_state_column)
+        return output_gate_hidden_state_column
 
     def get_all_parameters_as_list(self):
         result = list([])
