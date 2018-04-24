@@ -39,16 +39,16 @@ class ParallelMultipleStateWeightingsComputation:
         result = list([])
 
         convolution_result = self.compute_convolution_result(previous_state_column)
-        print("convolution result: " + str(convolution_result))
+        # print("convolution result: " + str(convolution_result))
 
         for i in range(0, self.number_of_paired_input_weightings):
             range_begin = self.get_result_range_start_index(i * 2)
             range_end = self.get_result_range_end_index(i * 2)
-            print("range begin: " + str(range_begin) + " range end: " + str(range_end))
+            # print("range begin: " + str(range_begin) + " range end: " + str(range_end))
             pair_element_one = convolution_result[:, range_begin:range_end, :]
             range_begin = self.get_result_range_start_index(i * 2 + 1)
             range_end = self.get_result_range_end_index(i * 2 + 1)
-            print("range begin: " + str(range_begin) + " range end: " + str(range_end))
+            # print("range begin: " + str(range_begin) + " range end: " + str(range_end))
             pair_element_two = convolution_result[:, range_begin:range_end, :]
             pair = tuple((pair_element_one, pair_element_two))
             result.append(pair)
@@ -90,7 +90,7 @@ class ParallelMultipleStateWeightingsComputation:
             #print("summed_values: " + str(summed_values))
             #summed_values[:, :, 1:] = summed_values[:, :, 1:] +\
             #    pair_element_two[:, :, 0: pair_element_two.size(2) - 1]
-            print("summed values: " + str(summed_values))
+            # print("summed values: " + str(summed_values))
             result.append(summed_values)
         return result
 

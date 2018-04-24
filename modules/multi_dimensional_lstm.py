@@ -19,13 +19,13 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                                   compute_multi_directional,
                                                   nonlinearity)
 
-        #self.mdlstm_direction_one_parameters = \
-        #    MultiDimensionalLSTMParametersOneDirectionFast.create_multi_dimensional_lstm_parameters_one_direction_fast(
-        #    self.hidden_states_size, self.input_channels)
-
         self.mdlstm_direction_one_parameters = \
-            MultiDimensionalLSTMParametersOneDirection.create_multi_dimensional_lstm_parameters_one_direction(
-                self.hidden_states_size, self.input_channels)
+            MultiDimensionalLSTMParametersOneDirectionFast.create_multi_dimensional_lstm_parameters_one_direction_fast(
+            self.hidden_states_size, self.input_channels)
+
+        #self.mdlstm_direction_one_parameters = \
+        #    MultiDimensionalLSTMParametersOneDirection.create_multi_dimensional_lstm_parameters_one_direction(
+         #       self.hidden_states_size, self.input_channels)
 
         # For multi-directional rnn
         if self.compute_multi_directional:

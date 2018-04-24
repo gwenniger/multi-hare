@@ -81,6 +81,23 @@ class MultiDimensionalLSTMParametersOneDirectionBase:
     def get_all_parameters_as_list(self):
         raise RuntimeError("not implemented")
 
+    def get_all_input_convolutions_as_list(self):
+        result = list([])
+        result.append(self.input_input_convolution)
+        result.append(self.input_gate_input_convolution)
+        result.append(self.forget_gate_one_input_convolution)
+        result.append(self.forget_gate_two_input_convolution)
+        result.append(self.output_gate_input_convolution)
+        return result
+
+    def get_all_memory_state_convolutions_as_list(self):
+        result = list([])
+        result.append(self.output_gate_memory_state_convolution)
+        result.append(self.forget_gate_one_memory_state_convolution)
+        result.append(self.forget_gate_two_memory_state_convolution)
+        result.extend(self.input_gate_memory_state_update_block.get_state_convolutions_as_list())
+        return result
+
 
 class MultiDimensionalLSTMParametersOneDirection(MultiDimensionalLSTMParametersOneDirectionBase):
     def __init__(self, hidden_states_size, input_channels):
@@ -149,23 +166,20 @@ class MultiDimensionalLSTMParametersOneDirection(MultiDimensionalLSTMParametersO
                 self.previous_hidden_state_column)
         return output_gate_hidden_state_column
 
-    def get_all_parameters_as_list(self):
+    def get_all_hidden_state_convolutions_as_list(self):
         result = list([])
-        result.append(self.input_input_convolution)
-        result.append(self.input_gate_input_convolution)
-        result.append(self.forget_gate_one_input_convolution)
-        result.append(self.forget_gate_two_input_convolution)
-        result.append(self.output_gate_input_convolution)
-        result.append(self.output_gate_memory_state_convolution)
-        result.append(self.forget_gate_one_memory_state_convolution)
-        result.append(self.forget_gate_two_memory_state_convolution)
-        result.extend(self.input_gate_memory_state_update_block.get_state_convolutions_as_list())
         result.extend(self.input_hidden_state_update_block.get_state_convolutions_as_list())
         result.extend(self.input_gate_hidden_state_update_block.get_state_convolutions_as_list())
         result.extend(self.forget_gate_one_hidden_state_update_block.get_state_convolutions_as_list())
         result.extend(self.forget_gate_two_hidden_state_update_block.get_state_convolutions_as_list())
         result.extend(self.output_gate_hidden_state_update_block.get_state_convolutions_as_list())
+        return result
 
+    def get_all_parameters_as_list(self):
+        result = list([])
+        result.extend(self.get_all_input_convolutions_as_list())
+        result.extend(self.get_all_memory_state_convolutions_as_list())
+        result.extend(self.get_all_hidden_state_convolutions_as_list())
         return result
 
 
@@ -229,17 +243,9 @@ class MultiDimensionalLSTMParametersOneDirectionFast(MultiDimensionalLSTMParamet
 
     def get_all_parameters_as_list(self):
         result = list([])
+        result.extend(self.get_all_input_convolutions_as_list())
+        result.extend(self.get_all_memory_state_convolutions_as_list())
         result.extend(self.parallel_hidden_state_column_computation.get_state_convolutions_as_list())
-        result.append(self.input_input_convolution)
-        result.append(self.input_gate_input_convolution)
-        result.append(self.forget_gate_one_input_convolution)
-        result.append(self.forget_gate_two_input_convolution)
-        result.append(self.output_gate_input_convolution)
-        result.append(self.output_gate_memory_state_convolution)
-        result.append(self.forget_gate_one_memory_state_convolution)
-        result.append(self.forget_gate_two_memory_state_convolution)
-        result.extend(self.input_gate_memory_state_update_block.get_state_convolutions_as_list())
-
         return result
 
 
