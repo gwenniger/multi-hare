@@ -192,8 +192,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # print("input and input gate combined: " + str(input_and_input_gate_combined))
 
             memory_states_column_forget_gate_one = StateUpdateBlock.\
-                get_previous_state_column_static(previous_memory_state_column, 1,
-                                                 self.hidden_states_size)
+                get_previous_state_column(previous_memory_state_column, 1)
 
             forget_gate_one_weighted_stated_plus_input = self.compute_weighted_input_forget_gate(
                 mdlstm_parameters.forget_gate_one_hidden_state_update_block,
@@ -212,8 +211,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                           memory_states_column_forget_gate_one)
 
             memory_states_column_forget_gate_two = StateUpdateBlock.\
-                get_previous_state_column_static(previous_memory_state_column, 2,
-                                                 self.hidden_states_size)
+                get_previous_state_column(previous_memory_state_column, 2)
 
             forget_gate_two_weighted_stated_plus_input = self.compute_weighted_input_forget_gate(
                 mdlstm_parameters.forget_gate_two_hidden_state_update_block,

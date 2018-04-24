@@ -34,7 +34,7 @@ class StateUpdateBlock():
     # This is a faster implementation of the get_shifted_column method
     # that avoids use of the torch.cat method, but instead uses F.pad
     @staticmethod
-    def get_shifted_column_fast(previous_state_column, hidden_states_size: int):
+    def get_shifted_column_fast(previous_state_column):
         # print("previous_state_column: " + str(previous_state_column))
         previous_state_column_4_dim = previous_state_column.unsqueeze(2) # add a fake height
 
@@ -49,24 +49,17 @@ class StateUpdateBlock():
         return result
 
     @staticmethod
-    def get_previous_state_column_static(previous_state_column, state_index: int,
-                                         hidden_states_size: int):
+    def get_previous_state_column(previous_state_column, state_index: int):
         # print("previous memory state column: " + str(previous_memory_state_column))
         if state_index == 2:
-            return StateUpdateBlock.get_shifted_column(previous_state_column, hidden_states_size)
+            return StateUpdateBlock.get_shifted_column_fast(previous_state_column)
         return previous_state_column
-
-    def get_previous_state_column(self, previous_state_column, state_index: int):
-        return StateUpdateBlock.get_previous_state_column_static(previous_state_column,
-                                                                 state_index,
-                                                                 self.hidden_states_size)
 
     @staticmethod
     def compute_weighted_state_input_static(state_convolution, previous_state_column,
                                             state_index: int, hidden_states_size):
         return state_convolution(StateUpdateBlock.
-                                 get_previous_state_column_static(previous_state_column, state_index,
-                                                                  hidden_states_size))
+                                 get_previous_state_column(previous_state_column, state_index))
 
     def compute_weighted_state_input(self, state_convolution, previous_state_column,
                                      state_index: int):

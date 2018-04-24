@@ -73,13 +73,14 @@ class ParallelMultipleStateWeightingsComputation:
             # summed_values = pair_element_one + pair_two_element_shifted
 
             # Faster
-            pair_two_element_shifted = StateUpdateBlock.get_shifted_column_fast(result_pair[1], self.hidden_states_size)
+            pair_two_element_shifted = StateUpdateBlock.get_shifted_column_fast(result_pair[1])
             summed_values = pair_element_one + pair_two_element_shifted
 
             # Not really faster but simpler and about the same speed
-            # summed_values = pair_element_one.clone()
-            # summed_values[:, :, 1:] = summed_values[:, :, 1:] +
-            #   pair_element_two[:, :, 0: pair_element_two.size(2) - 1]
+            #summed_values = pair_element_one.clone()
+            #print("summed_values: " + str(summed_values))
+            #summed_values[:, :, 1:] = summed_values[:, :, 1:] +\
+            #    pair_element_two[:, :, 0: pair_element_two.size(2) - 1]
 
             result.append(summed_values)
         return result
