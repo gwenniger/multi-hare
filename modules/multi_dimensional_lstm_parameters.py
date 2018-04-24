@@ -194,6 +194,7 @@ class MultiDimensionalLSTMParametersOneDirectionFast(MultiDimensionalLSTMParamet
             hidden_states_size, 5)
 
         self.node_hidden_state_columns = None
+        self.node_memory_state_columns = None  # TODO: Implement the computation of this
         self.previous_memory_state_column = None
 
     @staticmethod
@@ -208,6 +209,10 @@ class MultiDimensionalLSTMParametersOneDirectionFast(MultiDimensionalLSTMParamet
         self.node_hidden_state_columns = \
             self.parallel_hidden_state_column_computation.compute_summed_outputs_every_pair(previous_hidden_state_column)
         self.previous_memory_state_column = previous_memory_state_column
+
+        # TODO: A second list node_memory_state_columns should be computed
+        # using a second 1d convolution that computes all memory state convolutions
+        # that depend only on the input at once
 
     def get_input_hidden_state_column(self):
         return self.node_hidden_state_columns[0]
@@ -225,17 +230,20 @@ class MultiDimensionalLSTMParametersOneDirectionFast(MultiDimensionalLSTMParamet
         return self.node_hidden_state_columns[4]
 
     def get_input_gate_memory_state_column(self):
+        # TODO: Compute using self.node_memory_state_columns
         input_gate_memory_state_column = self.input_gate_memory_state_update_block. \
             compute_weighted_states_input(self.previous_memory_state_column)
         return input_gate_memory_state_column
 
     def get_forget_gate_one_memory_state_column(self):
+        # TODO: Compute using self.node_memory_state_columns
         forget_gate_memory_state_column = \
             StateUpdateBlock.compute_weighted_state_input_state_one(self.forget_gate_one_memory_state_convolution,
                                                                     self.previous_memory_state_column)
         return forget_gate_memory_state_column
 
     def get_forget_gate_two_memory_state_column(self):
+        # TODO: Compute using self.node_memory_state_columns
         forget_gate_memory_state_column = \
             StateUpdateBlock.compute_weighted_state_input_state_two(self.forget_gate_two_memory_state_convolution,
                                                                     self.previous_memory_state_column)
