@@ -84,7 +84,10 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
     if Utils.use_cuda():
         multi_dimensional_rnn = multi_dimensional_rnn.cuda()
 
-    optimizer = optim.SGD(multi_dimensional_rnn.parameters(), lr=0.001, momentum=0.9)
+    #optimizer = optim.SGD(multi_dimensional_rnn.parameters(), lr=0.001, momentum=0.9)
+
+    # Adding some weight decay seems to do magic, see: http://pytorch.org/docs/master/optim.html
+    optimizer = optim.SGD(multi_dimensional_rnn.parameters(), lr=0.001, momentum=0.9, weight_decay=1e-5)
 
     # Faster learning
     #optimizer = optim.SGD(multi_dimensional_rnn.parameters(), lr=0.01, momentum=0.9)
@@ -152,7 +155,7 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
 def main():
     # test_mdrnn_cell()
     #test_mdrnn()
-    hidden_states_size = 5
+    hidden_states_size = 32
     batch_size = 128
     compute_multi_directional = False
     train_mdrnn(hidden_states_size, batch_size,  compute_multi_directional)
