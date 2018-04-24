@@ -33,15 +33,25 @@ class ParallelMultipleStateWeightingsComputation:
 
     def compute_result_and_split_into_output_pairs(self, previous_state_column):
         result = list([])
-        convolution_result = self.compute_convolution_result(previous_state_column)
-        for i in range(0, self.number_of_paired_input_weightings):
 
+        # print("previous state column: " + str(previous_state_column))
+
+        convolution_result = self.compute_convolution_result(previous_state_column)
+        # print("convolution result: " + str(convolution_result))
+
+        for i in range(0, self.number_of_paired_input_weightings):
+            range_begin = self.get_result_range_start_index(i * 2)
+            range_end = self.get_result_range_end_index(i * 2)
+            # print("range begin: " + str(range_begin) + " range end: " + str(range_end))
             pair_element_one = \
                 convolution_result[:, self.get_result_range_start_index(i*2):
                                    self.get_result_range_end_index(i*2), :]
+            range_begin = self.get_result_range_start_index(i * 2 + 1)
+            range_end = self.get_result_range_end_index(i * 2 + 1)
+            # print("range begin: " + str(range_begin) + " range end: " + str(range_end))
             pair_element_two = \
-                convolution_result[:, self.get_result_range_start_index(i * 2 + 1):
-                                   self.get_result_range_end_index(i * 2 + 1), :]
+                convolution_result[:, range_begin : range_end
+                                   , :]
             pair = tuple((pair_element_one, pair_element_two))
             result.append(pair)
         return result

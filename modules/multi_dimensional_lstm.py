@@ -8,6 +8,8 @@ import torch.nn
 import torch.nn as nn
 from modules.state_update_block import StateUpdateBlock
 from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParametersOneDirection
+from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParametersOneDirectionFast
+
 
 class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
@@ -16,6 +18,10 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         super(MultiDimensionalLSTM, self).__init__(hidden_states_size, batch_size,
                                                   compute_multi_directional,
                                                   nonlinearity)
+
+        #self.mdlstm_direction_one_parameters = \
+        #    MultiDimensionalLSTMParametersOneDirectionFast.create_multi_dimensional_lstm_parameters_one_direction_fast(
+        #        self.hidden_states_size, self.input_channels)
 
         self.mdlstm_direction_one_parameters = \
             MultiDimensionalLSTMParametersOneDirection.create_multi_dimensional_lstm_parameters_one_direction(
@@ -45,7 +51,6 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
         self.state_convolutions = nn.ModuleList([])
         self.register_parameters_to_assure_same_gpu_is_used()
-
 
     def set_bias_forget_gates_to_one(self, mdlstm_parameters):
         FORGET_GATE_BIAS_INIT = 1
@@ -166,6 +171,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # Compute the forget gate two activation
             forget_gate_two_activation_column = F.sigmoid(forget_gate_two_weighted_states_plus_input)
 
+
             # forget_gate_weighted_states_combined =  forget_gate_one_weighted_stated_plus_input + forget_gate_two_weighted_stated_plus_input
             # forget_gates_combined_activation_column = F.sigmoid(forget_gate_weighted_states_combined)
             # forget_gates_combined_activation_multiplied_with_previous_memory_state = torch.mul(
@@ -177,10 +183,13 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
             # print("input_and_input_gate_combined: " + str(input_and_input_gate_combined))
 
+            #print("forget_gate_one_activation_column: " + str(forget_gate_two_activation_column))
+            #print("memory_states_column_forget_gate_one: " + str(memory_states_column_forget_gate_one))
+            #print("forget_gate_two_activation_column: " + str(forget_gate_two_activation_column))
+            #print("memory_states_column_forget_gate_two: " + str(memory_states_column_forget_gate_two))
             #print("forget_gate_one_activation_multiplied_with_previous_memory_state: "+
             #      str(forget_gate_one_activation_multiplied_with_previous_memory_state))
-
-            #print("forget_gate_one_activation_multiplied_with_previous_memory_state: " +
+            #print("forget_gate_two_activation_multiplied_with_previous_memory_state: " +
             #      str(forget_gate_two_activation_multiplied_with_previous_memory_state))
 
             new_memory_state = input_and_input_gate_combined + \
