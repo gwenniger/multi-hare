@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torch
 from modules.multi_dimensional_rnn import StateUpdateBlock
 
 
@@ -18,6 +19,9 @@ class ParallelMultipleStateWeightingsComputation:
         output_states_size = hidden_states_size * number_of_paired_input_weightings * 2
 
         parallel_convolution = nn.Conv1d(hidden_states_size, output_states_size, 1)
+        # Xavier weight initialization
+        # torch.nn.init.xavier_uniform(parallel_convolution.weight)
+
         return ParallelMultipleStateWeightingsComputation(hidden_states_size, number_of_paired_input_weightings,
                                                           output_states_size, parallel_convolution)
 
@@ -34,24 +38,18 @@ class ParallelMultipleStateWeightingsComputation:
     def compute_result_and_split_into_output_pairs(self, previous_state_column):
         result = list([])
 
-        # print("previous state column: " + str(previous_state_column))
-
         convolution_result = self.compute_convolution_result(previous_state_column)
-        # print("convolution result: " + str(convolution_result))
+        print("convolution result: " + str(convolution_result))
 
         for i in range(0, self.number_of_paired_input_weightings):
             range_begin = self.get_result_range_start_index(i * 2)
             range_end = self.get_result_range_end_index(i * 2)
-            # print("range begin: " + str(range_begin) + " range end: " + str(range_end))
-            pair_element_one = \
-                convolution_result[:, self.get_result_range_start_index(i*2):
-                                   self.get_result_range_end_index(i*2), :]
+            print("range begin: " + str(range_begin) + " range end: " + str(range_end))
+            pair_element_one = convolution_result[:, range_begin:range_end, :]
             range_begin = self.get_result_range_start_index(i * 2 + 1)
             range_end = self.get_result_range_end_index(i * 2 + 1)
-            # print("range begin: " + str(range_begin) + " range end: " + str(range_end))
-            pair_element_two = \
-                convolution_result[:, range_begin : range_end
-                                   , :]
+            print("range begin: " + str(range_begin) + " range end: " + str(range_end))
+            pair_element_two = convolution_result[:, range_begin:range_end, :]
             pair = tuple((pair_element_one, pair_element_two))
             result.append(pair)
         return result
@@ -73,7 +71,7 @@ class ParallelMultipleStateWeightingsComputation:
         convolution_result_pairs = self.compute_result_and_split_into_output_pairs(previous_state_column)
         for result_pair in convolution_result_pairs:
             pair_element_one = result_pair[0]
-            pair_element_two = result_pair[1]
+            # pair_element_two = result_pair[1]
             # print("pair_element_two: " + str(pair_element_two))
             # The second pair element is shifted, so that the right elements are combined
             # for multi-dimensional RNN/LSTM computation
@@ -84,6 +82,7 @@ class ParallelMultipleStateWeightingsComputation:
 
             # Faster
             pair_two_element_shifted = StateUpdateBlock.get_shifted_column_fast(result_pair[1])
+            # print("pair two element shifted: " + str(pair_two_element_shifted))
             summed_values = pair_element_one + pair_two_element_shifted
 
             # Not really faster but simpler and about the same speed
@@ -91,7 +90,7 @@ class ParallelMultipleStateWeightingsComputation:
             #print("summed_values: " + str(summed_values))
             #summed_values[:, :, 1:] = summed_values[:, :, 1:] +\
             #    pair_element_two[:, :, 0: pair_element_two.size(2) - 1]
-
+            print("summed values: " + str(summed_values))
             result.append(summed_values)
         return result
 

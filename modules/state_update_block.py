@@ -35,7 +35,7 @@ class StateUpdateBlock():
     # that avoids use of the torch.cat method, but instead uses F.pad
     @staticmethod
     def get_shifted_column_fast(previous_state_column):
-        # print("previous_state_column: " + str(previous_state_column))
+        #print("previous_state_column: " + str(previous_state_column))
         previous_state_column_4_dim = previous_state_column.unsqueeze(2) # add a fake height
 
         # See: https://github.com/pytorch/pytorch/issues/1128

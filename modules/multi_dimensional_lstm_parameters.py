@@ -9,6 +9,27 @@ class MultiDimensionalLSTMParametersOneDirectionBase:
         self.input_channels = input_channels
         self.hidden_states_size = hidden_states_size
 
+        # Input convolutions
+        self.input_input_convolution = nn.Conv2d(self.input_channels,
+                                                 self.hidden_states_size, 1)
+        self.input_gate_input_convolution = nn.Conv2d(self.input_channels,
+                                                      self.hidden_states_size, 1)
+        self.forget_gate_one_input_convolution = nn.Conv2d(self.input_channels,
+                                                           self.hidden_states_size, 1)
+        self.forget_gate_two_input_convolution = nn.Conv2d(self.input_channels,
+                                                           self.hidden_states_size, 1)
+        self.output_gate_input_convolution = nn.Conv2d(self.input_channels,
+                                                       self.hidden_states_size, 1)
+
+        # Memory state convolutions
+        self.input_gate_memory_state_update_block = StateUpdateBlock(hidden_states_size)
+        self.forget_gate_one_memory_state_convolution = nn.Conv1d(self.hidden_states_size,
+                                                                  self.hidden_states_size, 1)
+        self.forget_gate_two_memory_state_convolution = nn.Conv1d(self.hidden_states_size,
+                                                                  self.hidden_states_size, 1)
+        self.output_gate_memory_state_convolution = nn.Conv1d(self.hidden_states_size,
+                                                              self.hidden_states_size, 1)
+
     # Needs to be implemented in the subclasses
     @abstractmethod
     def prepare_computation_next_column_functions(self, previous_hidden_state_column,
@@ -65,43 +86,11 @@ class MultiDimensionalLSTMParametersOneDirection(MultiDimensionalLSTMParametersO
     def __init__(self, hidden_states_size, input_channels):
         super(MultiDimensionalLSTMParametersOneDirection, self).__init__(hidden_states_size, input_channels)
 
-        # Input
-        self.input_input_convolution = nn.Conv2d(self.input_channels,
-                                                 self.hidden_states_size, 1)
-
         self.input_hidden_state_update_block = StateUpdateBlock(hidden_states_size)
-
-        # Input gate
-        self.input_gate_input_convolution = nn.Conv2d(self.input_channels,
-                                                      self.hidden_states_size, 1)
-
         self.input_gate_hidden_state_update_block = StateUpdateBlock(hidden_states_size)
-        self.input_gate_memory_state_update_block = StateUpdateBlock(hidden_states_size)
-
-        # Forget gate 1
-        self.forget_gate_one_input_convolution = nn.Conv2d(self.input_channels,
-                                                           self.hidden_states_size, 1)
         self.forget_gate_one_hidden_state_update_block = StateUpdateBlock(hidden_states_size)
-        self.forget_gate_one_memory_state_convolution = nn.Conv1d(self.hidden_states_size,
-                                                                  self.hidden_states_size, 1)
-
-        # Forget gate 2
-        self.forget_gate_two_input_convolution = nn.Conv2d(self.input_channels,
-                                                           self.hidden_states_size, 1)
         self.forget_gate_two_hidden_state_update_block = StateUpdateBlock(hidden_states_size)
-
-        #self.forget_gate_two_hidden_state_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
-        self.forget_gate_two_memory_state_convolution = nn.Conv1d(self.hidden_states_size,
-                                                                  self.hidden_states_size, 1)
-
-        # Output gate
-        self.output_gate_input_convolution = nn.Conv2d(self.input_channels,
-                                                       self.hidden_states_size, 1)
-
         self.output_gate_hidden_state_update_block = StateUpdateBlock(hidden_states_size)
-        # self.output_gate_memory_state_update_block = StateUpdateBlock(hidden_states_size)
-        self.output_gate_memory_state_convolution = nn.Conv1d(self.hidden_states_size,
-                                                                  self.hidden_states_size, 1)
 
         self.previous_hidden_state_column = None
         self.previous_memory_state_column = None
@@ -170,9 +159,9 @@ class MultiDimensionalLSTMParametersOneDirection(MultiDimensionalLSTMParametersO
         result.append(self.output_gate_memory_state_convolution)
         result.append(self.forget_gate_one_memory_state_convolution)
         result.append(self.forget_gate_two_memory_state_convolution)
+        result.extend(self.input_gate_memory_state_update_block.get_state_convolutions_as_list())
         result.extend(self.input_hidden_state_update_block.get_state_convolutions_as_list())
         result.extend(self.input_gate_hidden_state_update_block.get_state_convolutions_as_list())
-        result.extend(self.input_gate_memory_state_update_block.get_state_convolutions_as_list())
         result.extend(self.forget_gate_one_hidden_state_update_block.get_state_convolutions_as_list())
         result.extend(self.forget_gate_two_hidden_state_update_block.get_state_convolutions_as_list())
         result.extend(self.output_gate_hidden_state_update_block.get_state_convolutions_as_list())
@@ -189,37 +178,6 @@ class MultiDimensionalLSTMParametersOneDirectionFast(MultiDimensionalLSTMParamet
         # 4) forget gate two, 5) the output gate
         self.parallel_hidden_state_column_computation = ParallelMultipleStateWeightingsComputation.create_parallel_multiple_state_weighting_computation(
             hidden_states_size, 5)
-
-        # Input
-        self.input_input_convolution = nn.Conv2d(self.input_channels,
-                                                 self.hidden_states_size, 1)
-        # Input gate
-        self.input_gate_input_convolution = nn.Conv2d(self.input_channels,
-                                                      self.hidden_states_size, 1)
-
-        self.input_gate_memory_state_update_block = StateUpdateBlock(hidden_states_size)
-
-        # Forget gate 1
-        self.forget_gate_one_input_convolution = nn.Conv2d(self.input_channels,
-                                                           self.hidden_states_size, 1)
-        self.forget_gate_one_memory_state_convolution = nn.Conv1d(self.hidden_states_size,
-                                                                  self.hidden_states_size, 1)
-
-        # Forget gate 2
-        self.forget_gate_two_input_convolution = nn.Conv2d(self.input_channels,
-                                                           self.hidden_states_size, 1)
-
-        #self.forget_gate_two_hidden_state_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
-        self.forget_gate_two_memory_state_convolution = nn.Conv1d(self.hidden_states_size,
-                                                                  self.hidden_states_size, 1)
-
-        # Output gate
-        self.output_gate_input_convolution = nn.Conv2d(self.input_channels,
-                                                       self.hidden_states_size, 1)
-
-        # self.output_gate_memory_state_update_block = StateUpdateBlock(hidden_states_size)
-        self.output_gate_memory_state_convolution = nn.Conv1d(self.hidden_states_size,
-                                                                  self.hidden_states_size, 1)
 
         self.node_hidden_state_columns = None
         self.previous_memory_state_column = None

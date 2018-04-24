@@ -21,7 +21,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
         #self.mdlstm_direction_one_parameters = \
         #    MultiDimensionalLSTMParametersOneDirectionFast.create_multi_dimensional_lstm_parameters_one_direction_fast(
-        #        self.hidden_states_size, self.input_channels)
+        #    self.hidden_states_size, self.input_channels)
 
         self.mdlstm_direction_one_parameters = \
             MultiDimensionalLSTMParametersOneDirection.create_multi_dimensional_lstm_parameters_one_direction(
@@ -117,6 +117,9 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # storing the previous hidden state and previous memory state columns in the
             # mdlstm_parameters class or already part of the computation, depending on the
             # implementaiton of mdlstm_parameters
+
+            # print("previous hidden state column: " + str(previous_hidden_state_column))
+            # print("previous memory state column: " + str(previous_memory_state_column))
             mdlstm_parameters.prepare_computation_next_column_functions(previous_hidden_state_column,
                                                                         previous_memory_state_column)
 
@@ -151,6 +154,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                 mdlstm_parameters.get_forget_gate_one_memory_state_column(),
                 column_number, forget_gate_one_input_matrix)
 
+            # print(">>> forget_gate_one_weighted_states_plus_input: " + str(forget_gate_one_weighted_states_plus_input))
+
             # Compute the forget gate one activation
             forget_gate_one_activation_column = F.sigmoid(forget_gate_one_weighted_states_plus_input)
             # print("forget gate one activation column: " + str(forget_gate_one_activation_column))
@@ -183,9 +188,9 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
             # print("input_and_input_gate_combined: " + str(input_and_input_gate_combined))
 
-            #print("forget_gate_one_activation_column: " + str(forget_gate_two_activation_column))
-            #print("memory_states_column_forget_gate_one: " + str(memory_states_column_forget_gate_one))
-            #print("forget_gate_two_activation_column: " + str(forget_gate_two_activation_column))
+            # print("forget_gate_one_activation_column: " + str(forget_gate_two_activation_column))
+            # print("memory_states_column_forget_gate_one: " + str(memory_states_column_forget_gate_one))
+            # print("forget_gate_two_activation_column: " + str(forget_gate_two_activation_column))
             #print("memory_states_column_forget_gate_two: " + str(memory_states_column_forget_gate_two))
             #print("forget_gate_one_activation_multiplied_with_previous_memory_state: "+
             #      str(forget_gate_one_activation_multiplied_with_previous_memory_state))
@@ -196,6 +201,9 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                 forget_gate_two_activation_multiplied_with_previous_memory_state + \
                 forget_gate_one_activation_multiplied_with_previous_memory_state # + \
                 # forget_gates_combined_activation_multiplied_with_previous_memory_state \
+
+            #new_memory_state = input_and_input_gate_combined + \
+            #    forget_gate_two_activation_multiplied_with_previous_memory_state
 
 
             # print("new memory state: " + str(new_memory_state))
@@ -308,9 +316,9 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         forget_gate_weighted_states_plus_weighted_input = forget_gate_input_column + forget_gate_hidden_state_column + \
             forget_gate_memory_state_column
 
-        #print("forget_gate_memory_state_column: " + str(forget_gate_memory_state_column))
-        #print("forget_gate_hidden_state_column: " + str(forget_gate_hidden_state_column))
-        #print("forget_gate_input_column: " + str(forget_gate_input_column))
+        # print("forget_gate_memory_state_column: " + str(forget_gate_memory_state_column))
+        # print("forget_gate_hidden_state_column: " + str(forget_gate_hidden_state_column))
+        # print("forget_gate_input_column: " + str(forget_gate_input_column))
 
         # print("forget_gate_weighted_states_plus_weighted_input: " + str(forget_gate_weighted_states_plus_weighted_input))
 
