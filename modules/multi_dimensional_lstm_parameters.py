@@ -1,11 +1,68 @@
 from modules.state_update_block import StateUpdateBlock
+from abc import abstractmethod
 import torch.nn as nn
 
 
-class MultiDimensionalLSTMParametersOneDirection():
+class MultiDimensionalLSTMParametersOneDirectionBase:
     def __init__(self, hidden_states_size, input_channels):
         self.input_channels = input_channels
         self.hidden_states_size = hidden_states_size
+
+    # Needs to be implemented in the subclasses
+    @abstractmethod
+    def prepare_computation_next_column_functions(self, previous_hidden_state_column,
+                                                  previous_memory_state_column):
+        raise RuntimeError("not implemented")
+
+    # Needs to be implemented in the subclasses
+    @abstractmethod
+    def get_input_hidden_state_column(self):
+        raise RuntimeError("not implemented")
+
+    # Needs to be implemented in the subclasses
+    @abstractmethod
+    def get_input_gate_hidden_state_column(self):
+        raise RuntimeError("not implemented")
+
+    # Needs to be implemented in the subclasses
+    @abstractmethod
+    def get_input_gate_memory_state_column(self):
+        raise RuntimeError("not implemented")
+
+    # Needs to be implemented in the subclasses
+    @abstractmethod
+    def get_forget_gate_one_hidden_state_column(self):
+        raise RuntimeError("not implemented")
+
+    # Needs to be implemented in the subclasses
+    @abstractmethod
+    def get_forget_gate_two_hidden_state_column(self):
+        raise RuntimeError("not implemented")
+
+    # Needs to be implemented in the subclasses
+    @abstractmethod
+    def get_forget_gate_one_memory_state_column(self):
+        raise RuntimeError("not implemented")
+
+    # Needs to be implemented in the subclasses
+    @abstractmethod
+    def get_forget_gate_two_memory_state_column(self):
+        raise RuntimeError("not implemented")
+
+    # Needs to be implemented in the subclasses
+    @abstractmethod
+    def get_output_gate_hidden_state_column(self):
+        raise RuntimeError("not implemented")
+
+    # Needs to be implemented in the subclasses
+    @abstractmethod
+    def get_all_parameters_as_list(self):
+        raise RuntimeError("not implemented")
+
+
+class MultiDimensionalLSTMParametersOneDirection(MultiDimensionalLSTMParametersOneDirectionBase):
+    def __init__(self, hidden_states_size, input_channels):
+        super(MultiDimensionalLSTMParametersOneDirection, self).__init__(hidden_states_size, input_channels)
 
         # Input
         self.input_input_convolution = nn.Conv2d(self.input_channels,
@@ -95,7 +152,6 @@ class MultiDimensionalLSTMParametersOneDirection():
             StateUpdateBlock.compute_weighted_state_input_state_two(self.forget_gate_two_memory_state_convolution,
                                                                     self.previous_memory_state_column)
         return forget_gate_memory_state_column
-
 
     def get_output_gate_hidden_state_column(self):
         output_gate_hidden_state_column = \
