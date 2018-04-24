@@ -9,19 +9,22 @@ import torch.nn as nn
 from modules.state_update_block import StateUpdateBlock
 from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParametersOneDirection
 from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParametersOneDirectionFast
-
+from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParametersCreator
+from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParametersCreatorSlow
+from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParametersCreatorFast
 
 class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
     def __init__(self, hidden_states_size, batch_size, compute_multi_directional: bool,
+                 multi_dimensional_lstm_parameter_creator:MultiDimensionalLSTMParametersCreator,
                  nonlinearity="tanh"):
         super(MultiDimensionalLSTM, self).__init__(hidden_states_size, batch_size,
                                                   compute_multi_directional,
                                                   nonlinearity)
 
         self.mdlstm_direction_one_parameters = \
-            MultiDimensionalLSTMParametersOneDirectionFast.create_multi_dimensional_lstm_parameters_one_direction_fast(
-            self.hidden_states_size, self.input_channels)
+            multi_dimensional_lstm_parameter_creator.create_multi_dimensional_lstm_parameters_one_direction(
+                self.hidden_states_size, self.input_channels)
 
         #self.mdlstm_direction_one_parameters = \
         #    MultiDimensionalLSTMParametersOneDirection.create_multi_dimensional_lstm_parameters_one_direction(
@@ -31,13 +34,13 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         if self.compute_multi_directional:
             self.fc3 = nn.Linear(self.number_of_output_dimensions(), 10)
             self.mdlstm_direction_two_parameters = \
-                MultiDimensionalLSTMParametersOneDirection.create_multi_dimensional_lstm_parameters_one_direction(
+                multi_dimensional_lstm_parameter_creator.create_multi_dimensional_lstm_parameters_one_direction(
                     self.hidden_states_size, self.input_channels)
             self.mdlstm_direction_three_parameters = \
-                MultiDimensionalLSTMParametersOneDirection.create_multi_dimensional_lstm_parameters_one_direction(
+                multi_dimensional_lstm_parameter_creator.create_multi_dimensional_lstm_parameters_one_direction(
                     self.hidden_states_size, self.input_channels)
             self.mdlstm_direction_four_parameters = \
-                MultiDimensionalLSTMParametersOneDirection.create_multi_dimensional_lstm_parameters_one_direction(
+                multi_dimensional_lstm_parameter_creator.create_multi_dimensional_lstm_parameters_one_direction(
                     self.hidden_states_size, self.input_channels)
 
             self.set_bias_forget_gates_to_one(self.mdlstm_direction_two_parameters)
@@ -74,7 +77,16 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
     @staticmethod
     def create_multi_dimensional_lstm(hidden_states_size:int ,batch_size:int , compute_multi_directional: bool,
                                      nonlinearity="tanh"):
-        return MultiDimensionalLSTM(hidden_states_size, batch_size, compute_multi_directional, nonlinearity)
+        return MultiDimensionalLSTM(hidden_states_size, batch_size, compute_multi_directional,
+                                    MultiDimensionalLSTMParametersCreatorSlow(),
+                                    nonlinearity)
+
+    @staticmethod
+    def create_multi_dimensional_lstm_fast(hidden_states_size: int, batch_size: int, compute_multi_directional: bool,
+                                      nonlinearity="tanh"):
+        return MultiDimensionalLSTM(hidden_states_size, batch_size, compute_multi_directional,
+                                    MultiDimensionalLSTMParametersCreatorFast(),
+                                    nonlinearity)
 
     def compute_multi_dimensional_lstm_one_direction(self, mdlstm_parameters, x):
         # Step 1: Create a skewed version of the input image

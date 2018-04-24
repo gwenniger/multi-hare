@@ -74,10 +74,15 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
     #                                                                                  compute_multi_directional,
     #                                                                                  nonlinearity="sigmoid")
 
-    multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm(hidden_states_size,
-                                                                               batch_size,
-                                                                               compute_multi_directional,
-                                                                               nonlinearity="sigmoid")
+    #multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm(hidden_states_size,
+    #                                                                           batch_size,
+    #                                                                           compute_multi_directional,
+    #                                                                           nonlinearity="sigmoid")
+
+    multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(hidden_states_size,
+                                                                                    batch_size,
+                                                                                    compute_multi_directional,
+                                                                                    nonlinearity="sigmoid")
 
     #multi_dimensional_rnn = Net()
 

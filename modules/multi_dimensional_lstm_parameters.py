@@ -249,7 +249,7 @@ class MultiDimensionalLSTMParametersOneDirectionFast(MultiDimensionalLSTMParamet
         return result
 
 
-class MultiDimensionalLSTMParametersCreator():
+class MultiDimensionalLSTMParametersCreator:
 
     # Needs to be implemented in the subclasses
     @abstractmethod
