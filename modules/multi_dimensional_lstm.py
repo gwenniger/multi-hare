@@ -118,11 +118,11 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
             # Compute convolution on previous state column vector padded with zeros
             # Compute convolution on previous state column vector padded with zeros
-            input_hidden_state_column = mdlstm_parameters.input_hidden_state_update_block.\
-                compute_weighted_states_input(previous_hidden_state_column)
+            input_hidden_state_column = mdlstm_parameters.get_input_hidden_state_column()
 
             # print("state_column.size(): " + str(state_column.size()))
-            input_state_plus_input = MultiDimensionalRNNBase.compute_states_plus_input(input_input_matrix, column_number,
+            input_state_plus_input = MultiDimensionalRNNBase.compute_states_plus_input(input_input_matrix,
+                                                                                       column_number,
                                                                                        input_hidden_state_column)
 
             # Compute the sum of weighted inputs of the input gate
@@ -144,10 +144,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
             forget_gate_one_weighted_states_plus_input = self.compute_weighted_input_forget_gate(
                 mdlstm_parameters.get_forget_gate_one_hidden_state_column(),
-                mdlstm_parameters.forget_gate_one_memory_state_convolution,
-                previous_memory_state_column,
-                column_number, forget_gate_one_input_matrix,
-                1)
+                mdlstm_parameters.get_forget_gate_one_memory_state_column(),
+                column_number, forget_gate_one_input_matrix)
 
             # Compute the forget gate one activation
             forget_gate_one_activation_column = F.sigmoid(forget_gate_one_weighted_states_plus_input)
@@ -163,10 +161,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
             forget_gate_two_weighted_states_plus_input = self.compute_weighted_input_forget_gate(
                 mdlstm_parameters.get_forget_gate_two_hidden_state_column(),
-                mdlstm_parameters.forget_gate_two_memory_state_convolution,
-                previous_memory_state_column,
-                column_number, forget_gate_two_input_matrix,
-                2)
+                mdlstm_parameters.get_forget_gate_two_memory_state_column(),
+                column_number, forget_gate_two_input_matrix)
 
             # Compute the forget gate two activation
             forget_gate_two_activation_column = F.sigmoid(forget_gate_two_weighted_states_plus_input)
@@ -274,40 +270,34 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         return result
 
     @staticmethod
-    def compute_weighted_input_both_memory_gate(column_number, input_gate_input_matrix,
-                                                ldstm_parameters: MultiDimensionalLSTMParametersOneDirection):
-        input_gate_input_column = input_gate_input_matrix[:, :, :, column_number]
-        input_gate_hidden_state_column = ldstm_parameters.get_input_gate_hidden_state_column()
-        input_gate_memory_state_column = ldstm_parameters.get_input_gate_memory_state_column()
-        input_gate_weighted_states_plus_weighted_input = input_gate_input_column + input_gate_hidden_state_column + \
-            input_gate_memory_state_column
-        return input_gate_weighted_states_plus_weighted_input
-
-    @staticmethod
     def compute_weighted_input_input_gate(column_number, input_gate_input_matrix, mdlstm_parameters):
-        return MultiDimensionalLSTM.compute_weighted_input_both_memory_gate(column_number, input_gate_input_matrix,
-                                                                            mdlstm_parameters)
+        input_gate_input_column = input_gate_input_matrix[:, :, :, column_number]
+        input_gate_hidden_state_column = mdlstm_parameters.get_input_gate_hidden_state_column()
+        input_gate_memory_state_column = mdlstm_parameters.get_input_gate_memory_state_column()
+        input_gate_weighted_states_plus_weighted_input = input_gate_input_column + \
+            input_gate_hidden_state_column + input_gate_memory_state_column
+        return input_gate_weighted_states_plus_weighted_input
 
     def compute_weighted_input_output_gate(self, mdlstm_parameters,
                                            previous_memory_state_column,
                                            column_number, output_gate_input_matrix):
+
+        # TODO: The third argument should be 1, 2 is a bug, as it shifts the input
+        # to the memory gate
+        output_gate_memory_state_column = StateUpdateBlock.\
+            compute_weighted_state_input_static(mdlstm_parameters.output_gate_memory_state_convolution,
+                                                previous_memory_state_column, 2)
+
         return self.compute_weighted_input_forget_gate(
                 mdlstm_parameters.get_output_gate_hidden_state_column(),
-                mdlstm_parameters.output_gate_memory_state_convolution,
-                previous_memory_state_column,
-                column_number, output_gate_input_matrix,
-                2)
+                output_gate_memory_state_column,
+                column_number, output_gate_input_matrix)
 
-    def compute_weighted_input_forget_gate(self, forget_gate_hidden_state_column,
-                                           forget_gate_memory_state_convolution,
-                                           previous_memory_state_column,
-                                           column_number, forget_gate_input_matrix,
-                                           memory_state_index: int):
-        forget_gate_memory_state_column = \
-            StateUpdateBlock.compute_weighted_state_input_static(forget_gate_memory_state_convolution,
-                                                                 previous_memory_state_column,
-                                                                 memory_state_index,
-                                                                 self.hidden_states_size)
+    @staticmethod
+    def compute_weighted_input_forget_gate(forget_gate_hidden_state_column,
+                                           forget_gate_memory_state_column,
+                                           column_number, forget_gate_input_matrix):
+
         forget_gate_input_column = forget_gate_input_matrix[:, :, :, column_number]
         forget_gate_weighted_states_plus_weighted_input = forget_gate_input_column + forget_gate_hidden_state_column + \
             forget_gate_memory_state_column

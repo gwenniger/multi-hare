@@ -57,7 +57,7 @@ class StateUpdateBlock():
 
     @staticmethod
     def compute_weighted_state_input_static(state_convolution, previous_state_column,
-                                            state_index: int, hidden_states_size):
+                                            state_index: int):
         return state_convolution(StateUpdateBlock.
                                  get_previous_state_column(previous_state_column, state_index))
 

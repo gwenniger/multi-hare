@@ -57,6 +57,11 @@ class MultiDimensionalLSTMParametersOneDirection():
         self.previous_hidden_state_column = previous_hidden_state_column
         self.previous_memory_state_column = previous_memory_state_column
 
+    def get_input_hidden_state_column(self):
+        input_hidden_state_column = self.input_hidden_state_update_block. \
+            compute_weighted_states_input(self.previous_hidden_state_column)
+        return input_hidden_state_column
+
     def get_input_gate_hidden_state_column(self):
         input_gate_hidden_state_column = self.input_gate_hidden_state_update_block. \
             compute_weighted_states_input(self.previous_hidden_state_column)
@@ -78,6 +83,21 @@ class MultiDimensionalLSTMParametersOneDirection():
             self.forget_gate_two_hidden_state_update_block.compute_weighted_states_input(
                 self.previous_hidden_state_column)
         return forget_gate_two_hidden_state_column
+
+    def get_forget_gate_one_memory_state_column(self):
+        forget_gate_memory_state_column = \
+            StateUpdateBlock.compute_weighted_state_input_static(self.forget_gate_one_memory_state_convolution,
+                                                                 self.previous_memory_state_column,
+                                                                 1)
+        return forget_gate_memory_state_column
+
+    def get_forget_gate_two_memory_state_column(self):
+        forget_gate_memory_state_column = \
+            StateUpdateBlock.compute_weighted_state_input_static(self.forget_gate_two_memory_state_convolution,
+                                                                 self.previous_memory_state_column,
+                                                                 2)
+        return forget_gate_memory_state_column
+
 
     def get_output_gate_hidden_state_column(self):
         output_gate_hidden_state_column = \
