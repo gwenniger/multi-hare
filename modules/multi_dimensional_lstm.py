@@ -282,11 +282,9 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                            previous_memory_state_column,
                                            column_number, output_gate_input_matrix):
 
-        # TODO: The third argument should be 1, 2 is a bug, as it shifts the input
-        # to the memory gate
         output_gate_memory_state_column = StateUpdateBlock.\
             compute_weighted_state_input_static(mdlstm_parameters.output_gate_memory_state_convolution,
-                                                previous_memory_state_column, 2)
+                                                previous_memory_state_column, 1)
 
         return self.compute_weighted_input_forget_gate(
                 mdlstm_parameters.get_output_gate_hidden_state_column(),
