@@ -56,18 +56,20 @@ class StateUpdateBlock():
         return previous_state_column
 
     @staticmethod
-    def compute_weighted_state_input_static(state_convolution, previous_state_column,
-                                            state_index: int):
-        return state_convolution(StateUpdateBlock.
-                                 get_previous_state_column(previous_state_column, state_index))
+    def compute_weighted_state_input_state_one(state_convolution, previous_state_column):
+        return state_convolution(previous_state_column)
 
-    def compute_weighted_state_input(self, state_convolution, previous_state_column,
-                                     state_index: int):
-        return state_convolution(self.get_previous_state_column(previous_state_column, state_index))
+    # The weighted state input for the second state is computed over the shifted previous
+    # state column. This is necessary to get the right predecessor, while using the
+    # skewed input trick from the pixel RNN paper as done in this implementation of
+    # MultiDimensionalLSTM
+    @staticmethod
+    def compute_weighted_state_input_state_two(state_convolution, previous_state_column):
+        return state_convolution(StateUpdateBlock.get_shifted_column_fast(previous_state_column))
 
     def compute_weighted_states_input(self, previous_state_column):
-        state_one_result = self.state_one_convolution(self.get_previous_state_column(previous_state_column, 1))
-        state_two_result = self.state_two_convolution(self.get_previous_state_column(previous_state_column, 2))
+        state_one_result = self.state_one_convolution(previous_state_column)
+        state_two_result = self.state_two_convolution(StateUpdateBlock.get_shifted_column_fast(previous_state_column))
         result = state_one_result + state_two_result
         return result
 

@@ -139,8 +139,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             input_and_input_gate_combined = torch.mul(input_activation_column, input_gate_activation_column)
             # print("input and input gate combined: " + str(input_and_input_gate_combined))
 
-            memory_states_column_forget_gate_one = StateUpdateBlock.\
-                get_previous_state_column(previous_memory_state_column, 1)
+            memory_states_column_forget_gate_one = previous_memory_state_column
 
             forget_gate_one_weighted_states_plus_input = self.compute_weighted_input_forget_gate(
                 mdlstm_parameters.get_forget_gate_one_hidden_state_column(),
@@ -157,7 +156,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                           memory_states_column_forget_gate_one)
 
             memory_states_column_forget_gate_two = StateUpdateBlock.\
-                get_previous_state_column(previous_memory_state_column, 2)
+                get_shifted_column_fast(previous_memory_state_column)
 
             forget_gate_two_weighted_states_plus_input = self.compute_weighted_input_forget_gate(
                 mdlstm_parameters.get_forget_gate_two_hidden_state_column(),
@@ -283,8 +282,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                            column_number, output_gate_input_matrix):
 
         output_gate_memory_state_column = StateUpdateBlock.\
-            compute_weighted_state_input_static(mdlstm_parameters.output_gate_memory_state_convolution,
-                                                previous_memory_state_column, 1)
+            compute_weighted_state_input_state_one(mdlstm_parameters.output_gate_memory_state_convolution,
+                                                   previous_memory_state_column)
 
         return self.compute_weighted_input_forget_gate(
                 mdlstm_parameters.get_output_gate_hidden_state_column(),

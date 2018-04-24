@@ -86,16 +86,14 @@ class MultiDimensionalLSTMParametersOneDirection():
 
     def get_forget_gate_one_memory_state_column(self):
         forget_gate_memory_state_column = \
-            StateUpdateBlock.compute_weighted_state_input_static(self.forget_gate_one_memory_state_convolution,
-                                                                 self.previous_memory_state_column,
-                                                                 1)
+            StateUpdateBlock.compute_weighted_state_input_state_one(self.forget_gate_one_memory_state_convolution,
+                                                                    self.previous_memory_state_column)
         return forget_gate_memory_state_column
 
     def get_forget_gate_two_memory_state_column(self):
         forget_gate_memory_state_column = \
-            StateUpdateBlock.compute_weighted_state_input_static(self.forget_gate_two_memory_state_convolution,
-                                                                 self.previous_memory_state_column,
-                                                                 2)
+            StateUpdateBlock.compute_weighted_state_input_state_two(self.forget_gate_two_memory_state_convolution,
+                                                                    self.previous_memory_state_column)
         return forget_gate_memory_state_column
 
 
