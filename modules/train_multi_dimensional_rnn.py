@@ -61,7 +61,7 @@ def evaluate_mdrnn(multi_dimensional_rnn, batch_size):
             100 * correct / total))
 
 
-def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional: bool):
+def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional: bool, use_dropout: bool):
     import torch.optim as optim
 
     criterion = nn.CrossEntropyLoss()
@@ -82,6 +82,7 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
     multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(hidden_states_size,
                                                                                     batch_size,
                                                                                     compute_multi_directional,
+                                                                                    use_dropout,
                                                                                     nonlinearity="sigmoid")
 
     #multi_dimensional_rnn = Net()
@@ -154,6 +155,7 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
     print('Finished Training')
 
     # Run evaluation
+    multi_dimensional_rnn.set_training(False)
     evaluate_mdrnn(multi_dimensional_rnn, batch_size)
 
 
@@ -163,7 +165,8 @@ def main():
     hidden_states_size = 32
     batch_size = 128
     compute_multi_directional = False
-    train_mdrnn(hidden_states_size, batch_size,  compute_multi_directional)
+    use_dropout = True
+    train_mdrnn(hidden_states_size, batch_size,  compute_multi_directional, use_dropout)
 
 
 if __name__ == "__main__":

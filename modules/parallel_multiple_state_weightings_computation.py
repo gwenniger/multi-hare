@@ -1,5 +1,5 @@
 import torch.nn as nn
-import torch
+import torch.nn.functional as F
 from modules.multi_dimensional_rnn import StateUpdateBlock
 
 
@@ -7,15 +7,20 @@ class ParallelMultipleStateWeightingsComputation:
     def __init__(self, hidden_states_size: int,
                  number_of_paired_input_weightings,
                  output_states_size,
-                 parallel_convolution,):
+                 parallel_convolution,
+                 use_dropout: bool,
+                 training: bool):
         self.hidden_states_size = hidden_states_size
         self.number_of_paired_input_weightings = number_of_paired_input_weightings
         self.output_states_size = output_states_size
         self.parallel_convolution = parallel_convolution
+        self.use_dropout = use_dropout
+        self.training = training
 
     @staticmethod
     def create_parallel_multiple_state_weighting_computation(hidden_states_size: int,
-                                                             number_of_paired_input_weightings: int):
+                                                             number_of_paired_input_weightings: int,
+                                                             use_dropout: bool):
         output_states_size = hidden_states_size * number_of_paired_input_weightings * 2
 
         parallel_convolution = nn.Conv1d(hidden_states_size, output_states_size, 1)
@@ -23,9 +28,21 @@ class ParallelMultipleStateWeightingsComputation:
         # torch.nn.init.xavier_uniform(parallel_convolution.weight)
 
         return ParallelMultipleStateWeightingsComputation(hidden_states_size, number_of_paired_input_weightings,
-                                                          output_states_size, parallel_convolution)
 
+                                                          output_states_size, parallel_convolution, use_dropout,
+                                                          True)
+
+    # How to do dropout in pytorch:
+    # https://discuss.pytorch.org/t/dropout-functional-api-advantages-disadvantages/181/4
+    # https://github.com/pytorch/examples/blob/master/mnist/main.py
+    # Where to apply dropout:
+    # https://stats.stackexchange.com/questions/240305/where-should-i-place-dropout-layers-in-a-neural-network
     def compute_convolution_result(self, previous_state_column):
+        if self.use_dropout:
+                # print("Applying dropout...")
+                # TODO: which probability to use for dropout?
+                result = F.dropout(self.parallel_convolution(previous_state_column),   p=0.2, training=self.training)
+                return result
         result = self.parallel_convolution(previous_state_column)
         return result
 
@@ -100,3 +117,7 @@ class ParallelMultipleStateWeightingsComputation:
 
     def get_state_convolutions_as_list(self):
         return list([self.parallel_convolution])
+
+    # When testing the model, training should be set to false
+    def set_training(self, training):
+        self.training = training
