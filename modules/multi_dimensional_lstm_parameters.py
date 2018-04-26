@@ -22,11 +22,6 @@ class MultiDimensionalLSTMParametersOneDirectionBase:
                                                        self.hidden_states_size, 1)
 
         # Memory state convolutions
-        self.input_gate_memory_state_update_block = StateUpdateBlock(hidden_states_size)
-        self.forget_gate_one_memory_state_convolution = nn.Conv1d(self.hidden_states_size,
-                                                                  self.hidden_states_size, 1)
-        self.forget_gate_two_memory_state_convolution = nn.Conv1d(self.hidden_states_size,
-                                                                  self.hidden_states_size, 1)
         self.output_gate_memory_state_convolution = nn.Conv1d(self.hidden_states_size,
                                                               self.hidden_states_size, 1)
 
@@ -81,6 +76,11 @@ class MultiDimensionalLSTMParametersOneDirectionBase:
     def get_all_parameters_as_list(self):
         raise RuntimeError("not implemented")
 
+    # Needs to be implemented in the subclasses
+    @abstractmethod
+    def set_bias_forget_gates_to_one(self):
+        raise RuntimeError("not implemented")
+
     def get_all_input_convolutions_as_list(self):
         result = list([])
         result.append(self.input_input_convolution)
@@ -88,14 +88,6 @@ class MultiDimensionalLSTMParametersOneDirectionBase:
         result.append(self.forget_gate_one_input_convolution)
         result.append(self.forget_gate_two_input_convolution)
         result.append(self.output_gate_input_convolution)
-        return result
-
-    def get_all_memory_state_convolutions_as_list(self):
-        result = list([])
-        result.append(self.output_gate_memory_state_convolution)
-        result.append(self.forget_gate_one_memory_state_convolution)
-        result.append(self.forget_gate_two_memory_state_convolution)
-        result.extend(self.input_gate_memory_state_update_block.get_state_convolutions_as_list())
         return result
 
 
@@ -108,6 +100,13 @@ class MultiDimensionalLSTMParametersOneDirection(MultiDimensionalLSTMParametersO
         self.forget_gate_one_hidden_state_update_block = StateUpdateBlock(hidden_states_size)
         self.forget_gate_two_hidden_state_update_block = StateUpdateBlock(hidden_states_size)
         self.output_gate_hidden_state_update_block = StateUpdateBlock(hidden_states_size)
+
+        # Memory state convolutions
+        self.input_gate_memory_state_update_block = StateUpdateBlock(hidden_states_size)
+        self.forget_gate_one_memory_state_convolution = nn.Conv1d(self.hidden_states_size,
+                                                                  self.hidden_states_size, 1)
+        self.forget_gate_two_memory_state_convolution = nn.Conv1d(self.hidden_states_size,
+                                                                  self.hidden_states_size, 1)
 
         self.previous_hidden_state_column = None
         self.previous_memory_state_column = None
@@ -175,6 +174,14 @@ class MultiDimensionalLSTMParametersOneDirection(MultiDimensionalLSTMParametersO
         result.extend(self.output_gate_hidden_state_update_block.get_state_convolutions_as_list())
         return result
 
+    def get_all_memory_state_convolutions_as_list(self):
+        result = list([])
+        result.append(self.output_gate_memory_state_convolution)
+        result.append(self.forget_gate_one_memory_state_convolution)
+        result.append(self.forget_gate_two_memory_state_convolution)
+        result.extend(self.input_gate_memory_state_update_block.get_state_convolutions_as_list())
+        return result
+
     def get_all_parameters_as_list(self):
         result = list([])
         result.extend(self.get_all_input_convolutions_as_list())
@@ -182,7 +189,21 @@ class MultiDimensionalLSTMParametersOneDirection(MultiDimensionalLSTMParametersO
         result.extend(self.get_all_hidden_state_convolutions_as_list())
         return result
 
+    def set_bias_forget_gates_to_one(self):
+        FORGET_GATE_BIAS_INIT = 1
+        # self.forget_gate_one_input_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
+        # self.forget_gate_one_hidden_state_update_block.set_bias_for_convolutions(FORGET_GATE_BIAS_INIT)
+        self.forget_gate_one_memory_state_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
 
+        # self.forget_gate_two_input_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
+        # self.forget_gate_two_hidden_state_update_block.set_bias_for_convolutions(FORGET_GATE_BIAS_INIT)
+        self.forget_gate_two_memory_state_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
+
+
+# This implementation of MultiDimensionalLSTMParametersOneDirectionBase uses special 1d convolutions wrapped by the
+# ParallelMultipleStateWeightingsComputation to perform several (N) 1d convolutions over the same input together, using
+# a single convolution with N times as many outputs
+# https://discuss.pytorch.org/t/is-there-a-way-to-parallelize-independent-sequential-steps/3360
 class MultiDimensionalLSTMParametersOneDirectionFast(MultiDimensionalLSTMParametersOneDirectionBase):
     def __init__(self, hidden_states_size, input_channels):
         super(MultiDimensionalLSTMParametersOneDirectionFast, self).__init__(hidden_states_size, input_channels)
@@ -193,8 +214,11 @@ class MultiDimensionalLSTMParametersOneDirectionFast(MultiDimensionalLSTMParamet
         self.parallel_hidden_state_column_computation = ParallelMultipleStateWeightingsComputation.create_parallel_multiple_state_weighting_computation(
             hidden_states_size, 5)
 
+        self.parallel_memory_state_column_computation = ParallelMultipleStateWeightingsComputation.create_parallel_multiple_state_weighting_computation(
+            hidden_states_size, 2)
+
         self.node_hidden_state_columns = None
-        self.node_memory_state_columns = None  # TODO: Implement the computation of this
+        self.node_memory_state_columns = None
         self.previous_memory_state_column = None
 
     @staticmethod
@@ -210,9 +234,9 @@ class MultiDimensionalLSTMParametersOneDirectionFast(MultiDimensionalLSTMParamet
             self.parallel_hidden_state_column_computation.compute_summed_outputs_every_pair(previous_hidden_state_column)
         self.previous_memory_state_column = previous_memory_state_column
 
-        # TODO: A second list node_memory_state_columns should be computed
-        # using a second 1d convolution that computes all memory state convolutions
-        # that depend only on the input at once
+        self.node_memory_state_columns = self.\
+            parallel_memory_state_column_computation.\
+            compute_result_and_split_into_pairs_with_second_pair_element_shifted(previous_memory_state_column)
 
     def get_input_hidden_state_column(self):
         return self.node_hidden_state_columns[0]
@@ -230,31 +254,46 @@ class MultiDimensionalLSTMParametersOneDirectionFast(MultiDimensionalLSTMParamet
         return self.node_hidden_state_columns[4]
 
     def get_input_gate_memory_state_column(self):
-        # TODO: Compute using self.node_memory_state_columns
-        input_gate_memory_state_column = self.input_gate_memory_state_update_block. \
-            compute_weighted_states_input(self.previous_memory_state_column)
+        input_gate_memory_state_column_part_pair = \
+            self.node_memory_state_columns[0]
+        input_gate_memory_state_column = input_gate_memory_state_column_part_pair[0] + \
+            input_gate_memory_state_column_part_pair[1]
         return input_gate_memory_state_column
 
     def get_forget_gate_one_memory_state_column(self):
-        # TODO: Compute using self.node_memory_state_columns
-        forget_gate_memory_state_column = \
-            StateUpdateBlock.compute_weighted_state_input_state_one(self.forget_gate_one_memory_state_convolution,
-                                                                    self.previous_memory_state_column)
+        forget_gate_memory_state_column_part_pair = \
+            self.node_memory_state_columns[1]
+        forget_gate_memory_state_column = forget_gate_memory_state_column_part_pair[0]
         return forget_gate_memory_state_column
 
     def get_forget_gate_two_memory_state_column(self):
-        # TODO: Compute using self.node_memory_state_columns
-        forget_gate_memory_state_column = \
-            StateUpdateBlock.compute_weighted_state_input_state_two(self.forget_gate_two_memory_state_convolution,
-                                                                    self.previous_memory_state_column)
+        forget_gate_memory_state_column_part_pair = \
+            self.node_memory_state_columns[1]
+        forget_gate_memory_state_column = forget_gate_memory_state_column_part_pair[1]
         return forget_gate_memory_state_column
 
     def get_all_parameters_as_list(self):
         result = list([])
         result.extend(self.get_all_input_convolutions_as_list())
-        result.extend(self.get_all_memory_state_convolutions_as_list())
+        result.append(self.output_gate_memory_state_convolution)
         result.extend(self.parallel_hidden_state_column_computation.get_state_convolutions_as_list())
+        result.extend(self.parallel_memory_state_column_computation.get_state_convolutions_as_list())
         return result
+
+    def set_bias_forget_gates_to_one(self):
+        FORGET_GATE_BIAS_INIT = 1
+        # self.forget_gate_one_input_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
+        # self.forget_gate_one_hidden_state_update_block.set_bias_for_convolutions(FORGET_GATE_BIAS_INIT)
+        #self.forget_gate_one_memory_state_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
+        # print("before: self.parallel_memory_state_column_computation.parallel_convolution.bias.data: " +
+        #        str(self.parallel_memory_state_column_computation.parallel_convolution.bias.data))
+        start_index = int(self.parallel_memory_state_column_computation.parallel_convolution.bias.data.size(0) / 2)
+        end_index = self.parallel_memory_state_column_computation.parallel_convolution.bias.data.size(0)
+        # print("start index: " + str(start_index) + " end index: " + str(end_index))
+        for index in range(start_index, end_index):
+            self.parallel_memory_state_column_computation.parallel_convolution.bias.data[index] = FORGET_GATE_BIAS_INIT
+        #print("after: self.parallel_memory_state_column_computation.parallel_convolution.bias.data: " +
+        #      str(self.parallel_memory_state_column_computation.parallel_convolution.bias.data))
 
 
 class MultiDimensionalLSTMParametersCreator:
@@ -278,5 +317,5 @@ class MultiDimensionalLSTMParametersCreatorSlow(MultiDimensionalLSTMParametersCr
 
     def create_multi_dimensional_lstm_parameters_one_direction(self,
                                                                     hidden_states_size, input_channels):
-        return MultiDimensionalLSTMParametersOneDirectionFast.\
+        return MultiDimensionalLSTMParametersOneDirection.\
             create_multi_dimensional_lstm_parameters_one_direction(hidden_states_size, input_channels)

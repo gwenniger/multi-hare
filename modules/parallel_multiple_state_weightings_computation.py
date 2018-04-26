@@ -54,19 +54,7 @@ class ParallelMultipleStateWeightingsComputation:
             result.append(pair)
         return result
 
-    # This method :
-    # 1. Computes the shared convolution over the previous_state_column
-    # 2. Splits the output of the convolution with dimension of
-    #    [batch_size, image_height, hidden_states_size * number_of_paired_input_weightings * 2]
-    #    into pairs, each pair containing a part of the output of size
-    #    [batch_size, image_height, hidden_states_size]
-    #    the two pair elements correspond to a weighting of the first and second
-    #    previous state respectively (to get the second previous state the results
-    #    still need to be shifted by one position)
-    # 3. Shift the second element of each pair one row down, and sum it with the first
-    #    element to get the final output for each pair. Return the list of these
-    #    results, which has number_of_paired_input_weightings elements
-    def compute_summed_outputs_every_pair(self, previous_state_column):
+    def compute_result_and_split_into_pairs_with_second_pair_element_shifted(self, previous_state_column):
         result = list([])
         convolution_result_pairs = self.compute_result_and_split_into_output_pairs(previous_state_column)
         for result_pair in convolution_result_pairs:
@@ -82,15 +70,31 @@ class ParallelMultipleStateWeightingsComputation:
 
             # Faster
             pair_two_element_shifted = StateUpdateBlock.get_shifted_column_fast(result_pair[1])
+            pair = tuple((pair_element_one, pair_two_element_shifted))
+            result.append(pair)
+        return result
+
+    # This method :
+    # 1. Computes the shared convolution over the previous_state_column
+    # 2. Splits the output of the convolution with dimension of
+    #    [batch_size, image_height, hidden_states_size * number_of_paired_input_weightings * 2]
+    #    into pairs, each pair containing a part of the output of size
+    #    [batch_size, image_height, hidden_states_size]
+    #    the two pair elements correspond to a weighting of the first and second
+    #    previous state respectively (to get the second previous state the results
+    #    still need to be shifted by one position)
+    # 3. Shift the second element of each pair one row down, and sum it with the first
+    #    element to get the final output for each pair. Return the list of these
+    #    results, which has number_of_paired_input_weightings elements
+    def compute_summed_outputs_every_pair(self, previous_state_column):
+        result = list([])
+        convolution_result_pairs = self.\
+            compute_result_and_split_into_pairs_with_second_pair_element_shifted(previous_state_column)
+        for result_pair in convolution_result_pairs:
+            pair_element_one = result_pair[0]
+            pair_two_element_shifted = result_pair[1]
             # print("pair two element shifted: " + str(pair_two_element_shifted))
             summed_values = pair_element_one + pair_two_element_shifted
-
-            # Not really faster but simpler and about the same speed
-            #summed_values = pair_element_one.clone()
-            #print("summed_values: " + str(summed_values))
-            #summed_values[:, :, 1:] = summed_values[:, :, 1:] +\
-            #    pair_element_two[:, :, 0: pair_element_two.size(2) - 1]
-            # print("summed values: " + str(summed_values))
             result.append(summed_values)
         return result
 

@@ -101,7 +101,7 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
 
     start = time.time()
 
-    for epoch in range(2):  # loop over the dataset multiple times
+    for epoch in range(4):  # loop over the dataset multiple times
 
         running_loss = 0.0
         for i, data in enumerate(trainloader, 0):

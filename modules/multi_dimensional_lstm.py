@@ -26,9 +26,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             multi_dimensional_lstm_parameter_creator.create_multi_dimensional_lstm_parameters_one_direction(
                 self.hidden_states_size, self.input_channels)
 
-        #self.mdlstm_direction_one_parameters = \
-        #    MultiDimensionalLSTMParametersOneDirection.create_multi_dimensional_lstm_parameters_one_direction(
-         #       self.hidden_states_size, self.input_channels)
+        # Set initial bias for the forget gates to one, since it is known to give better results
+        self.mdlstm_direction_one_parameters.set_bias_forget_gates_to_one()
 
         # For multi-directional rnn
         if self.compute_multi_directional:
@@ -36,12 +35,20 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             self.mdlstm_direction_two_parameters = \
                 multi_dimensional_lstm_parameter_creator.create_multi_dimensional_lstm_parameters_one_direction(
                     self.hidden_states_size, self.input_channels)
+            # Set initial bias for the forget gates to one, since it is known to give better results
+            self.mdlstm_direction_two_parameters.set_bias_forget_gates_to_one()
+
             self.mdlstm_direction_three_parameters = \
                 multi_dimensional_lstm_parameter_creator.create_multi_dimensional_lstm_parameters_one_direction(
                     self.hidden_states_size, self.input_channels)
+            # Set initial bias for the forget gates to one, since it is known to give better results
+            self.mdlstm_direction_three_parameters.set_bias_forget_gates_to_one()
+
             self.mdlstm_direction_four_parameters = \
                 multi_dimensional_lstm_parameter_creator.create_multi_dimensional_lstm_parameters_one_direction(
                     self.hidden_states_size, self.input_channels)
+            # Set initial bias for the forget gates to one, since it is known to give better results
+            self.mdlstm_direction_four_parameters.set_bias_forget_gates_to_one()
 
             self.set_bias_forget_gates_to_one(self.mdlstm_direction_two_parameters)
             self.set_bias_forget_gates_to_one(self.mdlstm_direction_three_parameters)
@@ -49,21 +56,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         else:
             self.fc3 = nn.Linear(self.number_of_output_dimensions(), 10)
 
-        # Set initial bias for the forget gates to one, since it is known to give better results
-        self.set_bias_forget_gates_to_one(self.mdlstm_direction_one_parameters)
-
         self.state_convolutions = nn.ModuleList([])
         self.register_parameters_to_assure_same_gpu_is_used()
-
-    def set_bias_forget_gates_to_one(self, mdlstm_parameters):
-        FORGET_GATE_BIAS_INIT = 1
-        #self.forget_gate_one_input_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
-        #self.forget_gate_one_hidden_state_update_block.set_bias_for_convolutions(FORGET_GATE_BIAS_INIT)
-        mdlstm_parameters.forget_gate_one_memory_state_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
-
-        #self.forget_gate_two_input_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
-        #self.forget_gate_two_hidden_state_update_block.set_bias_for_convolutions(FORGET_GATE_BIAS_INIT)
-        mdlstm_parameters.forget_gate_two_memory_state_convolution.bias.data.fill_(FORGET_GATE_BIAS_INIT)
 
     def register_parameters_to_assure_same_gpu_is_used(self):
         self.state_convolutions.extend(self.mdlstm_direction_one_parameters.get_all_parameters_as_list())
