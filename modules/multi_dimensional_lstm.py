@@ -16,7 +16,7 @@ from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParame
 class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
     def __init__(self, hidden_states_size, batch_size, compute_multi_directional: bool,
-                 use_dropout: bool,
+                 use_dropout: bool, training: bool,
                  multi_dimensional_lstm_parameter_creator:MultiDimensionalLSTMParametersCreator,
                  nonlinearity="tanh"):
         super(MultiDimensionalLSTM, self).__init__(hidden_states_size, batch_size,
@@ -24,6 +24,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                                   nonlinearity)
 
         self.use_dropout = use_dropout
+        self.training = training
 
 
         self.mdlstm_direction_one_parameters = \
@@ -77,6 +78,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                       use_dropout: bool,
                                      nonlinearity="tanh"):
         return MultiDimensionalLSTM(hidden_states_size, batch_size, compute_multi_directional, use_dropout,
+                                    True,
                                     MultiDimensionalLSTMParametersCreatorSlow(),
                                     nonlinearity)
 
@@ -85,6 +87,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                       use_dropout: bool,
                                       nonlinearity="tanh"):
         return MultiDimensionalLSTM(hidden_states_size, batch_size, compute_multi_directional, use_dropout,
+                                    True,
                                     MultiDimensionalLSTMParametersCreatorFast(),
                                     nonlinearity)
 
@@ -95,6 +98,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             self.mdlstm_direction_two_parameters.set_training(training)
             self.mdlstm_direction_three_parameters.set_training(training)
             self.mdlstm_direction_four_parameters.set_training(training)
+
+        self.training = training
 
     def compute_multi_dimensional_lstm_one_direction(self, mdlstm_parameters, x):
         # Step 1: Create a skewed version of the input image
@@ -318,9 +323,15 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                            previous_memory_state_column,
                                            column_number, output_gate_input_matrix):
 
-        output_gate_memory_state_column = StateUpdateBlock.\
-            compute_weighted_state_input_state_one(mdlstm_parameters.output_gate_memory_state_convolution,
-                                                   previous_memory_state_column)
+        if self.use_dropout:
+            output_gate_memory_state_column = \
+                F.dropout(StateUpdateBlock.compute_weighted_state_input_state_one(
+                    mdlstm_parameters.output_gate_memory_state_convolution,
+                    previous_memory_state_column), p=0.2, training=self.training)
+        else:
+            output_gate_memory_state_column = StateUpdateBlock. \
+                compute_weighted_state_input_state_one(mdlstm_parameters.output_gate_memory_state_convolution,
+                                                       previous_memory_state_column)
 
         return self.compute_weighted_input_forget_gate(
                 mdlstm_parameters.get_output_gate_hidden_state_column(),

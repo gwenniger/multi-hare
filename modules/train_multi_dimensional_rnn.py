@@ -102,7 +102,7 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
 
     start = time.time()
 
-    for epoch in range(4):  # loop over the dataset multiple times
+    for epoch in range(2):  # loop over the dataset multiple times
 
         running_loss = 0.0
         for i, data in enumerate(trainloader, 0):
@@ -163,6 +163,8 @@ def main():
     # test_mdrnn_cell()
     #test_mdrnn()
     hidden_states_size = 32
+    # https://stackoverflow.com/questions/45027234/strange-loss-curve-while-training-lstm-with-keras
+    # Possibly a batch size of 128 leads to more instability in training?
     batch_size = 128
     compute_multi_directional = False
     use_dropout = True
