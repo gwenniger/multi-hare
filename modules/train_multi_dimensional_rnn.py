@@ -169,6 +169,13 @@ def main():
     compute_multi_directional = False
     # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
     use_dropout = False
+
+    # TODO: Add gradient clipping? This might also make training more stable?
+    # Interesting link with tips on how to fix training:
+    # https://blog.slavv.com/37-reasons-why-your-neural-network-is-not-working-4020854bd607
+    # https://discuss.pytorch.org/t/about-torch-nn-utils-clip-grad-norm/13873
+    # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191
+
     train_mdrnn(hidden_states_size, batch_size,  compute_multi_directional, use_dropout)
 
 
