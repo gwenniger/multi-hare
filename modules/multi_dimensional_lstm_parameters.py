@@ -6,7 +6,7 @@ import torch.nn as nn
 
 class MultiDimensionalLSTMParametersOneDirectionBase:
     # https://github.com/pytorch/pytorch/issues/750
-    FORGET_GATE_BIAS_INIT = 0.5
+    FORGET_GATE_BIAS_INIT = 1
 
     def __init__(self, hidden_states_size, input_channels, use_dropout):
         self.input_channels = input_channels

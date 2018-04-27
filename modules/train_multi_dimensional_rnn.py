@@ -167,7 +167,8 @@ def main():
     # Possibly a batch size of 128 leads to more instability in training?
     batch_size = 128
     compute_multi_directional = False
-    use_dropout = True
+    # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
+    use_dropout = False
     train_mdrnn(hidden_states_size, batch_size,  compute_multi_directional, use_dropout)
 
 
