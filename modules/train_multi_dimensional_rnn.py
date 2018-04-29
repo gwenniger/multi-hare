@@ -104,7 +104,7 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
 
     num_gradient_corrections = 0
 
-    for epoch in range(3):  # loop over the dataset multiple times
+    for epoch in range(2):  # loop over the dataset multiple times
 
         running_loss = 0.0
         for i, data in enumerate(trainloader, 0):
@@ -158,7 +158,10 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
             # A max norm of 15 seems to make the learning go faster and yield almost no
             # clipping in the second epoch onwards, which seems ideal.
             max_norm = 15
-            # norm_type is the p-norm type, a value of 2 means the Eucledian norm
+            # norm_type is the p-norm type, a value of 2 means the eucledian norm
+            # The higher the number of the norm_type, the higher the influence of the
+            # outliers on the total_norm. For norm_type = 1 (= "manhattan distance")
+            # all values have linear effect on the total norm.
             norm_type = 2
 
             # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.

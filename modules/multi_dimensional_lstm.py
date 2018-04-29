@@ -165,8 +165,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
 
             # Compute the input activation
-            input_activation_column = F.tanh(input_state_plus_input)
-            #input_activation_column = F.relu(input_state_plus_input) # Relu can be used as an alternative to tanh
+            #input_activation_column = F.tanh(input_state_plus_input)
+            input_activation_column = F.relu(input_state_plus_input) # Relu can be used as an alternative to tanh
             # Compute the input gate activation
             input_gate_activation_column = F.sigmoid(input_gate_weighted_states_plus_input)
 
