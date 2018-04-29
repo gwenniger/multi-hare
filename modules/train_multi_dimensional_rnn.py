@@ -104,7 +104,7 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
 
     num_gradient_corrections = 0
 
-    for epoch in range(2):  # loop over the dataset multiple times
+    for epoch in range(3):  # loop over the dataset multiple times
 
         running_loss = 0.0
         for i, data in enumerate(trainloader, 0):
@@ -159,7 +159,7 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
             # clipping in the second epoch onwards, which seems ideal.
             max_norm = 15
             # norm_type is the p-norm type, a value of 2 means the Eucledian norm
-            norm_type = 3
+            norm_type = 2
 
             # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
             # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191/9
