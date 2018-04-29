@@ -102,6 +102,8 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
 
     start = time.time()
 
+    num_gradient_corrections = 0
+
     for epoch in range(2):  # loop over the dataset multiple times
 
         running_loss = 0.0
@@ -137,6 +139,37 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
             #print("labels: " + str(labels))
             loss = criterion(outputs, labels)
             loss.backward()
+
+            # What is a good max norm for clipping is an empirical question. But a norm
+            # of 15 seems to work nicely for this problem.
+            # In the beginning there is a lot of clipping,
+            # but within an epoch, the total norm is nearly almost below 15
+            # so that  clipping becomes almost unnecessary after the start.
+            # This is probably what you want: avoiding instability but not also
+            # clipping much more or stronger than necessary, as it slows down learning.
+            # A max_norm of 10 also seems to work reasonably well, but worse than 15.
+            # On person on Quora wrote
+            # https://www.quora.com/How-should-I-set-the-gradient-clipping-value
+            # "It’s very empirical. I usually set to 4~6.
+            # In tensorflow seq2seq example, it is 5.
+            # According to the original paper, the author suggests you could first print
+            # out uncliped norm and setting value to 1/10 of the max value can still
+            # make the model converge."
+            # A max norm of 15 seems to make the learning go faster and yield almost no
+            # clipping in the second epoch onwards, which seems ideal.
+            max_norm = 15
+            # norm_type is the p-norm type, a value of 2 means the Eucledian norm
+            norm_type = 3
+
+            # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
+            # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191/9
+            total_norm = torch.nn.utils.clip_grad_norm(multi_dimensional_rnn.parameters(), max_norm,
+                                          norm_type)
+            if total_norm > max_norm:
+                num_gradient_corrections += 1
+
+            # print("total norm: " + str(total_norm))
+
             optimizer.step()
 
             # print statistics
@@ -150,7 +183,9 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
                 print('[%d, %5d] loss: %.3f' %
                       (epoch + 1, i + 1, running_loss / 100) +
                       " Running time: " + str(running_time))
+                print("Number of gradient corrections: " + str(num_gradient_corrections))
                 running_loss = 0.0
+                num_gradient_corrections = 0
 
     print('Finished Training')
 
