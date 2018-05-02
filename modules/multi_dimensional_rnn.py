@@ -16,6 +16,7 @@ from abc import abstractmethod
 from modules.state_update_block import StateUpdateBlock
 from modules.parallel_multiple_state_weightings_computation import ParallelMultipleStateWeightingsComputation
 
+
 class MDRNNCellBase(Module):
 
     def __repr__(self):
@@ -282,7 +283,9 @@ class MultiDimensionalRNNBase(torch.nn.Module):
         skewed_images_four_dim = torch.unsqueeze(skewed_images, 1)
         skewed_images_variable = Variable(skewed_images_four_dim)
         if MultiDimensionalRNNBase.use_cuda():
-            skewed_images_variable = skewed_images_variable.cuda()
+            # https://discuss.pytorch.org/t/which-device-is-model-tensor-stored-on/4908/7
+            device = x.get_device()
+            skewed_images_variable = skewed_images_variable.to(device)
         return skewed_images_variable
 
 
@@ -317,6 +320,7 @@ class MultiDimensionalRNNBase(torch.nn.Module):
             # print("activations:" + str(activations))
             activations_unskewed = torch.cat((activations_unskewed, activations), 2)
         # print("activations_unskewed: " + str(activations_unskewed))
+        activations_unskewed = Variable(activations_unskewed)
         return activations_unskewed
 
     @staticmethod

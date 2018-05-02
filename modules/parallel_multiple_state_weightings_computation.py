@@ -1,15 +1,17 @@
 import torch.nn as nn
 import torch.nn.functional as F
 from modules.multi_dimensional_rnn import StateUpdateBlock
+from torch.nn.modules.module import Module
 
 
-class ParallelMultipleStateWeightingsComputation:
+class ParallelMultipleStateWeightingsComputation(Module):
     def __init__(self, hidden_states_size: int,
                  number_of_paired_input_weightings,
                  output_states_size,
                  parallel_convolution,
                  use_dropout: bool,
                  training: bool):
+        super(ParallelMultipleStateWeightingsComputation, self).__init__()
         self.hidden_states_size = hidden_states_size
         self.number_of_paired_input_weightings = number_of_paired_input_weightings
         self.output_states_size = output_states_size
@@ -121,3 +123,12 @@ class ParallelMultipleStateWeightingsComputation:
     # When testing the model, training should be set to false
     def set_training(self, training):
         self.training = training
+
+    # This class extends Module so as to make sure that the parameters
+    # are properly copied (to the right cuda device) when using nn.DataParallel(model)
+    # and the to(device) method from  the Module base class
+    # http://pytorch.org/docs/master/_modules/torch/nn/modules/module.html
+    # The class is not however meant to be used as a stand-alone Module, so forward
+    # is not implemented
+    def forward(self, x):
+        raise NotImplementedError

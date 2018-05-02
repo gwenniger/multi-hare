@@ -2,13 +2,15 @@ from modules.state_update_block import StateUpdateBlock
 from modules.parallel_multiple_state_weightings_computation import ParallelMultipleStateWeightingsComputation
 from abc import abstractmethod
 import torch.nn as nn
+from torch.nn.modules.module import Module
 
 
-class MultiDimensionalLSTMParametersOneDirectionBase:
+class MultiDimensionalLSTMParametersOneDirectionBase(Module):
     # https://github.com/pytorch/pytorch/issues/750
     FORGET_GATE_BIAS_INIT = 1
 
     def __init__(self, hidden_states_size, input_channels, use_dropout):
+        super(MultiDimensionalLSTMParametersOneDirectionBase, self).__init__()
         self.input_channels = input_channels
         self.hidden_states_size = hidden_states_size
         self.use_dropout = use_dropout
@@ -96,7 +98,6 @@ class MultiDimensionalLSTMParametersOneDirectionBase:
     def set_bias_forget_gates_to_one(self):
         raise RuntimeError("not implemented")
 
-
     # Needs to be implemented in the subclasses
     @abstractmethod
     def set_training(self, training):
@@ -110,6 +111,15 @@ class MultiDimensionalLSTMParametersOneDirectionBase:
         result.append(self.forget_gate_two_input_convolution)
         result.append(self.output_gate_input_convolution)
         return result
+
+    # This class extends Module so as to make sure that the parameters
+    # are properly copied (to the right cuda device) when using nn.DataParallel(model)
+    # and the to(device) method from  the Module base class
+    # http://pytorch.org/docs/master/_modules/torch/nn/modules/module.html
+    # The class is not however meant to be used as a stand-alone Module, so forward
+    # is not implemented
+    def forward(self, x):
+        raise NotImplementedError
 
 
 class MultiDimensionalLSTMParametersOneDirection(MultiDimensionalLSTMParametersOneDirectionBase):
@@ -238,6 +248,9 @@ class MultiDimensionalLSTMParametersOneDirection(MultiDimensionalLSTMParametersO
         # TODO: implement this
         return
 
+    def forward(self, x):
+        raise NotImplementedError
+
 
     # This implementation of MultiDimensionalLSTMParametersOneDirectionBase uses special 1d convolutions wrapped by the
 # ParallelMultipleStateWeightingsComputation to perform several (N) 1d convolutions over the same input together, using
@@ -354,6 +367,9 @@ class MultiDimensionalLSTMParametersOneDirectionFast(MultiDimensionalLSTMParamet
     def set_training(self, training):
         self.parallel_hidden_state_column_computation.set_training(training)
         self.parallel_memory_state_column_computation.set_training(training)
+
+    def forward(self, x):
+        raise NotImplementedError
 
 
 class MultiDimensionalLSTMParametersCreator:

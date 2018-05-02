@@ -1,4 +1,5 @@
 import torch
+from util.utils import Utils
 
 class ImageInputTransformer:
 
@@ -68,6 +69,11 @@ class ImageInputTransformer:
     # Requirement: all images must be of the same size
     @staticmethod
     def create_row_diagonal_offset_tensors_parallel(image_tensors):
+
+        if Utils.use_cuda():
+            # https://discuss.pytorch.org/t/which-device-is-model-tensor-stored-on/4908/7
+            device = image_tensors.get_device()
+
         #See: https://stackoverflow.com/questions/46826218/pytorch-how-to-get-the-shape-of-a-tensor-as-a-list-of-int
 
         #print("list(image_tensor.size()): " + str(list(image_tensors.size())))
@@ -92,14 +98,23 @@ class ImageInputTransformer:
                 # image_tensors[:, 0, y, :]
                 # See:
                 # https://stackoverflow.com/questions/47374172/how-to-select-index-over-two-dimension-in-pytorch?rq=1
-                new_row = torch.cat((torch.zeros(number_of_image_tensors, leading_zeros),
+                leading_zeros_tensor = torch.zeros(number_of_image_tensors, leading_zeros)
+
+                if Utils.use_cuda():
+                    leading_zeros_tensor = leading_zeros_tensor.to(device)
+
+                new_row = torch.cat((leading_zeros_tensor,
                                      image_tensors[:, 0, y, :]), 1)
             else:
                 new_row = image_tensors[:, 0, y, :]
 
             if tailing_zeros > 0:
                 tailing_zeros_tensor = torch.zeros(number_of_image_tensors, tailing_zeros)
-                #print("new tailing_zeros_tensor: " + str(tailing_zeros_tensor))
+                if Utils.use_cuda():
+                    tailing_zeros_tensor = tailing_zeros_tensor.to(device)
+
+                # print("new_row: " + str(new_row))
+                # print("tailing_zeros_tensor: " + str(tailing_zeros_tensor))
                 new_row = torch.cat((new_row, tailing_zeros_tensor), 1)
             #print("new row: " + str(new_row))
             #print("transformed_image[0][y][:] : " + str(transformed_image[0][y][:]))
@@ -108,7 +123,6 @@ class ImageInputTransformer:
         transformed_images = transformed_images.squeeze(1)
 
         return transformed_images
-
 
     @staticmethod
     def create_row_diagonal_offset_tensors(image_tensors):

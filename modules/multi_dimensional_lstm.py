@@ -13,6 +13,7 @@ from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParame
 from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParametersCreatorSlow
 from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParametersCreatorFast
 
+
 class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
     def __init__(self, hidden_states_size, batch_size, compute_multi_directional: bool,
@@ -26,7 +27,6 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         self.use_dropout = use_dropout
         self.training = training
 
-
         self.mdlstm_direction_one_parameters = \
             multi_dimensional_lstm_parameter_creator.create_multi_dimensional_lstm_parameters_one_direction(
                 self.hidden_states_size, self.input_channels, use_dropout)
@@ -34,9 +34,14 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         # Set initial bias for the forget gates to one, since it is known to give better results
         self.mdlstm_direction_one_parameters.set_bias_forget_gates_to_one()
 
+        self.fc3 = nn.Linear(self.number_of_output_dimensions(), 10)
+
+        # print("self.fc3 : " + str(self.fc3))
+        # print("self.fc3.weight: " + str(self.fc3.weight))
+        # print("self.fc3.bias: " + str(self.fc3.bias))
+
         # For multi-directional rnn
         if self.compute_multi_directional:
-            self.fc3 = nn.Linear(self.number_of_output_dimensions(), 10)
             self.mdlstm_direction_two_parameters = \
                 multi_dimensional_lstm_parameter_creator.create_multi_dimensional_lstm_parameters_one_direction(
                     self.hidden_states_size, self.input_channels, use_dropout)
@@ -55,22 +60,18 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # Set initial bias for the forget gates to one, since it is known to give better results
             self.mdlstm_direction_four_parameters.set_bias_forget_gates_to_one()
 
-            self.set_bias_forget_gates_to_one(self.mdlstm_direction_two_parameters)
-            self.set_bias_forget_gates_to_one(self.mdlstm_direction_three_parameters)
-            self.set_bias_forget_gates_to_one(self.mdlstm_direction_four_parameters)
-        else:
-            self.fc3 = nn.Linear(self.number_of_output_dimensions(), 10)
-
         self.state_convolutions = nn.ModuleList([])
         self.register_parameters_to_assure_same_gpu_is_used()
 
     def register_parameters_to_assure_same_gpu_is_used(self):
+        self.state_convolutions.append(self.fc3)
         self.state_convolutions.extend(self.mdlstm_direction_one_parameters.get_all_parameters_as_list())
 
         if self.compute_multi_directional:
             self.state_convolutions.extend(self.mdlstm_direction_two_parameters.get_all_parameters_as_list())
             self.state_convolutions.extend(self.mdlstm_direction_three_parameters.get_all_parameters_as_list())
             self.state_convolutions.extend(self.mdlstm_direction_four_parameters.get_all_parameters_as_list())
+
 
 
     @staticmethod
@@ -102,6 +103,10 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         self.training = training
 
     def compute_multi_dimensional_lstm_one_direction(self, mdlstm_parameters, x):
+        if MultiDimensionalRNNBase.use_cuda():
+            # https://discuss.pytorch.org/t/which-device-is-model-tensor-stored-on/4908/7
+            device = x.get_device()
+
         # Step 1: Create a skewed version of the input image
         # skewed_image = ImageInputTransformer.create_row_diagonal_offset_tensor(x)
         skewed_images_variable = MultiDimensionalRNNBase.create_skewed_images_variable_four_dim(x)
@@ -119,11 +124,15 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                                             image_height))
 
         if MultiDimensionalRNNBase.use_cuda():
-            previous_hidden_state_column = previous_hidden_state_column.cuda()
-            previous_memory_state_column = previous_memory_state_column.cuda()
+            previous_hidden_state_column = previous_hidden_state_column.to(device)
+            previous_memory_state_column = previous_memory_state_column.to(device)
 
         skewed_image_columns = skewed_images_variable.size(3)
 
+        # print("mdlstm_parameters.input_input_convolution: " + str(mdlstm_parameters.input_input_convolution))
+        # print("skewed_images_variable: " + str(skewed_images_variable))
+        # print("mdlstm_parameters.input_input_convolution.bias: "
+        # + str(mdlstm_parameters.input_input_convolution.bias))
         input_input_matrix = mdlstm_parameters.input_input_convolution(skewed_images_variable)
         # print("input_matrix: " + str(input_matrix))
 
@@ -263,6 +272,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
         original_image_columns = x.size(2)
         skewed_image_rows = skewed_images_variable.size(2)
+
         activations_unskewed = MultiDimensionalRNNBase.extract_unskewed_activations(activations,
                                                                                     original_image_columns,
                                                                                     skewed_image_columns,
@@ -361,6 +371,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         activations_one_dimensional = activations_unskewed.view(-1, self.number_of_output_dimensions())
         # print("activations_one_dimensional: " + str(activations_one_dimensional))
         # It is necessary to output a tensor of size 10, for 10 different output classes
+        # print("self.fc3.weight: " + str(self.fc3.weight))
+        # print("self.fc3.bias: " + str(self.fc3.bias))
         result = self.fc3(activations_one_dimensional)
         return result
 

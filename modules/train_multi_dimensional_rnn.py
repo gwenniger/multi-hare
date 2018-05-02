@@ -42,6 +42,8 @@ def test_mdrnn_one_image():
 
 
 def evaluate_mdrnn(multi_dimensional_rnn, batch_size):
+    device = torch.device("cuda:0")
+
     correct = 0
     total = 0
     test_loader = data_preprocessing.load_mnist.get_test_loader(batch_size)
@@ -49,7 +51,8 @@ def evaluate_mdrnn(multi_dimensional_rnn, batch_size):
         images, labels = data
 
         if MultiDimensionalRNNBase.use_cuda():
-            labels = labels.cuda()
+            labels = labels.to(device)
+            images = images.to(device)
 
         #outputs = multi_dimensional_rnn(Variable(images))  # For "Net" (Le Net)
         outputs = multi_dimensional_rnn(images)
@@ -79,6 +82,9 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
     #                                                                           compute_multi_directional,
     #                                                                           nonlinearity="sigmoid")
 
+    # http://pytorch.org/docs/master/notes/cuda.html
+    device = torch.device("cuda:0")
+
     multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(hidden_states_size,
                                                                                     batch_size,
                                                                                     compute_multi_directional,
@@ -88,7 +94,10 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
     #multi_dimensional_rnn = Net()
 
     if Utils.use_cuda():
-        multi_dimensional_rnn = multi_dimensional_rnn.cuda()
+        #multi_dimensional_rnn = multi_dimensional_rnn.cuda()
+
+        multi_dimensional_rnn = nn.DataParallel(multi_dimensional_rnn, device_ids=[0])
+        multi_dimensional_rnn.to(device)
 
     #optimizer = optim.SGD(multi_dimensional_rnn.parameters(), lr=0.001, momentum=0.9)
 
@@ -104,12 +113,18 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
 
     num_gradient_corrections = 0
 
-    for epoch in range(2):  # loop over the dataset multiple times
+    for epoch in range(4):  # loop over the dataset multiple times
 
         running_loss = 0.0
         for i, data in enumerate(trainloader, 0):
+
+
             # get the inputs
             inputs, labels = data
+
+            if Utils.use_cuda():
+                inputs = inputs.to(device)
+
 
             # See: https://stackoverflow.com/questions/48015235/i-get-this-error-on-pytorch-runtimeerror-invalid-argument-2-size-1-x-400?rq=1
             #LRTrans = transforms.Compose(
@@ -122,7 +137,7 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
             # wrap them in Variable
             labels = Variable(labels)
             if Utils.use_cuda():
-                labels = labels.cuda()
+                labels = labels.to(device)
 
             #labels, inputs = Variable(labels), Variable(inputs)
 
@@ -166,17 +181,17 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
 
             # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
             # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191/9
-            total_norm = torch.nn.utils.clip_grad_norm(multi_dimensional_rnn.parameters(), max_norm,
-                                          norm_type)
-            if total_norm > max_norm:
-                num_gradient_corrections += 1
+            #total_norm = torch.nn.utils.clip_grad_norm_(multi_dimensional_rnn.parameters(), max_norm,
+            #                                            norm_type)
+            #if total_norm > max_norm:
+            #    num_gradient_corrections += 1
 
-            # print("total norm: " + str(total_norm))
+            #print("total norm: " + str(total_norm))
 
             optimizer.step()
 
             # print statistics
-            running_loss += loss.data[0]
+            running_loss += loss.data
             #if i % 2000 == 1999:  # print every 2000 mini-batches
             # See: https://stackoverflow.com/questions/5598181/python-multiple-prints-on-the-same-line
             #print(str(i)+",", end="", flush=True)
@@ -193,7 +208,8 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
     print('Finished Training')
 
     # Run evaluation
-    multi_dimensional_rnn.set_training(False)
+    # multi_dimensional_rnn.set_training(False) # Normal case
+    multi_dimensional_rnn.module.set_training(False)  # When using DataParallel
     evaluate_mdrnn(multi_dimensional_rnn, batch_size)
 
 
