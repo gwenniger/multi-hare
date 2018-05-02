@@ -64,7 +64,6 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         self.register_parameters_to_assure_same_gpu_is_used()
 
     def register_parameters_to_assure_same_gpu_is_used(self):
-        self.state_convolutions.append(self.fc3)
         self.state_convolutions.extend(self.mdlstm_direction_one_parameters.get_all_parameters_as_list())
 
         if self.compute_multi_directional:

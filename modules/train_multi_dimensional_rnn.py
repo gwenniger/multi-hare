@@ -40,6 +40,20 @@ def test_mdrnn_one_image():
         multi_dimensional_rnn = multi_dimensional_rnn.cuda()
     multi_dimensional_rnn.forward(image)
 
+def print_number_of_parameters(model):
+    i = 0
+    total_parameters = 0
+    for parameter in model.parameters():
+        parameters = 1
+        for dim in parameter.size():
+            parameters *= dim
+        print("model.parameters[" + str(i) + "] size: " +
+              str(parameter.size()) + ": " + str(parameters))
+        total_parameters += parameters
+        i += 1
+    print("total parameters: " + str(total_parameters))
+
+
 
 def evaluate_mdrnn(multi_dimensional_rnn, batch_size):
     device = torch.device("cuda:0")
@@ -98,8 +112,23 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
 
         multi_dimensional_rnn = nn.DataParallel(multi_dimensional_rnn, device_ids=[0])
         multi_dimensional_rnn.to(device)
+        #print("multi_dimensional_rnn.module.mdlstm_direction_one_parameters.parallel_memory_state_column_computation :"
+        #      + str(multi_dimensional_rnn.module.mdlstm_direction_one_parameters.parallel_memory_state_column_computation))
+
+        #print("multi_dimensional_rnn.module.mdlstm_direction_one_parameters."
+        #      "parallel_memory_state_column_computation.parallel_convolution.bias :"
+        #      + str(multi_dimensional_rnn.module.mdlstm_direction_one_parameters.
+        #            parallel_memory_state_column_computation.parallel_convolution.bias))
+
+        #print("multi_dimensional_rnn.module.mdlstm_direction_one_parameters."
+        #      "parallel_hidden_state_column_computation.parallel_convolution.bias :"
+        #      + str(multi_dimensional_rnn.module.mdlstm_direction_one_parameters.
+        #            parallel_hidden_state_column_computation.parallel_convolution.bias))
+
+    print_number_of_parameters(multi_dimensional_rnn)
 
     #optimizer = optim.SGD(multi_dimensional_rnn.parameters(), lr=0.001, momentum=0.9)
+
 
     # Adding some weight decay seems to do magic, see: http://pytorch.org/docs/master/optim.html
     optimizer = optim.SGD(multi_dimensional_rnn.parameters(), lr=0.001, momentum=0.9, weight_decay=1e-5)
@@ -113,7 +142,7 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
 
     num_gradient_corrections = 0
 
-    for epoch in range(4):  # loop over the dataset multiple times
+    for epoch in range(8):  # loop over the dataset multiple times
 
         running_loss = 0.0
         for i, data in enumerate(trainloader, 0):
@@ -172,7 +201,10 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
             # make the model converge."
             # A max norm of 15 seems to make the learning go faster and yield almost no
             # clipping in the second epoch onwards, which seems ideal.
-            max_norm = 15
+            max_norm = 30
+            # https://www.reddit.com/r/MachineLearning/comments/3n8g28/gradient_clipping_what_are_good_values_to_clip_at/
+            # https://machinelearningmastery.com/exploding-gradients-in-neural-networks/
+            grad_clip_value_ = 1
             # norm_type is the p-norm type, a value of 2 means the eucledian norm
             # The higher the number of the norm_type, the higher the influence of the
             # outliers on the total_norm. For norm_type = 1 (= "manhattan distance")
@@ -181,16 +213,24 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
 
             # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
             # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191/9
-            #total_norm = torch.nn.utils.clip_grad_norm_(multi_dimensional_rnn.parameters(), max_norm,
-            #                                            norm_type)
-            #if total_norm > max_norm:
-            #    num_gradient_corrections += 1
+            total_norm = torch.nn.utils.clip_grad_norm_(multi_dimensional_rnn.parameters(), max_norm,
+                                                        norm_type)
 
-            #print("total norm: " + str(total_norm))
+            if total_norm > max_norm:
+                num_gradient_corrections += 1
+
+            # print("total norm: " + str(total_norm))
+
+            # Clipping the gradient value is an alternative to clipping the gradient norm,
+            # and seems to be more effective
+            # https://pytorch.org/docs/master/_modules/torch/nn/utils/clip_grad.html
+            torch.nn.utils.clip_grad_value_(multi_dimensional_rnn.parameters(), grad_clip_value_)
 
             optimizer.step()
 
             # print statistics
+            # print("loss.data: " + str(loss.data))
+            # print("loss.data[0]: " + str(loss.data[0]))
             running_loss += loss.data
             #if i % 2000 == 1999:  # print every 2000 mini-batches
             # See: https://stackoverflow.com/questions/5598181/python-multiple-prints-on-the-same-line
@@ -201,7 +241,7 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
                 print('[%d, %5d] loss: %.3f' %
                       (epoch + 1, i + 1, running_loss / 100) +
                       " Running time: " + str(running_time))
-                print("Number of gradient corrections: " + str(num_gradient_corrections))
+                print("Number of gradient norm-based corrections: " + str(num_gradient_corrections))
                 running_loss = 0.0
                 num_gradient_corrections = 0
 
@@ -220,6 +260,7 @@ def main():
     # https://stackoverflow.com/questions/45027234/strange-loss-curve-while-training-lstm-with-keras
     # Possibly a batch size of 128 leads to more instability in training?
     batch_size = 128
+    # batch_size = 256
     compute_multi_directional = False
     # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
     use_dropout = False
