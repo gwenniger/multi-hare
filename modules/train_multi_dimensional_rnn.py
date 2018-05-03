@@ -86,14 +86,16 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
     #                                                                         batch_size,
     #                                                                         compute_multi_directional,
     #                                                                         nonlinearity="sigmoid")
-    # multi_dimensional_rnn = MultiDimensionalRNNFast.create_multi_dimensional_rnn_fast(hidden_states_size,
+    #multi_dimensional_rnn = MultiDimensionalRNNFast.create_multi_dimensional_rnn_fast(hidden_states_size,
     #                                                                                  batch_size,
     #                                                                                  compute_multi_directional,
+    #                                                                                  use_dropout,
     #                                                                                  nonlinearity="sigmoid")
 
     #multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm(hidden_states_size,
     #                                                                           batch_size,
     #                                                                           compute_multi_directional,
+    #                                                                           use_dropout,
     #                                                                           nonlinearity="sigmoid")
 
     # http://pytorch.org/docs/master/notes/cuda.html
@@ -146,7 +148,6 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
 
         running_loss = 0.0
         for i, data in enumerate(trainloader, 0):
-
 
             # get the inputs
             inputs, labels = data
@@ -259,11 +260,11 @@ def main():
     hidden_states_size = 32
     # https://stackoverflow.com/questions/45027234/strange-loss-curve-while-training-lstm-with-keras
     # Possibly a batch size of 128 leads to more instability in training?
-    batch_size = 128
-    # batch_size = 256
+    #batch_size = 128
+    batch_size = 256
     compute_multi_directional = False
     # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
-    use_dropout = False
+    use_dropout = True
 
     # TODO: Add gradient clipping? This might also make training more stable?
     # Interesting link with tips on how to fix training:
