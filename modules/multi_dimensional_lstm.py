@@ -123,6 +123,10 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                                    image_height,
                                                    requires_grad=True)
 
+        # After initialization, the value of grad_fn is still None, later it gets set
+        # print("initialization: previous_memory_state_column.grad_fn: " + str(previous_memory_state_column.grad_fn))
+        # print("initialization: previous_hidden_state_column.grad_fn: " + str(previous_hidden_state_column.grad_fn))
+
         if MultiDimensionalRNNBase.use_cuda():
             previous_hidden_state_column = previous_hidden_state_column.to(device)
             previous_memory_state_column = previous_memory_state_column.to(device)
@@ -269,6 +273,11 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             previous_hidden_state_column = activation_column
             previous_memory_state_column = new_memory_state
             activations.append(activation_column)
+
+            # In the loop the value of grad_fn becomes set, as a backwards path for
+            # back-propagation is collected
+            # print("in loop: previous_memory_state_column.grad_fn: " + str(previous_memory_state_column.grad_fn))
+            # print("in loop: previous_hidden_state_column.grad_fn: " + str(previous_hidden_state_column.grad_fn))
 
         original_image_columns = x.size(2)
         skewed_image_rows = skewed_images_variable.size(2)

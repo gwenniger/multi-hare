@@ -263,7 +263,7 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
 
 
 def main():
-    test_mdrnn_cell()
+    # test_mdrnn_cell()
     #test_mdrnn()
     hidden_states_size = 32
     # https://stackoverflow.com/questions/45027234/strange-loss-curve-while-training-lstm-with-keras

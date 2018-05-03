@@ -4,6 +4,7 @@
 """
 import math
 import torch
+from torch.autograd import Variable
 from torch.nn.modules.module import Module
 import torch.nn.functional as F
 import torch.nn
@@ -327,13 +328,43 @@ class MultiDimensionalRNNBase(torch.nn.Module):
             activations_unskewed = torch.cat((activations_unskewed, activations), 2)
         # print("activations_unskewed: " + str(activations_unskewed))
 
+        # activations_unskewed = MultiDimensionalRNNBase.break_activations_unskewed(activations_unskewed)
+
+        return activations_unskewed
+
+    # Method that demonstrates and explains the bug of adding a superfluous variable
+    # wrapping. What happens is that the additional wrapping makes
+    # the variable into a leaf variable, with a non-existent (empty) gradient function
+    # graph trace. This breaks the path used by back-propagation to
+    # update previous upstream graph nodes, with catastrophic effect on the learning
+    # results
+    # See: https://pytorch.org/docs/0.2.0/_modules/torch/autograd/variable.html :
+    # "
+    # Variable is a thin wrapper around a Tensor object, that also holds
+    # the gradient w.r.t. to it, and a reference to a function that created it.
+    # This reference allows retracing the whole chain of operations that
+    # created the data. If the Variable has been created by the user, its grad_fn
+    # will be ``None`` and we call such objects *leaf* Variables.
+    # "
+    # So explicitly created Variables have an emtpy grad_fn field, in other words,
+    # the gradient backwards path is lost, and hence updating predecessor variables
+    # is made impossible, causing learning to fail.
+    #
+    @staticmethod
+    def break_non_leaf_variable_by_wrapping_with_additional_variable(activations_unskewed):
         # If activations_unskewed is made a variable (again!) it still works but runs
         # much faster, but results are much worse somehow!!!
         # print("activations_unskewed before: " + str(activations_unskewed.grad))
         # print("activation_unskewed.requires_grad: " + str(activations_unskewed.requires_grad))
-        # activations_unskewed = Variable(activations_unskewed)
+        # See: https://pytorch.org/docs/0.3.1/autograd.html
+        # Wrapping into an additional variable makes activations_unskewed into a graph
+        # leaf, which it isn't before the extra wrapping (what exactly does this mean?)
+        print("before: activations_unskewed.is_leaf: " + str(activations_unskewed.is_leaf))
+        print("before: activations_unskewed. grad_fn: " + str(activations_unskewed.grad_fn))
+        activations_unskewed = Variable(activations_unskewed)
+        print("after: activations_unskewed.is_leaf: " + str(activations_unskewed.is_leaf))
+        print("after: activations_unskewed. grad_fn: " + str(activations_unskewed.grad_fn))
         # print("activations_unskewed after: " + str(activations_unskewed.grad))
-
         return activations_unskewed
 
     @staticmethod
