@@ -21,7 +21,7 @@ def get_train_loader(batch_size):
     download = False  # download MNIST dataset or not
 
     # Scaling to size 32*32
-    trans = transforms.Compose([transforms.Resize((32, 32)), transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
+    trans = transforms.Compose([transforms.Resize((16, 16)), transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
     #trans = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
     train_set = dset.MNIST(root=root, train=True, transform=trans, download=download)
 
@@ -47,7 +47,7 @@ def get_test_loader(batch_size):
     download = False  # download MNIST dataset or not
 
     # Scaling to size 32*32
-    trans = transforms.Compose([transforms.Resize((32, 32)), transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
+    trans = transforms.Compose([transforms.Resize((16, 16)), transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
     #trans = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
     test_set = dset.MNIST(root=root, train=False, transform=trans)
 

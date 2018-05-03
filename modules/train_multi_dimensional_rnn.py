@@ -123,7 +123,8 @@ def clip_gradient(model):
     return made_gradient_norm_based_correction
 
 
-def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional: bool, use_dropout: bool):
+def train_mdrnn(input_height: int, input_width: int,
+                hidden_states_size: int, batch_size,  compute_multi_directional: bool, use_dropout: bool):
     import torch.optim as optim
 
     criterion = nn.CrossEntropyLoss()
@@ -131,11 +132,12 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
     #                                                                         batch_size,
     #                                                                         compute_multi_directional,
     #                                                                         nonlinearity="sigmoid")
-    #multi_dimensional_rnn = MultiDimensionalRNNFast.create_multi_dimensional_rnn_fast(hidden_states_size,
+    #multi_dimensional_rnn = MultiDimensionalRNNFast.create_multi_dimensional_rnn_fast(input_height, input_width,
+    #                                                                                  hidden_states_size,
     #                                                                                  batch_size,
     #                                                                                  compute_multi_directional,
     #                                                                                  use_dropout,
-    #                                                                                  nonlinearity="sigmoid")
+    #                                                                                   nonlinearity="sigmoid")
 
     #multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm(hidden_states_size,
     #                                                                           batch_size,
@@ -146,7 +148,9 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
     # http://pytorch.org/docs/master/notes/cuda.html
     device = torch.device("cuda:0")
 
-    multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(hidden_states_size,
+    multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(input_height,
+                                                                                    input_width,
+                                                                                    hidden_states_size,
                                                                                     batch_size,
                                                                                     compute_multi_directional,
                                                                                     use_dropout,
@@ -201,20 +205,10 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
                 inputs = inputs.to(device)
 
 
-            # See: https://stackoverflow.com/questions/48015235/i-get-this-error-on-pytorch-runtimeerror-invalid-argument-2-size-1-x-400?rq=1
-            #LRTrans = transforms.Compose(
-            #    [transforms.Scale((32, 32)),
-            #     transforms.ToTensor(),
-            #     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-
-            #inputs = LRTrans(inputs)
-
             # wrap them in Variable
             # labels = Variable(labels)  # Labels need no gradient apparently
             if Utils.use_cuda():
                 labels = labels.to(device)
-
-            #labels, inputs = Variable(labels), Variable(inputs)
 
             # zero the parameter gradients
             optimizer.zero_grad()
@@ -265,6 +259,8 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
 def main():
     # test_mdrnn_cell()
     #test_mdrnn()
+    input_height = 16
+    input_width = 16
     hidden_states_size = 32
     # https://stackoverflow.com/questions/45027234/strange-loss-curve-while-training-lstm-with-keras
     # Possibly a batch size of 128 leads to more instability in training?
@@ -272,7 +268,7 @@ def main():
     batch_size = 256
     compute_multi_directional = False
     # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
-    use_dropout = True
+    use_dropout = False
 
     # TODO: Add gradient clipping? This might also make training more stable?
     # Interesting link with tips on how to fix training:
@@ -280,7 +276,10 @@ def main():
     # https://discuss.pytorch.org/t/about-torch-nn-utils-clip-grad-norm/13873
     # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191
 
-    train_mdrnn(hidden_states_size, batch_size,  compute_multi_directional, use_dropout)
+    #with torch.autograd.profiler.profile(use_cuda=False) as prof:
+    train_mdrnn(input_height, input_width,
+                hidden_states_size, batch_size,  compute_multi_directional, use_dropout)
+    #print(prof)
 
 
 if __name__ == "__main__":
