@@ -1,9 +1,7 @@
 import torch
-from torch.autograd import Variable
 import torch.nn
 import torch.nn as nn
 import time
-
 from modules.multi_dimensional_rnn import MDRNNCell
 from modules.multi_dimensional_rnn import MultiDimensionalRNNBase
 from modules.multi_dimensional_rnn import MultiDimensionalRNN
@@ -16,12 +14,12 @@ from util.utils import Utils
 def test_mdrnn_cell():
     print("Testing the MultDimensionalRNN Cell... ")
     mdrnn = MDRNNCell(10, 5, nonlinearity="relu")
-    input = Variable(torch.randn(6, 3, 10))
+    input = torch.randn(6, 3, 10, requires_grad=True)
 
     # print("Input: " + str(input))
 
-    h1 = Variable(torch.randn(3, 5))
-    h2 = Variable(torch.randn(3, 5))
+    h1 = torch.randn(3, 5, requires_grad=True)
+    h2 = torch.randn(3, 5, requires_grad=True)
     output = []
 
     for i in range(6):
@@ -40,6 +38,7 @@ def test_mdrnn_one_image():
         multi_dimensional_rnn = multi_dimensional_rnn.cuda()
     multi_dimensional_rnn.forward(image)
 
+
 def print_number_of_parameters(model):
     i = 0
     total_parameters = 0
@@ -52,7 +51,6 @@ def print_number_of_parameters(model):
         total_parameters += parameters
         i += 1
     print("total parameters: " + str(total_parameters))
-
 
 
 def evaluate_mdrnn(multi_dimensional_rnn, batch_size):
@@ -114,9 +112,8 @@ def clip_gradient(model):
                                                 norm_type)
 
     if total_norm > max_norm:
-        made_gradient_norm_based_correction
-
-    # print("total norm: " + str(total_norm))
+        made_gradient_norm_based_correction = True
+        print("Made gradient norm based correction. total norm: " + str(total_norm))
 
     # Clipping the gradient value is an alternative to clipping the gradient norm,
     # and seems to be more effective
@@ -192,7 +189,7 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
 
     num_gradient_corrections = 0
 
-    for epoch in range(8):  # loop over the dataset multiple times
+    for epoch in range(2):  # loop over the dataset multiple times
 
         running_loss = 0.0
         for i, data in enumerate(trainloader, 0):
@@ -213,7 +210,7 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
             #inputs = LRTrans(inputs)
 
             # wrap them in Variable
-            labels = Variable(labels)
+            # labels = Variable(labels)  # Labels need no gradient apparently
             if Utils.use_cuda():
                 labels = labels.to(device)
 
@@ -266,7 +263,7 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
 
 
 def main():
-    # test_mdrnn_cell()
+    test_mdrnn_cell()
     #test_mdrnn()
     hidden_states_size = 32
     # https://stackoverflow.com/questions/45027234/strange-loss-curve-while-training-lstm-with-keras
@@ -275,7 +272,7 @@ def main():
     batch_size = 256
     compute_multi_directional = False
     # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
-    use_dropout = False
+    use_dropout = True
 
     # TODO: Add gradient clipping? This might also make training more stable?
     # Interesting link with tips on how to fix training:

@@ -2,11 +2,9 @@
     These will be based on a generalization of the native pytorch RNN code
     from:  https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/rnn.py
 """
-
 import math
 import torch
 from torch.nn.modules.module import Module
-from torch.autograd import Variable
 import torch.nn.functional as F
 import torch.nn
 from util.image_input_transformer import ImageInputTransformer
@@ -165,7 +163,8 @@ class MultiDimensionalRNNBase(torch.nn.Module):
         self.nonlinearity = nonlinearity
         self.input_channels = 1
         self.hidden_states_size = hidden_states_size
-        self.selection_tensor = Variable(self.create_torch_indices_selection_tensor(batch_size))
+        self.selection_tensor = self.create_torch_indices_selection_tensor(batch_size)
+        self.selection_tensor.requires_grad_(True)
         if MultiDimensionalRNNBase.use_cuda():
             self.selection_tensor = self.selection_tensor.cuda()
         self.compute_multi_directional = compute_multi_directional
@@ -190,8 +189,8 @@ class MultiDimensionalRNNBase(torch.nn.Module):
         if number_of_examples == self.batch_size:
             selection_tensor = self.selection_tensor
         else:
-            selection_tensor = Variable(MultiDimensionalRNNBase.create_torch_indices_selection_tensor(
-                number_of_examples))
+            selection_tensor = MultiDimensionalRNNBase.create_torch_indices_selection_tensor(
+                number_of_examples)
             if MultiDimensionalRNNBase.use_cuda():
                 selection_tensor = selection_tensor.cuda()
 
@@ -280,15 +279,18 @@ class MultiDimensionalRNNBase(torch.nn.Module):
         # print("skewed images rows: " + str(skewed_images_rows))
         # print("skewed_images: " + str(skewed_images))
 
-        skewed_images_four_dim = torch.unsqueeze(skewed_images, 1)
-        skewed_images_variable = Variable(skewed_images_four_dim)
+        skewed_images_four_dim_variable = torch.unsqueeze(skewed_images, 1)
+        # See: https://pytorch.org/docs/stable/tensors.html
+        # This replaces explicit variable creation, which is deprecated
+        skewed_images_four_dim_variable.requires_grad_(True)
+
         if MultiDimensionalRNNBase.use_cuda():
             # https://discuss.pytorch.org/t/which-device-is-model-tensor-stored-on/4908/7
             device = x.get_device()
-            skewed_images_variable = skewed_images_variable.to(device)
+            skewed_images_variable = skewed_images_four_dim_variable.to(device)
         return skewed_images_variable
 
-
+    # activations is a list of activation columns
     @staticmethod
     def extract_unskewed_activations(activations,
                                      original_image_columns: int,
@@ -297,12 +299,16 @@ class MultiDimensionalRNNBase(torch.nn.Module):
 
         # print("original image columns: " + str(original_image_columns))
 
+        #print("activations: " + str(activations))
+
+
         # How to unskew the activation matrix, and retrieve an activation
         # matrix of the original image size?
         activations_column = activations[0]
         # Columns will be horizontally concatenated, add extra dimension for this concatenation
         activations_column_unsqueezed = torch.unsqueeze(activations_column, 3)
         activations_as_tensor = activations_column_unsqueezed
+        # print("activations_as_tensor.requires_grad: " + str(activations_as_tensor.requires_grad))
         for column_number in range(1, skewed_image_columns):
             # print("activations[column_number]: " + str(activations[column_number]))
             activations_column = activations[column_number]
@@ -320,7 +326,14 @@ class MultiDimensionalRNNBase(torch.nn.Module):
             # print("activations:" + str(activations))
             activations_unskewed = torch.cat((activations_unskewed, activations), 2)
         # print("activations_unskewed: " + str(activations_unskewed))
-        activations_unskewed = Variable(activations_unskewed)
+
+        # If activations_unskewed is made a variable (again!) it still works but runs
+        # much faster, but results are much worse somehow!!!
+        # print("activations_unskewed before: " + str(activations_unskewed.grad))
+        # print("activation_unskewed.requires_grad: " + str(activations_unskewed.requires_grad))
+        # activations_unskewed = Variable(activations_unskewed)
+        # print("activations_unskewed after: " + str(activations_unskewed.grad))
+
         return activations_unskewed
 
     @staticmethod
@@ -391,9 +404,11 @@ class MultiDimensionalRNNAbstract(MultiDimensionalRNNBase):
         image_height = x.size(2)
         number_of_examples = x.size(0)
         # print("image height: " + str(image_height))
-        previous_hidden_state_column = Variable(torch.zeros(self.input_channels,
-                                                            self.hidden_states_size,
-                                                            image_height))
+        previous_hidden_state_column = torch.zeros(self.input_channels,
+                                                   self.hidden_states_size,
+                                                   image_height,
+                                                   requires_grad=True)
+
         if MultiDimensionalRNNBase.use_cuda():
             previous_hidden_state_column = previous_hidden_state_column.cuda()
 

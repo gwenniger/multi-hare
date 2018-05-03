@@ -2,7 +2,6 @@ from modules.multi_dimensional_rnn import MultiDimensionalRNN
 from modules.multi_dimensional_rnn import MultiDimensionalRNNBase
 import util.tensor_flipping
 import torch
-from torch.autograd import Variable
 import torch.nn.functional as F
 import torch.nn
 import torch.nn as nn
@@ -112,15 +111,17 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         # print("list(x.size()): " + str(list(x.size())))
         image_height = x.size(2)
         # print("image height: " + str(image_height))
-        previous_hidden_state_column = Variable(torch.zeros(self.input_channels,
-                                                            self.hidden_states_size,
-                                                            image_height))
-        # Todo: I'm confused about the dimensions of previous_memory_state
+        previous_hidden_state_column = torch.zeros(self.input_channels,
+                                                   self.hidden_states_size,
+                                                   image_height,
+                                                   requires_grad=True)
+
         # and previous_hidden_state: why the latter has dimension equal to
         # batch size but for the former it doesn't seem to matter
-        previous_memory_state_column = Variable(torch.zeros(self.input_channels,
-                                                            self.hidden_states_size,
-                                                            image_height))
+        previous_memory_state_column = torch.zeros(self.input_channels,
+                                                   self.hidden_states_size,
+                                                   image_height,
+                                                   requires_grad=True)
 
         if MultiDimensionalRNNBase.use_cuda():
             previous_hidden_state_column = previous_hidden_state_column.to(device)
