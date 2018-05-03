@@ -78,6 +78,54 @@ def evaluate_mdrnn(multi_dimensional_rnn, batch_size):
             100 * correct / total))
 
 
+def clip_gradient(model):
+    made_gradient_norm_based_correction = False
+
+    # What is a good max norm for clipping is an empirical question. But a norm
+    # of 15 seems to work nicely for this problem.
+    # In the beginning there is a lot of clipping,
+    # but within an epoch, the total norm is nearly almost below 15
+    # so that  clipping becomes almost unnecessary after the start.
+    # This is probably what you want: avoiding instability but not also
+    # clipping much more or stronger than necessary, as it slows down learning.
+    # A max_norm of 10 also seems to work reasonably well, but worse than 15.
+    # On person on Quora wrote
+    # https://www.quora.com/How-should-I-set-the-gradient-clipping-value
+    # "It’s very empirical. I usually set to 4~6.
+    # In tensorflow seq2seq example, it is 5.
+    # According to the original paper, the author suggests you could first print
+    # out uncliped norm and setting value to 1/10 of the max value can still
+    # make the model converge."
+    # A max norm of 15 seems to make the learning go faster and yield almost no
+    # clipping in the second epoch onwards, which seems ideal.
+    max_norm = 30
+    # https://www.reddit.com/r/MachineLearning/comments/3n8g28/gradient_clipping_what_are_good_values_to_clip_at/
+    # https://machinelearningmastery.com/exploding-gradients-in-neural-networks/
+    # grad_clip_value_ = 1
+    # norm_type is the p-norm type, a value of 2 means the eucledian norm
+    # The higher the number of the norm_type, the higher the influence of the
+    # outliers on the total_norm. For norm_type = 1 (= "manhattan distance")
+    # all values have linear effect on the total norm.
+    norm_type = 2
+
+    # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
+    # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191/9
+    total_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm,
+                                                norm_type)
+
+    if total_norm > max_norm:
+        made_gradient_norm_based_correction
+
+    # print("total norm: " + str(total_norm))
+
+    # Clipping the gradient value is an alternative to clipping the gradient norm,
+    # and seems to be more effective
+    # https://pytorch.org/docs/master/_modules/torch/nn/utils/clip_grad.html
+    # torch.nn.utils.clip_grad_value_(multi_dimensional_rnn.parameters(), grad_clip_value_)
+    #
+    return made_gradient_norm_based_correction
+
+
 def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional: bool, use_dropout: bool):
     import torch.optim as optim
 
@@ -185,47 +233,10 @@ def train_mdrnn(hidden_states_size: int, batch_size,  compute_multi_directional:
             loss = criterion(outputs, labels)
             loss.backward()
 
-            # What is a good max norm for clipping is an empirical question. But a norm
-            # of 15 seems to work nicely for this problem.
-            # In the beginning there is a lot of clipping,
-            # but within an epoch, the total norm is nearly almost below 15
-            # so that  clipping becomes almost unnecessary after the start.
-            # This is probably what you want: avoiding instability but not also
-            # clipping much more or stronger than necessary, as it slows down learning.
-            # A max_norm of 10 also seems to work reasonably well, but worse than 15.
-            # On person on Quora wrote
-            # https://www.quora.com/How-should-I-set-the-gradient-clipping-value
-            # "It’s very empirical. I usually set to 4~6.
-            # In tensorflow seq2seq example, it is 5.
-            # According to the original paper, the author suggests you could first print
-            # out uncliped norm and setting value to 1/10 of the max value can still
-            # make the model converge."
-            # A max norm of 15 seems to make the learning go faster and yield almost no
-            # clipping in the second epoch onwards, which seems ideal.
-            max_norm = 30
-            # https://www.reddit.com/r/MachineLearning/comments/3n8g28/gradient_clipping_what_are_good_values_to_clip_at/
-            # https://machinelearningmastery.com/exploding-gradients-in-neural-networks/
-            grad_clip_value_ = 1
-            # norm_type is the p-norm type, a value of 2 means the eucledian norm
-            # The higher the number of the norm_type, the higher the influence of the
-            # outliers on the total_norm. For norm_type = 1 (= "manhattan distance")
-            # all values have linear effect on the total norm.
-            norm_type = 2
-
-            # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
-            # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191/9
-            total_norm = torch.nn.utils.clip_grad_norm_(multi_dimensional_rnn.parameters(), max_norm,
-                                                        norm_type)
-
-            if total_norm > max_norm:
+            # Perform gradient clipping
+            made_gradient_norm_based_correction = clip_gradient(multi_dimensional_rnn)
+            if made_gradient_norm_based_correction:
                 num_gradient_corrections += 1
-
-            # print("total norm: " + str(total_norm))
-
-            # Clipping the gradient value is an alternative to clipping the gradient norm,
-            # and seems to be more effective
-            # https://pytorch.org/docs/master/_modules/torch/nn/utils/clip_grad.html
-            torch.nn.utils.clip_grad_value_(multi_dimensional_rnn.parameters(), grad_clip_value_)
 
             optimizer.step()
 
@@ -264,7 +275,7 @@ def main():
     batch_size = 256
     compute_multi_directional = False
     # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
-    use_dropout = True
+    use_dropout = False
 
     # TODO: Add gradient clipping? This might also make training more stable?
     # Interesting link with tips on how to fix training:
