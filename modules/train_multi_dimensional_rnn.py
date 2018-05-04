@@ -134,11 +134,11 @@ def train_mdrnn(input_size: SizeTwoDimensional, hidden_states_size: int, batch_s
     #                                                                         batch_size,
     #                                                                         compute_multi_directional,
     #                                                                         nonlinearity="sigmoid")
-    multi_dimensional_rnn = MultiDimensionalRNNFast.create_multi_dimensional_rnn_fast(hidden_states_size,
-                                                                                      batch_size,
-                                                                                      compute_multi_directional,
-                                                                                      use_dropout,
-                                                                                      nonlinearity="sigmoid")
+    #multi_dimensional_rnn = MultiDimensionalRNNFast.create_multi_dimensional_rnn_fast(hidden_states_size,
+    #                                                                                  batch_size,
+    #                                                                                  compute_multi_directional,
+    #                                                                                  use_dropout,
+    #                                                                                  nonlinearity="sigmoid")
 
     #multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm(hidden_states_size,
     #                                                                           batch_size,
@@ -149,11 +149,11 @@ def train_mdrnn(input_size: SizeTwoDimensional, hidden_states_size: int, batch_s
     # http://pytorch.org/docs/master/notes/cuda.html
     device = torch.device("cuda:0")
 
-    #multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(hidden_states_size,
-    #                                                                                batch_size,
-    #                                                                                compute_multi_directional,
-    #                                                                                use_dropout,
-    #                                                                                nonlinearity="sigmoid")
+    multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(hidden_states_size,
+                                                                                    batch_size,
+                                                                                    compute_multi_directional,
+                                                                                    use_dropout,
+                                                                                    nonlinearity="sigmoid")
 
     network = MultiDimensionalRNNToSingleClassNetwork.\
         create_multi_dimensional_rnn_to_single_class_network(multi_dimensional_rnn, input_size)
@@ -205,6 +205,8 @@ def train_mdrnn(input_size: SizeTwoDimensional, hidden_states_size: int, batch_s
 
             if Utils.use_cuda():
                 inputs = inputs.to(device)
+                # Set requires_grad(True) directly and only for the input
+                inputs.requires_grad_(True)
 
 
             # wrap them in Variable

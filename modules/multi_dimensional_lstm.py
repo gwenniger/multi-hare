@@ -107,15 +107,13 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         # print("image height: " + str(image_height))
         previous_hidden_state_column = torch.zeros(self.input_channels,
                                                    self.hidden_states_size,
-                                                   image_height,
-                                                   requires_grad=True)
+                                                   image_height)
 
         # and previous_hidden_state: why the latter has dimension equal to
         # batch size but for the former it doesn't seem to matter
         previous_memory_state_column = torch.zeros(self.input_channels,
                                                    self.hidden_states_size,
-                                                   image_height,
-                                                   requires_grad=True)
+                                                   image_height)
 
         # After initialization, the value of grad_fn is still None, later it gets set
         # print("initialization: previous_memory_state_column.grad_fn: " + str(previous_memory_state_column.grad_fn))
@@ -144,6 +142,11 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         # print("skewed image columns: " + str(skewed_image_columns))
 
         for column_number in range(0, skewed_image_columns):
+            #print("column_number: " + str(column_number))
+            #print("previous_hidden_state_column.is_leaf: " + str(previous_hidden_state_column.is_leaf))
+            #print("previous_hidden_state_column.grad_fn: " + str(previous_hidden_state_column.grad_fn))
+            #print("previous_memory_state_column.is_leaf: " + str(previous_memory_state_column.is_leaf))
+            #print("previous_memory_state_column.grad_fn: " + str(previous_memory_state_column.grad_fn))
 
             #Preparation of the computations of the next state. This involves either just
             # storing the previous hidden state and previous memory state columns in the

@@ -202,7 +202,6 @@ class MultiDimensionalRNNBase(torch.nn.Module):
         self.input_channels = 1
         self.hidden_states_size = hidden_states_size
         self.selection_tensor = self.create_torch_indices_selection_tensor(batch_size)
-        self.selection_tensor.requires_grad_(True)
         if MultiDimensionalRNNBase.use_cuda():
             self.selection_tensor = self.selection_tensor.cuda()
         self.compute_multi_directional = compute_multi_directional
@@ -315,7 +314,7 @@ class MultiDimensionalRNNBase(torch.nn.Module):
         skewed_images_four_dim_variable = torch.unsqueeze(skewed_images, 1)
         # See: https://pytorch.org/docs/stable/tensors.html
         # This replaces explicit variable creation, which is deprecated
-        skewed_images_four_dim_variable.requires_grad_(True)
+        # skewed_images_four_dim_variable.requires_grad_(True)  # This is directly set for the original input
 
         if MultiDimensionalRNNBase.use_cuda():
             # https://discuss.pytorch.org/t/which-device-is-model-tensor-stored-on/4908/7
@@ -457,8 +456,7 @@ class MultiDimensionalRNNAbstract(MultiDimensionalRNNBase):
         # print("image height: " + str(image_height))
         previous_hidden_state_column = torch.zeros(self.input_channels,
                                                    self.hidden_states_size,
-                                                   image_height,
-                                                   requires_grad=True)
+                                                   image_height)
 
         if MultiDimensionalRNNBase.use_cuda():
             previous_hidden_state_column = previous_hidden_state_column.cuda()
