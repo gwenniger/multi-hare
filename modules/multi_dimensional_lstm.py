@@ -15,12 +15,11 @@ from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParame
 
 class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
-    def __init__(self, input_height:int, input_width:int, hidden_states_size, batch_size, compute_multi_directional: bool,
+    def __init__(self, hidden_states_size, batch_size, compute_multi_directional: bool,
                  use_dropout: bool, training: bool,
                  multi_dimensional_lstm_parameter_creator:MultiDimensionalLSTMParametersCreator,
                  nonlinearity="tanh"):
-        super(MultiDimensionalLSTM, self).__init__(input_height, input_width, hidden_states_size, batch_size,
-                                                  compute_multi_directional,
+        super(MultiDimensionalLSTM, self).__init__(hidden_states_size, batch_size, compute_multi_directional,
                                                   nonlinearity)
 
         self.use_dropout = use_dropout
@@ -32,12 +31,6 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
         # Set initial bias for the forget gates to one, since it is known to give better results
         self.mdlstm_direction_one_parameters.set_bias_forget_gates_to_one()
-
-        self.fc3 = nn.Linear(self.number_of_output_dimensions(), 10)
-
-        # print("self.fc3 : " + str(self.fc3))
-        # print("self.fc3.weight: " + str(self.fc3.weight))
-        # print("self.fc3.bias: " + str(self.fc3.bias))
 
         # For multi-directional rnn
         if self.compute_multi_directional:
@@ -82,12 +75,11 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                     nonlinearity)
 
     @staticmethod
-    def create_multi_dimensional_lstm_fast(input_height:int , input_width:int,
-                                           hidden_states_size: int, batch_size: int,
+    def create_multi_dimensional_lstm_fast(hidden_states_size: int, batch_size: int,
                                            compute_multi_directional: bool,
                                            use_dropout: bool,
                                            nonlinearity="tanh"):
-        return MultiDimensionalLSTM(input_height, input_width, hidden_states_size, batch_size, compute_multi_directional, use_dropout,
+        return MultiDimensionalLSTM(hidden_states_size, batch_size, compute_multi_directional, use_dropout,
                                     True,
                                     MultiDimensionalLSTMParametersCreatorFast(),
                                     nonlinearity)
@@ -379,16 +371,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
     def forward_one_directional_multi_dimensional_lstm(self, x):
         activations_unskewed = self.compute_multi_dimensional_lstm_one_direction(self.mdlstm_direction_one_parameters, x)
-        activations_one_dimensional = activations_unskewed.view(-1, self.number_of_output_dimensions())
-        # print("activations_one_dimensional: " + str(activations_one_dimensional))
-        # It is necessary to output a tensor of size 10, for 10 different output classes
-        # print("self.fc3.weight: " + str(self.fc3.weight))
-        # print("self.fc3.bias: " + str(self.fc3.bias))
-        result = self.fc3(activations_one_dimensional)
-        return result
-
-    def _final_activation_function(self, final_activation_function_input):
-        return self.fc3(final_activation_function_input)
+        return activations_unskewed
 
     # Needs to be implemented in the subclasses
     def _compute_multi_dimensional_function_one_direction(self, function_input):

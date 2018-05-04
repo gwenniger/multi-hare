@@ -14,6 +14,7 @@ import util.tensor_flipping
 from abc import abstractmethod
 from modules.state_update_block import StateUpdateBlock
 from modules.parallel_multiple_state_weightings_computation import ParallelMultipleStateWeightingsComputation
+from modules.size_two_dimensional import SizeTwoDimensional
 
 
 class MDRNNCellBase(Module):
@@ -154,11 +155,44 @@ class MDRNNCell(MDRNNCellBase):
         # )
 
 
+# This Module class stores a MultiDimensionalRNN or MultiDimensionalLSTM
+# and uses that to compute the initial activation, then flattens this
+# activation and feeds it to a final linear layer to compute the final output
+# This increases generality, by avoiding the need to provide the image size to the
+# MultiDimensionalRNN / MultiDimensionalLSTM modules, which should be generic and
+# working for arbitrary input sizes. An issue is that within a batch at least, all
+# inputs should be of the same size. But this can probably be fixed using padding.
+class MultiDimensionalRNNToSingleClassNetwork(torch.nn.Module):
+    def __init__(self, multi_dimensional_rnn, input_size: SizeTwoDimensional):
+        super(MultiDimensionalRNNToSingleClassNetwork, self).__init__()
+        self.multi_dimensional_rnn = multi_dimensional_rnn
+        self.input_size = input_size
+        self.fc3 = nn.Linear(self.number_of_output_dimensions(), 10)
+        # print("self.fc3 : " + str(self.fc3))
+        # print("self.fc3.weight: " + str(self.fc3.weight))
+        # print("self.fc3.bias: " + str(self.fc3.bias))
+
+    @staticmethod
+    def create_multi_dimensional_rnn_to_single_class_network(multi_dimensional_rnn, input_size: SizeTwoDimensional):
+        return MultiDimensionalRNNToSingleClassNetwork(multi_dimensional_rnn, input_size)
+
+    def number_of_output_dimensions(self):
+        result = self.input_size.height * self.input_size.width * self.multi_dimensional_rnn.hidden_states_size
+        if self.multi_dimensional_rnn.compute_multi_directional:
+            result = result * 4
+        return result
+
+    def set_training(self, training):
+        self.multi_dimensional_rnn.set_training(training)
+
+    def forward(self, x):
+        mdrnn_activations = self.multi_dimensional_rnn(x)
+        activations_one_dimensional = mdrnn_activations.view(-1, self.number_of_output_dimensions())
+        return self.fc3(activations_one_dimensional)
+
+
 class MultiDimensionalRNNBase(torch.nn.Module):
-    def __init__(self,
-                 input_height:int,
-                 input_width:int,
-                 hidden_states_size: int,
+    def __init__(self, hidden_states_size: int,
                  batch_size,  compute_multi_directional: bool,
                  nonlinearity="tanh",):
         super(MultiDimensionalRNNBase, self).__init__()
@@ -167,8 +201,6 @@ class MultiDimensionalRNNBase(torch.nn.Module):
         self.nonlinearity = nonlinearity
         self.input_channels = 1
         self.hidden_states_size = hidden_states_size
-        self.input_height = input_height
-        self.input_width = input_width
         self.selection_tensor = self.create_torch_indices_selection_tensor(batch_size)
         self.selection_tensor.requires_grad_(True)
         if MultiDimensionalRNNBase.use_cuda():
@@ -231,13 +263,8 @@ class MultiDimensionalRNNBase(torch.nn.Module):
 
         # print("activations_one_dimensional: " + str(activations_one_dimensional))
         # It is nescessary to output a tensor of size 10, for 10 different output classes
-        result = self._final_activation_function(activations_one_dimensional)
+        result = activations_one_dimensional
         return result
-
-    # Needs to be implemented in the subclasses
-    @abstractmethod
-    def _final_activation_function(self, final_activation_function_input):
-        raise RuntimeError("not implemented")
 
     # Needs to be implemented in the subclasses
     @abstractmethod
@@ -393,30 +420,17 @@ class MultiDimensionalRNNBase(torch.nn.Module):
         # print("state_plus_input: " + str(state_plus_input))
         return state_plus_input
 
-    def number_of_output_dimensions(self):
-        result = self.input_height * self.input_width * self.hidden_states_size
-        if self.compute_multi_directional:
-            result = result * 4
-        return result
-
 
 class MultiDimensionalRNNAbstract(MultiDimensionalRNNBase):
-    def __init__(self, input_height: int, input_width: int, hidden_states_size, batch_size, compute_multi_directional: bool,
+    def __init__(self, hidden_states_size, batch_size, compute_multi_directional: bool,
                  use_dropout: bool, training: bool,
                  nonlinearity="tanh"):
-        super(MultiDimensionalRNNAbstract, self).__init__(input_height, input_width,
-                                                          hidden_states_size, batch_size,
+        super(MultiDimensionalRNNAbstract, self).__init__(hidden_states_size, batch_size,
                                                           compute_multi_directional,
                                                           nonlinearity)
         self.input_convolution = nn.Conv2d(self.input_channels,
                                            self.hidden_states_size, 1)
-        # self.fc3 = nn.Linear(1024, 10)
         # For multi-directional rnn
-        if self.compute_multi_directional:
-            self.fc3 = nn.Linear(self.number_of_output_dimensions(), 10)
-        else:
-            self.fc3 = nn.Linear(self.number_of_output_dimensions(), 10)
-
         self.use_dropout = use_dropout
         self.training = training
 
@@ -485,13 +499,8 @@ class MultiDimensionalRNNAbstract(MultiDimensionalRNNBase):
 
     def forward_one_directional_multi_dimensional_rnn(self, x):
         activations_unskewed = self.compute_multi_dimensional_rnn_one_direction(x)
-        activations_one_dimensional = activations_unskewed.view(-1, self.number_of_output_dimensions())
         # print("activations_one_dimensional: " + str(activations_one_dimensional))
-        # It is nescessary to output a tensor of size 10, for 10 different output classes
-        result = self.fc3(activations_one_dimensional)
-         #print("result: " + str(result))
-        # print("result.size(): " + str(result.size()))
-        return result
+        return activations_unskewed
 
     # This function is slow because all four function calls for 4 directions are
     # executed sequentially. It isn't entirely clear how to optimize this.
@@ -502,33 +511,29 @@ class MultiDimensionalRNNAbstract(MultiDimensionalRNNBase):
 
         # Original order
         activations_unskewed_direction_one = self.compute_multi_dimensional_rnn_one_direction(x)
-        activations_one_dimensional_one = activations_unskewed_direction_one.view(-1, 1024)
 
         # Flipping 2nd dimension
         activations_unskewed_direction_two = self.compute_multi_dimensional_rnn_one_direction(
             util.tensor_flipping.flip(x, 2))
-        activations_one_dimensional_two = activations_unskewed_direction_two.view(-1, 1024)
 
         #print("activations_one_dimensional_two: " + str(activations_one_dimensional_two))
 
         # Flipping 3th dimension
         activations_unskewed_direction_three = self.compute_multi_dimensional_rnn_one_direction(
             util.tensor_flipping.flip(x, 3))
-        activations_one_dimensional_three = activations_unskewed_direction_three.view(-1, 1024)
 
         # Flipping 2nd and 3th dimension combined
         activations_unskewed_direction_four = self.compute_multi_dimensional_rnn_one_direction(
             util.tensor_flipping.flip(util.tensor_flipping.flip(x, 2), 3))
-        activations_one_dimensional_four = activations_unskewed_direction_four.view(-1, 1024)
 
-        activations_combined = torch.cat((activations_one_dimensional_one, activations_one_dimensional_two,
-                                         activations_one_dimensional_three, activations_one_dimensional_four), 1)
+        activations_combined = torch.cat((activations_unskewed_direction_one, activations_unskewed_direction_two,
+                                         activations_unskewed_direction_three, activations_unskewed_direction_four), 1)
 
         #print("activations_combined: " + str(activations_combined))
 
         # print("activations_one_dimensional: " + str(activations_one_dimensional))
         # It is nescessary to output a tensor of size 10, for 10 different output classes
-        result = self.fc3(activations_combined)
+        result = activations_combined
         return result
 
     # Input tensor x is a batch of image tensors
@@ -538,10 +543,6 @@ class MultiDimensionalRNNAbstract(MultiDimensionalRNNBase):
             return self.forward_multi_directional_multi_dimensional_function_fast(x)
         else:
             return self.forward_one_directional_multi_dimensional_rnn(x)
-
-    def _final_activation_function(self, final_activation_function_input):
-        # print("final_activation_function_input: " + str(final_activation_function_input))
-        return self.fc3(final_activation_function_input)
 
     def _compute_multi_dimensional_function_one_direction(self, function_input):
         return self.compute_multi_dimensional_rnn_one_direction(function_input)
@@ -580,13 +581,11 @@ class MultiDimensionalRNN(MultiDimensionalRNNAbstract):
 
 
 class MultiDimensionalRNNFast(MultiDimensionalRNNAbstract):
-    def __init__(self, input_height, input_width,
-                 hidden_states_size, batch_size, compute_multi_directional: bool,
+    def __init__(self, hidden_states_size, batch_size, compute_multi_directional: bool,
                  use_dropout: bool,
                  training: bool,
                  nonlinearity="tanh"):
-        super(MultiDimensionalRNNFast, self).__init__(input_height, input_width,
-                                                      hidden_states_size, batch_size,
+        super(MultiDimensionalRNNFast, self).__init__(hidden_states_size, batch_size,
                                                       compute_multi_directional,
                                                       use_dropout,
                                                       training,
@@ -602,12 +601,10 @@ class MultiDimensionalRNNFast(MultiDimensionalRNNAbstract):
             self.parallel_multiple_state_weighting_computation.get_state_convolutions_as_list())
 
     @staticmethod
-    def create_multi_dimensional_rnn_fast(input_height, input_width, hidden_states_size: int, batch_size: int,
+    def create_multi_dimensional_rnn_fast(hidden_states_size: int, batch_size: int,
                                           compute_multi_directional: bool, use_dropout: bool,
                                           nonlinearity="tanh"):
-        return MultiDimensionalRNNFast(input_height,
-                                       input_width,
-                                       hidden_states_size,
+        return MultiDimensionalRNNFast(hidden_states_size,
                                        batch_size,
                                        compute_multi_directional, use_dropout, True,
                                        nonlinearity)

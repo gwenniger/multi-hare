@@ -5,10 +5,12 @@ import time
 from modules.multi_dimensional_rnn import MDRNNCell
 from modules.multi_dimensional_rnn import MultiDimensionalRNNBase
 from modules.multi_dimensional_rnn import MultiDimensionalRNN
+from modules.multi_dimensional_rnn import MultiDimensionalRNNToSingleClassNetwork
 from modules.multi_dimensional_rnn import MultiDimensionalRNNFast
 from modules.multi_dimensional_lstm import MultiDimensionalLSTM
 import data_preprocessing.load_mnist
 from util.utils import Utils
+from modules.size_two_dimensional import SizeTwoDimensional
 
 
 def test_mdrnn_cell():
@@ -123,8 +125,8 @@ def clip_gradient(model):
     return made_gradient_norm_based_correction
 
 
-def train_mdrnn(input_height: int, input_width: int,
-                hidden_states_size: int, batch_size,  compute_multi_directional: bool, use_dropout: bool):
+def train_mdrnn(input_size: SizeTwoDimensional, hidden_states_size: int, batch_size,
+                compute_multi_directional: bool, use_dropout: bool):
     import torch.optim as optim
 
     criterion = nn.CrossEntropyLoss()
@@ -132,12 +134,11 @@ def train_mdrnn(input_height: int, input_width: int,
     #                                                                         batch_size,
     #                                                                         compute_multi_directional,
     #                                                                         nonlinearity="sigmoid")
-    #multi_dimensional_rnn = MultiDimensionalRNNFast.create_multi_dimensional_rnn_fast(input_height, input_width,
-    #                                                                                  hidden_states_size,
-    #                                                                                  batch_size,
-    #                                                                                  compute_multi_directional,
-    #                                                                                  use_dropout,
-    #                                                                                   nonlinearity="sigmoid")
+    multi_dimensional_rnn = MultiDimensionalRNNFast.create_multi_dimensional_rnn_fast(hidden_states_size,
+                                                                                      batch_size,
+                                                                                      compute_multi_directional,
+                                                                                      use_dropout,
+                                                                                      nonlinearity="sigmoid")
 
     #multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm(hidden_states_size,
     #                                                                           batch_size,
@@ -148,21 +149,22 @@ def train_mdrnn(input_height: int, input_width: int,
     # http://pytorch.org/docs/master/notes/cuda.html
     device = torch.device("cuda:0")
 
-    multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(input_height,
-                                                                                    input_width,
-                                                                                    hidden_states_size,
-                                                                                    batch_size,
-                                                                                    compute_multi_directional,
-                                                                                    use_dropout,
-                                                                                    nonlinearity="sigmoid")
+    #multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(hidden_states_size,
+    #                                                                                batch_size,
+    #                                                                                compute_multi_directional,
+    #                                                                                use_dropout,
+    #                                                                                nonlinearity="sigmoid")
+
+    network = MultiDimensionalRNNToSingleClassNetwork.\
+        create_multi_dimensional_rnn_to_single_class_network(multi_dimensional_rnn, input_size)
 
     #multi_dimensional_rnn = Net()
 
     if Utils.use_cuda():
         #multi_dimensional_rnn = multi_dimensional_rnn.cuda()
 
-        multi_dimensional_rnn = nn.DataParallel(multi_dimensional_rnn, device_ids=[0])
-        multi_dimensional_rnn.to(device)
+        network = nn.DataParallel(network, device_ids=[0])
+        network.to(device)
         #print("multi_dimensional_rnn.module.mdlstm_direction_one_parameters.parallel_memory_state_column_computation :"
         #      + str(multi_dimensional_rnn.module.mdlstm_direction_one_parameters.parallel_memory_state_column_computation))
 
@@ -182,7 +184,7 @@ def train_mdrnn(input_height: int, input_width: int,
 
 
     # Adding some weight decay seems to do magic, see: http://pytorch.org/docs/master/optim.html
-    optimizer = optim.SGD(multi_dimensional_rnn.parameters(), lr=0.001, momentum=0.9, weight_decay=1e-5)
+    optimizer = optim.SGD(network.parameters(), lr=0.001, momentum=0.9, weight_decay=1e-5)
 
     # Faster learning
     #optimizer = optim.SGD(multi_dimensional_rnn.parameters(), lr=0.01, momentum=0.9)
@@ -193,7 +195,7 @@ def train_mdrnn(input_height: int, input_width: int,
 
     num_gradient_corrections = 0
 
-    for epoch in range(2):  # loop over the dataset multiple times
+    for epoch in range(4):  # loop over the dataset multiple times
 
         running_loss = 0.0
         for i, data in enumerate(trainloader, 0):
@@ -218,8 +220,9 @@ def train_mdrnn(input_height: int, input_width: int,
 
             # forward + backward + optimize
             #outputs = multi_dimensional_rnn(Variable(inputs))  # For "Net" (Le Net)
-            outputs = multi_dimensional_rnn(inputs)
+            outputs = network(inputs)
             # print("outputs: " + str(outputs))
+            # print("outputs.size(): " + str(outputs.size()))
             #print("labels: " + str(labels))
             loss = criterion(outputs, labels)
             loss.backward()
@@ -252,8 +255,8 @@ def train_mdrnn(input_height: int, input_width: int,
 
     # Run evaluation
     # multi_dimensional_rnn.set_training(False) # Normal case
-    multi_dimensional_rnn.module.set_training(False)  # When using DataParallel
-    evaluate_mdrnn(multi_dimensional_rnn, batch_size)
+    network.module.set_training(False)  # When using DataParallel
+    evaluate_mdrnn(network, batch_size)
 
 
 def main():
@@ -276,9 +279,9 @@ def main():
     # https://discuss.pytorch.org/t/about-torch-nn-utils-clip-grad-norm/13873
     # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191
 
+    input_size = SizeTwoDimensional.create_size_two_dimensional(input_height, input_width)
     #with torch.autograd.profiler.profile(use_cuda=False) as prof:
-    train_mdrnn(input_height, input_width,
-                hidden_states_size, batch_size,  compute_multi_directional, use_dropout)
+    train_mdrnn(input_size, hidden_states_size, batch_size,  compute_multi_directional, use_dropout)
     #print(prof)
 
 
