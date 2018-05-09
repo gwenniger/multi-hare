@@ -15,11 +15,11 @@ from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParame
 
 class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
-    def __init__(self, hidden_states_size, batch_size, compute_multi_directional: bool,
+    def __init__(self, input_channels: int, hidden_states_size, batch_size, compute_multi_directional: bool,
                  use_dropout: bool, training: bool,
                  multi_dimensional_lstm_parameter_creator:MultiDimensionalLSTMParametersCreator,
                  nonlinearity="tanh"):
-        super(MultiDimensionalLSTM, self).__init__(hidden_states_size, batch_size, compute_multi_directional,
+        super(MultiDimensionalLSTM, self).__init__(input_channels, hidden_states_size, batch_size, compute_multi_directional,
                                                   nonlinearity)
 
         self.use_dropout = use_dropout
@@ -75,11 +75,11 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                     nonlinearity)
 
     @staticmethod
-    def create_multi_dimensional_lstm_fast(hidden_states_size: int, batch_size: int,
+    def create_multi_dimensional_lstm_fast(input_channels: int, hidden_states_size: int, batch_size: int,
                                            compute_multi_directional: bool,
                                            use_dropout: bool,
                                            nonlinearity="tanh"):
-        return MultiDimensionalLSTM(hidden_states_size, batch_size, compute_multi_directional, use_dropout,
+        return MultiDimensionalLSTM(input_channels, hidden_states_size, batch_size, compute_multi_directional, use_dropout,
                                     True,
                                     MultiDimensionalLSTMParametersCreatorFast(),
                                     nonlinearity)
@@ -104,14 +104,15 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         skewed_images_variable = MultiDimensionalRNNBase.create_skewed_images_variable_four_dim(x)
         # print("list(x.size()): " + str(list(x.size())))
         image_height = x.size(2)
+        number_of_images = x.size(0)
         # print("image height: " + str(image_height))
-        previous_hidden_state_column = torch.zeros(self.input_channels,
+        previous_hidden_state_column = torch.zeros(number_of_images,
                                                    self.hidden_states_size,
                                                    image_height)
 
         # and previous_hidden_state: why the latter has dimension equal to
         # batch size but for the former it doesn't seem to matter
-        previous_memory_state_column = torch.zeros(self.input_channels,
+        previous_memory_state_column = torch.zeros(number_of_images,
                                                    self.hidden_states_size,
                                                    image_height)
 
@@ -126,11 +127,11 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         skewed_image_columns = skewed_images_variable.size(3)
 
         # print("mdlstm_parameters.input_input_convolution: " + str(mdlstm_parameters.input_input_convolution))
-        # print("skewed_images_variable: " + str(skewed_images_variable))
+        # print("skewed_images_variable.size(): " + str(skewed_images_variable.size()))
         # print("mdlstm_parameters.input_input_convolution.bias: "
         # + str(mdlstm_parameters.input_input_convolution.bias))
         input_input_matrix = mdlstm_parameters.input_input_convolution(skewed_images_variable)
-        # print("input_matrix: " + str(input_matrix))
+        # print("input_input_matrix.size(): " + str(input_input_matrix.size()))
 
         input_gate_input_matrix = mdlstm_parameters.input_gate_input_convolution(skewed_images_variable)
         forget_gate_one_input_matrix = mdlstm_parameters.forget_gate_one_input_convolution(skewed_images_variable)

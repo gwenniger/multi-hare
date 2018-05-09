@@ -9,6 +9,7 @@ from modules.multi_dimensional_rnn import MultiDimensionalRNNToSingleClassNetwor
 from modules.multi_dimensional_rnn import MultiDimensionalRNNFast
 from modules.multi_dimensional_lstm import MultiDimensionalLSTM
 import data_preprocessing.load_mnist
+import data_preprocessing.load_cifar_ten
 from util.utils import Utils
 from modules.size_two_dimensional import SizeTwoDimensional
 
@@ -55,12 +56,12 @@ def print_number_of_parameters(model):
     print("total parameters: " + str(total_parameters))
 
 
-def evaluate_mdrnn(multi_dimensional_rnn, batch_size):
+def evaluate_mdrnn(test_loader, multi_dimensional_rnn, batch_size):
     device = torch.device("cuda:0")
 
     correct = 0
     total = 0
-    test_loader = data_preprocessing.load_mnist.get_test_loader(batch_size)
+
     for data in test_loader:
         images, labels = data
 
@@ -125,7 +126,7 @@ def clip_gradient(model):
     return made_gradient_norm_based_correction
 
 
-def train_mdrnn(input_size: SizeTwoDimensional, hidden_states_size: int, batch_size,
+def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: SizeTwoDimensional, hidden_states_size: int, batch_size,
                 compute_multi_directional: bool, use_dropout: bool):
     import torch.optim as optim
 
@@ -149,7 +150,8 @@ def train_mdrnn(input_size: SizeTwoDimensional, hidden_states_size: int, batch_s
     # http://pytorch.org/docs/master/notes/cuda.html
     device = torch.device("cuda:0")
 
-    multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(hidden_states_size,
+    multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(input_channels,
+                                                                                    hidden_states_size,
                                                                                     batch_size,
                                                                                     compute_multi_directional,
                                                                                     use_dropout,
@@ -189,8 +191,6 @@ def train_mdrnn(input_size: SizeTwoDimensional, hidden_states_size: int, batch_s
     # Faster learning
     #optimizer = optim.SGD(multi_dimensional_rnn.parameters(), lr=0.01, momentum=0.9)
 
-    trainloader = data_preprocessing.load_mnist.get_train_loader(batch_size)
-
     start = time.time()
 
     num_gradient_corrections = 0
@@ -198,7 +198,7 @@ def train_mdrnn(input_size: SizeTwoDimensional, hidden_states_size: int, batch_s
     for epoch in range(4):  # loop over the dataset multiple times
 
         running_loss = 0.0
-        for i, data in enumerate(trainloader, 0):
+        for i, data in enumerate(train_loader, 0):
 
             # get the inputs
             inputs, labels = data
@@ -258,19 +258,24 @@ def train_mdrnn(input_size: SizeTwoDimensional, hidden_states_size: int, batch_s
     # Run evaluation
     # multi_dimensional_rnn.set_training(False) # Normal case
     network.module.set_training(False)  # When using DataParallel
-    evaluate_mdrnn(network, batch_size)
+    evaluate_mdrnn(test_loader, network, batch_size)
 
 
-def main():
+def mnist_basic_recognition():
+    batch_size = 256
+    train_loader = data_preprocessing.load_mnist.get_train_loader(batch_size)
+    test_loader = data_preprocessing.load_mnist.get_test_loader(batch_size)
+
     # test_mdrnn_cell()
     #test_mdrnn()
     input_height = 16
     input_width = 16
+    input_channels = 1
     hidden_states_size = 32
     # https://stackoverflow.com/questions/45027234/strange-loss-curve-while-training-lstm-with-keras
     # Possibly a batch size of 128 leads to more instability in training?
     #batch_size = 128
-    batch_size = 256
+
     compute_multi_directional = False
     # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
     use_dropout = False
@@ -283,8 +288,44 @@ def main():
 
     input_size = SizeTwoDimensional.create_size_two_dimensional(input_height, input_width)
     #with torch.autograd.profiler.profile(use_cuda=False) as prof:
-    train_mdrnn(input_size, hidden_states_size, batch_size,  compute_multi_directional, use_dropout)
+    train_mdrnn(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,  compute_multi_directional, use_dropout)
     #print(prof)
+
+
+def cifar_ten_basic_recognition():
+    batch_size = 256
+    train_loader = data_preprocessing.load_cifar_ten.get_train_loader(batch_size)
+    test_loader = data_preprocessing.load_cifar_ten.get_test_loader(batch_size)
+
+    # test_mdrnn_cell()
+    #test_mdrnn()
+    input_height = 16
+    input_width = 16
+    input_channels = 3
+    hidden_states_size = 32
+    # https://stackoverflow.com/questions/45027234/strange-loss-curve-while-training-lstm-with-keras
+    # Possibly a batch size of 128 leads to more instability in training?
+    #batch_size = 128
+
+    compute_multi_directional = False
+    # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
+    use_dropout = False
+
+    # TODO: Add gradient clipping? This might also make training more stable?
+    # Interesting link with tips on how to fix training:
+    # https://blog.slavv.com/37-reasons-why-your-neural-network-is-not-working-4020854bd607
+    # https://discuss.pytorch.org/t/about-torch-nn-utils-clip-grad-norm/13873
+    # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191
+
+    input_size = SizeTwoDimensional.create_size_two_dimensional(input_height, input_width)
+    #with torch.autograd.profiler.profile(use_cuda=False) as prof:
+    train_mdrnn(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,  compute_multi_directional, use_dropout)
+    #print(prof)
+
+
+def main():
+    mnist_basic_recognition()
+    # cifar_ten_basic_recognition()
 
 
 if __name__ == "__main__":

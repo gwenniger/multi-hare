@@ -78,12 +78,13 @@ class ImageInputTransformer:
 
         #print("list(image_tensor.size()): " + str(list(image_tensors.size())))
         # See: https://discuss.pytorch.org/t/indexing-a-2d-tensor/1667/2
+        number_of_channels = image_tensors.size(1)
         height = image_tensors.size(2)
         width = image_tensors.size(3)
 
         number_of_image_tensors  = image_tensors.size(0)
         #print("number of image tensors: " + str(number_of_image_tensors))
-        transformed_images = torch.zeros(number_of_image_tensors, 1, height, (width * 2) - 1)
+        transformed_images = torch.zeros(number_of_image_tensors, number_of_channels, height, (width * 2) - 1)
         #print("transformed_image: " + str(transformed_image))
         # print("transformed_im   age.size(): " + str(transformed_image.size()))
 
@@ -98,29 +99,36 @@ class ImageInputTransformer:
                 # image_tensors[:, 0, y, :]
                 # See:
                 # https://stackoverflow.com/questions/47374172/how-to-select-index-over-two-dimension-in-pytorch?rq=1
-                leading_zeros_tensor = torch.zeros(number_of_image_tensors, leading_zeros)
+                leading_zeros_tensor = torch.zeros(number_of_image_tensors, number_of_channels,
+                                                   leading_zeros)
 
                 if Utils.use_cuda():
                     leading_zeros_tensor = leading_zeros_tensor.to(device)
 
+                # print("leading_zeros_tensor.size()" + str(leading_zeros_tensor.size()))
+
                 new_row = torch.cat((leading_zeros_tensor,
-                                     image_tensors[:, 0, y, :]), 1)
+                                     image_tensors[:, :, y, :]), 2)
             else:
-                new_row = image_tensors[:, 0, y, :]
+                new_row = image_tensors[:, :, y, :]
 
             if tailing_zeros > 0:
-                tailing_zeros_tensor = torch.zeros(number_of_image_tensors, tailing_zeros)
+                # print("number of channels: " + str(number_of_channels))
+                tailing_zeros_tensor = torch.zeros(number_of_image_tensors,
+                                                   number_of_channels, tailing_zeros)
                 if Utils.use_cuda():
                     tailing_zeros_tensor = tailing_zeros_tensor.to(device)
 
-                # print("new_row: " + str(new_row))
-                # print("tailing_zeros_tensor: " + str(tailing_zeros_tensor))
-                new_row = torch.cat((new_row, tailing_zeros_tensor), 1)
-            #print("new row: " + str(new_row))
-            #print("transformed_image[0][y][:] : " + str(transformed_image[0][y][:]))
-            transformed_images[:, 0, y, :] = new_row[:, :]
+                # print("new_row.size(): " + str(new_row.size()))
+                # print("tailing_zeros_tensor.size(): " + str(tailing_zeros_tensor.size()))
+                new_row = torch.cat((new_row, tailing_zeros_tensor), 2)
+            # print("new row.size(): " + str(new_row.size()))
+            # print("transformed_image[:, :, y, :].size()" + str(transformed_images[:, :, y, :].size()))
+            transformed_images[:, :, y, :] = new_row
+
+        # print("transformed_images.size(): " + str(transformed_images.size()))
         # Remove the image channel dimension
-        transformed_images = transformed_images.squeeze(1)
+        # transformed_images = transformed_images.squeeze(1)
 
         return transformed_images
 

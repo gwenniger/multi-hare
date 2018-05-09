@@ -192,14 +192,14 @@ class MultiDimensionalRNNToSingleClassNetwork(torch.nn.Module):
 
 
 class MultiDimensionalRNNBase(torch.nn.Module):
-    def __init__(self, hidden_states_size: int,
+    def __init__(self, input_channels: int, hidden_states_size: int,
                  batch_size,  compute_multi_directional: bool,
                  nonlinearity="tanh",):
         super(MultiDimensionalRNNBase, self).__init__()
 
+        self.input_channels = input_channels
         self.batch_size = batch_size
         self.nonlinearity = nonlinearity
-        self.input_channels = 1
         self.hidden_states_size = hidden_states_size
         self.selection_tensor = self.create_torch_indices_selection_tensor(batch_size)
         if MultiDimensionalRNNBase.use_cuda():
@@ -311,7 +311,8 @@ class MultiDimensionalRNNBase(torch.nn.Module):
         # print("skewed images rows: " + str(skewed_images_rows))
         # print("skewed_images: " + str(skewed_images))
 
-        skewed_images_four_dim_variable = torch.unsqueeze(skewed_images, 1)
+        #skewed_images_four_dim_variable = torch.unsqueeze(skewed_images, 1)
+        skewed_images_four_dim_variable = skewed_images
         # See: https://pytorch.org/docs/stable/tensors.html
         # This replaces explicit variable creation, which is deprecated
         # skewed_images_four_dim_variable.requires_grad_(True)  # This is directly set for the original input
@@ -414,6 +415,8 @@ class MultiDimensionalRNNBase(torch.nn.Module):
     @staticmethod
     def compute_states_plus_input(input_matrix, column_number, state_columns_combined):
         input_column = input_matrix[:, :, :, column_number]
+        # print("input_column.size(): " + str(input_column.size()))
+        # print("state_columns_combined.size(): " + str(state_columns_combined.size()))
         state_plus_input = state_columns_combined + input_column
         # print("input_column: " + str(input_column))
         # print("state_plus_input: " + str(state_plus_input))
@@ -421,10 +424,10 @@ class MultiDimensionalRNNBase(torch.nn.Module):
 
 
 class MultiDimensionalRNNAbstract(MultiDimensionalRNNBase):
-    def __init__(self, hidden_states_size, batch_size, compute_multi_directional: bool,
+    def __init__(self, input_channels: int, hidden_states_size, batch_size, compute_multi_directional: bool,
                  use_dropout: bool, training: bool,
                  nonlinearity="tanh"):
-        super(MultiDimensionalRNNAbstract, self).__init__(hidden_states_size, batch_size,
+        super(MultiDimensionalRNNAbstract, self).__init__(input_channels, hidden_states_size, batch_size,
                                                           compute_multi_directional,
                                                           nonlinearity)
         self.input_convolution = nn.Conv2d(self.input_channels,
@@ -579,11 +582,11 @@ class MultiDimensionalRNN(MultiDimensionalRNNAbstract):
 
 
 class MultiDimensionalRNNFast(MultiDimensionalRNNAbstract):
-    def __init__(self, hidden_states_size, batch_size, compute_multi_directional: bool,
+    def __init__(self, input_channels: int, hidden_states_size, batch_size, compute_multi_directional: bool,
                  use_dropout: bool,
                  training: bool,
                  nonlinearity="tanh"):
-        super(MultiDimensionalRNNFast, self).__init__(hidden_states_size, batch_size,
+        super(MultiDimensionalRNNFast, self).__init__(input_channels, hidden_states_size, batch_size,
                                                       compute_multi_directional,
                                                       use_dropout,
                                                       training,
