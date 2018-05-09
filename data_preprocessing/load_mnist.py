@@ -9,7 +9,7 @@ from util.image_input_transformer import ImageInputTransformer
 from random import randint
 
 
-def get_train_loader(batch_size):
+def get_train_set():
     # http://docs.python-guide.org/en/latest/writing/structure/
 
     # see: https://stackoverflow.com/questions/2668909/how-to-find-the-real-user-home-directory-using-python
@@ -22,15 +22,33 @@ def get_train_loader(batch_size):
     download = False  # download MNIST dataset or not
 
     # Scaling to size 32*32
-    trans = transforms.Compose([transforms.Resize((16, 16)), transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
-    #trans = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
+    trans = transforms.Compose(
+        [transforms.Resize((16, 16)), transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
+    # trans = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
     train_set = dset.MNIST(root=root, train=True, transform=trans, download=download)
+    return train_set
 
-    train_loader = torch.utils.data.DataLoader(
-        dataset=train_set,
-        batch_size=batch_size,
-        shuffle=True)
-    return train_loader
+
+def get_test_set():
+    # http://docs.python-guide.org/en/latest/writing/structure/
+
+    # see: https://stackoverflow.com/questions/2668909/how-to-find-the-real-user-home-directory-using-python
+    project_root = os.path.expanduser('~') + "/AI/handwriting-recognition/"
+
+    # exec(open(project_root + "shared_imports.py").read())
+
+    ## load mnist dataset
+    use_cuda = torch.cuda.is_available()
+
+    root = project_root + '/data'
+    download = False  # download MNIST dataset or not
+
+    # Scaling to size 32*32
+    trans = transforms.Compose(
+        [transforms.Resize((16, 16)), transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
+    # trans = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
+    test_set = dset.MNIST(root=root, train=False, transform=trans)
+    return test_set
 
 
 def get_item_tensors_and_labels_combined(train_set: list, start_index: int, sequence_length: int):
@@ -58,39 +76,26 @@ def get_item_tensors_and_labels_combined(train_set: list, start_index: int, sequ
     return item_tensors_combined, item_labels_combined
 
 
-# This data loader creates training examples of a specified length using
+# This data loader creates examples of a specified length using
 # MNIST digits by concatenating them. This data loader will be used as a toy,
 # development data set for handwriting recognition of sequences
 # This is a first step towards using a more complicated data loader that generates examples of
 # random length, concatenation 1 to N digits for each example. This latter case is
 # particularly complicated, as it requires padding to keep batches with the same size
 # during training.
-def get_multi_digit_train_loader_fixed_length(batch_size, sequence_length):
-    # http://docs.python-guide.org/en/latest/writing/structure/
-
-    # see: https://stackoverflow.com/questions/2668909/how-to-find-the-real-user-home-directory-using-python
-    project_root = os.path.expanduser('~') + "/AI/handwriting-recognition/"
-
-    ## load mnist dataset
-    use_cuda = torch.cuda.is_available()
-
-    root = project_root + '/data'
-    download = False  # download MNIST dataset or not
-
-    # Scaling to size 16*16
-    trans = transforms.Compose([transforms.Resize((16, 16)), transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
-    train_set = dset.MNIST(root=root, train=True, transform=trans, download=download)
+def get_multi_digit_loader_fixed_length(batch_size, sequence_length,
+                                        data_set):
     triples_train_set = list([])
-    print("train_set: " + str(train_set))
+    print("data_set: " + str(data_set))
 
     # To avoid trying to form more sequences than fits in the training length,
-    # (sequence_length -1) must be subtracted from the length of the train_set
+    # (sequence_length -1) must be subtracted from the length of the data_set
     # when determining the upper range
-    upper_range = len(train_set) - (sequence_length - 1)
+    upper_range = len(data_set) - (sequence_length - 1)
 
     for i in range(0, upper_range, sequence_length):
         item_tensors_combined, item_labels_combined = get_item_tensors_and_labels_combined(
-            train_set, i, sequence_length)
+            data_set, i, sequence_length)
         triples_train_set.append(tuple((item_tensors_combined, item_labels_combined)))
 
         # util.image_visualization.imshow(torchvision.utils.make_grid(item_tensors_combined))
@@ -103,40 +108,26 @@ def get_multi_digit_train_loader_fixed_length(batch_size, sequence_length):
     return train_loader
 
 
-# This data loader creates training examples with elements that are concatenated
+# This data loader creates examples with elements that are concatenated
 # sequences of a random length of min_num_digits (including)
 # to max_num_digits (including) elements
 # https://discuss.pytorch.org/t/solved-training-lstm-by-using-samples-of-various-sequence-length/9641
-def get_multi_digit_train_loader_random_length(batch_size,
-                                               min_num_digits, max_num_digits):
-    # http://docs.python-guide.org/en/latest/writing/structure/
-
-    # see: https://stackoverflow.com/questions/2668909/how-to-find-the-real-user-home-directory-using-python
-    project_root = os.path.expanduser('~') + "/AI/handwriting-recognition/"
-
-    ## load mnist dataset
-    use_cuda = torch.cuda.is_available()
-
-    root = project_root + '/data'
-    download = False  # download MNIST dataset or not
-
-    # Scaling to size 16*16
-    trans = transforms.Compose([transforms.Resize((16, 16)), transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
-    train_set = dset.MNIST(root=root, train=True, transform=trans, download=download)
+def get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_digits,
+                                         data_set):
     triples_train_set = list([])
-    print("train_set: " + str(train_set))
+    print("data_set: " + str(data_set))
     i = 0
-    while i < len(train_set):
+    while i < len(data_set):
         sequence_length = randint(min_num_digits, max_num_digits)
 
-        if i + sequence_length - 1 >= len(train_set):
+        if i + sequence_length - 1 >= len(data_set):
             print("Selected sequence  length " + str(sequence_length) +
                   " is no longer available in remaining items... " +
                   "skipping last items")
             break
 
         item_tensors_combined, item_labels_combined = get_item_tensors_and_labels_combined(
-            train_set, i, sequence_length)
+            data_set, i, sequence_length)
         triples_train_set.append(tuple((item_tensors_combined, item_labels_combined)))
 
         #util.image_visualization.imshow(torchvision.utils.make_grid(item_tensors_combined))
@@ -150,27 +141,38 @@ def get_multi_digit_train_loader_random_length(batch_size,
     return train_loader
 
 
+def get_multi_digit_train_loader_fixed_length(batch_size, sequence_length):
+    return get_multi_digit_loader_fixed_length(batch_size, sequence_length,
+                                               get_train_set())
+
+
+def get_multi_digit_test_loader_fixed_length(batch_size, sequence_length):
+    return get_multi_digit_loader_fixed_length(batch_size, sequence_length,
+                                               get_test_set())
+
+
+def get_multi_digit_train_loader_random_length(batch_size, min_num_digits, max_num_digits):
+    get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_digits,
+                                         get_train_set())
+
+
+def get_multi_digit_test_loader_random_length(batch_size, min_num_digits, max_num_digits):
+    get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_digits,
+                                         get_test_set())
+
+
+def get_train_loader(batch_size):
+    train_loader = torch.utils.data.DataLoader(
+        dataset=get_train_set(),
+        batch_size=batch_size,
+        shuffle=True)
+    return train_loader
+
+
 def get_test_loader(batch_size):
-    # http://docs.python-guide.org/en/latest/writing/structure/
-
-    # see: https://stackoverflow.com/questions/2668909/how-to-find-the-real-user-home-directory-using-python
-    project_root = os.path.expanduser('~') + "/AI/handwriting-recognition/"
-
-    # exec(open(project_root + "shared_imports.py").read())
-
-    ## load mnist dataset
-    use_cuda = torch.cuda.is_available()
-
-    root = project_root + '/data'
-    download = False  # download MNIST dataset or not
-
-    # Scaling to size 32*32
-    trans = transforms.Compose([transforms.Resize((16, 16)), transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
-    #trans = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
-    test_set = dset.MNIST(root=root, train=False, transform=trans)
 
     test_loader = torch.utils.data.DataLoader(
-        dataset=test_set,
+        dataset=get_test_set(),
         batch_size=batch_size,
         shuffle=False)
     return test_loader
