@@ -15,7 +15,7 @@ from abc import abstractmethod
 from modules.state_update_block import StateUpdateBlock
 from modules.parallel_multiple_state_weightings_computation import ParallelMultipleStateWeightingsComputation
 from modules.size_two_dimensional import SizeTwoDimensional
-
+from util.tensor_chunking import TensorChunking
 
 class MDRNNCellBase(Module):
 
@@ -201,7 +201,7 @@ class MultiDimensionalRNNBase(torch.nn.Module):
         self.batch_size = batch_size
         self.nonlinearity = nonlinearity
         self.hidden_states_size = hidden_states_size
-        self.selection_tensor = self.create_torch_indices_selection_tensor(batch_size)
+        self.selection_tensor = TensorChunking.create_torch_indices_selection_tensor(batch_size, 4)
         if MultiDimensionalRNNBase.use_cuda():
             self.selection_tensor = self.selection_tensor.cuda()
         self.compute_multi_directional = compute_multi_directional
@@ -226,8 +226,8 @@ class MultiDimensionalRNNBase(torch.nn.Module):
         if number_of_examples == self.batch_size:
             selection_tensor = self.selection_tensor
         else:
-            selection_tensor = MultiDimensionalRNNBase.create_torch_indices_selection_tensor(
-                number_of_examples)
+            selection_tensor = TensorChunking.create_torch_indices_selection_tensor(
+                number_of_examples, 4)
             if MultiDimensionalRNNBase.use_cuda():
                 selection_tensor = selection_tensor.cuda()
 
@@ -286,22 +286,6 @@ class MultiDimensionalRNNBase(torch.nn.Module):
             raise RuntimeError(
                 "Unknown nonlinearity: {}".format(self.nonlinearity))
         return activation_function
-
-    @staticmethod
-    def create_indices_list(number_of_examples):
-        result = []
-        for i in range(0, number_of_examples):
-            result.append(i)
-            result.append(number_of_examples + i)
-            result.append(number_of_examples * 2 + i)
-            result.append(number_of_examples * 3 + i)
-        return result
-
-    @staticmethod
-    def create_torch_indices_selection_tensor(number_of_examples):
-        indices = MultiDimensionalRNNBase.create_indices_list(number_of_examples)
-        result = torch.LongTensor(indices)
-        return result
 
     @staticmethod
     def create_skewed_images_variable_four_dim(x):

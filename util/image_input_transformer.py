@@ -1,9 +1,9 @@
 import torch
 from util.utils import Utils
 
+
 class ImageInputTransformer:
-
-
+    
     # This method takes an image and creates a transformed image, shifting the i-th row
     # with i pixels. This corresponds to the transformation used in the
     # pixel recurrent neural networks paper (https://arxiv.org/pdf/1601.06759.pdf)

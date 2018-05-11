@@ -195,7 +195,7 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
 
     num_gradient_corrections = 0
 
-    for epoch in range(4):  # loop over the dataset multiple times
+    for epoch in range(8):  # loop over the dataset multiple times
 
         running_loss = 0.0
         for i, data in enumerate(train_loader, 0):
@@ -299,8 +299,8 @@ def cifar_ten_basic_recognition():
 
     # test_mdrnn_cell()
     #test_mdrnn()
-    input_height = 16
-    input_width = 16
+    input_height = 32
+    input_width = 32
     input_channels = 3
     hidden_states_size = 32
     # https://stackoverflow.com/questions/45027234/strange-loss-curve-while-training-lstm-with-keras
@@ -324,8 +324,8 @@ def cifar_ten_basic_recognition():
 
 
 def main():
-    mnist_basic_recognition()
-    # cifar_ten_basic_recognition()
+    #mnist_basic_recognition()
+    cifar_ten_basic_recognition()
 
 
 if __name__ == "__main__":
