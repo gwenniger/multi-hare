@@ -220,6 +220,8 @@ class MultiDimensionalLSTMParametersOneDirection(MultiDimensionalLSTMParametersO
         result.extend(self.get_all_input_convolutions_as_list())
         result.extend(self.get_all_memory_state_convolutions_as_list())
         result.extend(self.get_all_hidden_state_convolutions_as_list())
+
+        print(">>> number of convolution parameter blocks: " + str(len(result)))
         return result
 
     def set_bias_forget_gates_to_one(self):
@@ -332,6 +334,7 @@ class MultiDimensionalLSTMParametersOneDirectionFast(MultiDimensionalLSTMParamet
         result.append(self.output_gate_memory_state_convolution)
         result.extend(self.parallel_hidden_state_column_computation.get_state_convolutions_as_list())
         result.extend(self.parallel_memory_state_column_computation.get_state_convolutions_as_list())
+        # print(">>> number of convolution parameter blocks: " + str(len(result)))
         return result
 
     def set_bias_forget_gates_memory_states_input(self):

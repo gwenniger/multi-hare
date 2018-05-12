@@ -177,8 +177,9 @@ class MultiDimensionalRNNToSingleClassNetwork(torch.nn.Module):
         return MultiDimensionalRNNToSingleClassNetwork(multi_dimensional_rnn, input_size)
 
     def number_of_output_dimensions(self):
-        result = self.input_size.height * self.input_size.width * self.multi_dimensional_rnn.hidden_states_size
-        if self.multi_dimensional_rnn.compute_multi_directional:
+        result = self.input_size.height * self.input_size.width \
+                 * self.multi_dimensional_rnn.get_hidden_states_size()
+        if self.multi_dimensional_rnn.compute_multi_directional():
             result = result * 4
         return result
 
@@ -193,8 +194,8 @@ class MultiDimensionalRNNToSingleClassNetwork(torch.nn.Module):
 
 class MultiDimensionalRNNBase(torch.nn.Module):
     def __init__(self, input_channels: int, hidden_states_size: int,
-                 batch_size,  compute_multi_directional: bool,
-                 nonlinearity="tanh",):
+                 batch_size, compute_multi_directional: bool,
+                 nonlinearity="tanh", ):
         super(MultiDimensionalRNNBase, self).__init__()
 
         self.input_channels = input_channels
@@ -204,7 +205,7 @@ class MultiDimensionalRNNBase(torch.nn.Module):
         self.selection_tensor = TensorChunking.create_torch_indices_selection_tensor(batch_size, 4)
         if MultiDimensionalRNNBase.use_cuda():
             self.selection_tensor = self.selection_tensor.cuda()
-        self.compute_multi_directional = compute_multi_directional
+        self.compute_multi_directional_flag = compute_multi_directional
 
     # This function is slow because all four function calls for 4 directions are
     # executed sequentially. It isn't entirely clear how to optimize this.
@@ -229,7 +230,8 @@ class MultiDimensionalRNNBase(torch.nn.Module):
             selection_tensor = TensorChunking.create_torch_indices_selection_tensor(
                 number_of_examples, 4)
             if MultiDimensionalRNNBase.use_cuda():
-                selection_tensor = selection_tensor.cuda()
+                device = x.get_device()
+                selection_tensor = selection_tensor.to(device)
 
         # print("activations_unskewed: " + str(activations_unskewed))
         # print("selection_tensor: " + str(selection_tensor))
@@ -406,6 +408,12 @@ class MultiDimensionalRNNBase(torch.nn.Module):
         # print("state_plus_input: " + str(state_plus_input))
         return state_plus_input
 
+    def get_hidden_states_size(self):
+        return self.hidden_states_size
+
+    def compute_multi_directional(self):
+        return self.compute_multi_directional_flag
+
 
 class MultiDimensionalRNNAbstract(MultiDimensionalRNNBase):
     def __init__(self, input_channels: int, hidden_states_size, batch_size, compute_multi_directional: bool,
@@ -446,7 +454,8 @@ class MultiDimensionalRNNAbstract(MultiDimensionalRNNBase):
                                                    image_height)
 
         if MultiDimensionalRNNBase.use_cuda():
-            previous_hidden_state_column = previous_hidden_state_column.cuda()
+            device = x.get_device()
+            previous_hidden_state_column = previous_hidden_state_column.to(device)
 
         # print("image_height: " + str(image_height))
 
@@ -523,7 +532,7 @@ class MultiDimensionalRNNAbstract(MultiDimensionalRNNBase):
 
     # Input tensor x is a batch of image tensors
     def forward(self, x):
-        if self.compute_multi_directional:
+        if self.compute_multi_directional_flag:
             # return self.forward_multi_directional_multi_dimensional_rnn(x)
             return self.forward_multi_directional_multi_dimensional_function_fast(x)
         else:

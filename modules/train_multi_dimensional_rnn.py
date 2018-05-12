@@ -8,6 +8,7 @@ from modules.multi_dimensional_rnn import MultiDimensionalRNN
 from modules.multi_dimensional_rnn import MultiDimensionalRNNToSingleClassNetwork
 from modules.multi_dimensional_rnn import MultiDimensionalRNNFast
 from modules.multi_dimensional_lstm import MultiDimensionalLSTM
+from modules.multi_dimensional_block_lstm import MultiDimensionalBlockLSTM
 import data_preprocessing.load_mnist
 import data_preprocessing.load_cifar_ten
 from util.utils import Utils
@@ -56,8 +57,7 @@ def print_number_of_parameters(model):
     print("total parameters: " + str(total_parameters))
 
 
-def evaluate_mdrnn(test_loader, multi_dimensional_rnn, batch_size):
-    device = torch.device("cuda:0")
+def evaluate_mdrnn(test_loader, multi_dimensional_rnn, batch_size, device):
 
     correct = 0
     total = 0
@@ -148,14 +148,29 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     #                                                                           nonlinearity="sigmoid")
 
     # http://pytorch.org/docs/master/notes/cuda.html
-    device = torch.device("cuda:0")
+    device = torch.device("cuda:1")
+    # device_ids should include device!
+    # device_ids lists all the gpus that may be used for parallelization
+    # device is the initial device the model will be put on
+    device_ids = [1]
 
-    multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(input_channels,
-                                                                                    hidden_states_size,
-                                                                                    batch_size,
-                                                                                    compute_multi_directional,
-                                                                                    use_dropout,
-                                                                                    nonlinearity="sigmoid")
+    # multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(input_channels,
+    #                                                                                 hidden_states_size,
+    #                                                                                 batch_size,
+    #                                                                                 compute_multi_directional,
+    #                                                                                 use_dropout,
+    #                                                                                 nonlinearity="sigmoid")
+
+    original_size = SizeTwoDimensional.create_size_two_dimensional(32, 32)
+    block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
+    multi_dimensional_rnn = MultiDimensionalBlockLSTM.create_multi_dimensional_block_lstm(input_channels,
+                                                                                          hidden_states_size,
+                                                                                          batch_size,
+                                                                                          original_size,
+                                                                                          block_size,
+                                                                                          compute_multi_directional,
+                                                                                          use_dropout,
+                                                                                          nonlinearity="sigmoid")
 
     network = MultiDimensionalRNNToSingleClassNetwork.\
         create_multi_dimensional_rnn_to_single_class_network(multi_dimensional_rnn, input_size)
@@ -165,7 +180,8 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     if Utils.use_cuda():
         #multi_dimensional_rnn = multi_dimensional_rnn.cuda()
 
-        network = nn.DataParallel(network, device_ids=[0])
+        network = nn.DataParallel(network, device_ids=device_ids)
+
         network.to(device)
         #print("multi_dimensional_rnn.module.mdlstm_direction_one_parameters.parallel_memory_state_column_computation :"
         #      + str(multi_dimensional_rnn.module.mdlstm_direction_one_parameters.parallel_memory_state_column_computation))
@@ -195,7 +211,7 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
 
     num_gradient_corrections = 0
 
-    for epoch in range(8):  # loop over the dataset multiple times
+    for epoch in range(4):  # loop over the dataset multiple times
 
         running_loss = 0.0
         for i, data in enumerate(train_loader, 0):
@@ -258,7 +274,7 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     # Run evaluation
     # multi_dimensional_rnn.set_training(False) # Normal case
     network.module.set_training(False)  # When using DataParallel
-    evaluate_mdrnn(test_loader, network, batch_size)
+    evaluate_mdrnn(test_loader, network, batch_size, device)
 
 
 def mnist_basic_recognition():

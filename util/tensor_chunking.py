@@ -26,8 +26,6 @@ class TensorChunking:
         self.blocks_per_row = int(original_size.width / block_size.width)
         self.blocks_per_column = int(original_size.height / block_size.height)
         self.number_of_feature_blocks_per_example = self.blocks_per_column * self.blocks_per_row
-        self.selection_tensor = TensorChunking.\
-            create_torch_indices_selection_tensor(self.batch_size, self.number_of_feature_blocks_per_example)
         return
 
     @staticmethod
@@ -75,6 +73,11 @@ class TensorChunking:
             tensor: torch.tensor):
         result = torch.zeros(0, tensor.size(1), self.block_size.height,
                              self.block_size.width)
+        if Utils.use_cuda():
+            # https://discuss.pytorch.org/t/which-device-is-model-tensor-stored-on/4908/7
+            device = tensor.get_device()
+            result = result.to(device)
+
         tensor_split_on_height = torch.split(tensor, self.block_size.height, 2)
         for row_block in tensor_split_on_height:
             blocks = torch.split(row_block, self.block_size.width, 3)
@@ -82,7 +85,7 @@ class TensorChunking:
             list_for_cat.append(result)
             list_for_cat.extend(blocks)
             result = torch.cat(list_for_cat, 0)
-            print("result.size(): " + str(result.size()))
+            # print("result.size(): " + str(result.size()))
         return result
 
     @staticmethod
@@ -120,30 +123,20 @@ class TensorChunking:
     def dechunk_block_tensor_concatenated_along_batch_dimension(self, tensor: torch.tensor):
         number_of_examples = int(tensor.size(0) / self.number_of_feature_blocks_per_example)
 
-        # if number_of_examples == self.batch_size:
-        #     selection_tensor = self.selection_tensor
-        # else:
-        #     selection_tensor = TensorChunking.create_torch_indices_selection_tensor(
-        #         number_of_examples, self.number_of_feature_blocks_per_example)
-        #     if Utils.use_cuda():
-        #         selection_tensor = selection_tensor.cuda()
-        # # The blocks in tensor are ordered by example, that is first all blocks
-        # # for example 1, then all blocks for example 2 etc.
-        # # Reorder them to have first all blocks at position 1 (for all examples),
-        # # then all blocks for position 2 etc.
-        # blocks_reordered_grouped_by_block_position = \
-        #     torch.index_select(tensor, 0, selection_tensor)
-        #
-        # print("blocks_reordered_grouped_by_block_position: " + str(blocks_reordered_grouped_by_block_position))
-        print("tensor.size(): " + str(tensor.size()))
+        # print("tensor.size(): " + str(tensor.size()))
         channels = tensor.size(1)
         result = torch.zeros(number_of_examples, channels, self.original_size.height,
                              self.original_size.width)
+        if Utils.use_cuda():
+            # https://discuss.pytorch.org/t/which-device-is-model-tensor-stored-on/4908/7
+            device = tensor.get_device()
+            result = result.to(device)
+
         tensor_grouped_by_block = tensor.view(self.number_of_feature_blocks_per_example,
                                               number_of_examples, channels,
                                               self.block_size.height, self.block_size.width)
 
-        print("tensor_grouped_by_block.size(): " + str(tensor_grouped_by_block.size()))
+        # print("tensor_grouped_by_block.size(): " + str(tensor_grouped_by_block.size()))
         for block_index in range(0, tensor_grouped_by_block.size(0)):
             # print("i: " + str(block_index))
 
@@ -159,7 +152,7 @@ class TensorChunking:
                    width_span_begin:width_span_end] = \
                 tensor_grouped_by_block[block_index, :, :, :]
 
-        print("result: " + str(result))
+        # print("result: " + str(result))
 
         return result
 

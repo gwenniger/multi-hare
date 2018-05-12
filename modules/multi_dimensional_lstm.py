@@ -20,7 +20,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                  multi_dimensional_lstm_parameter_creator:MultiDimensionalLSTMParametersCreator,
                  nonlinearity="tanh"):
         super(MultiDimensionalLSTM, self).__init__(input_channels, hidden_states_size, batch_size, compute_multi_directional,
-                                                  nonlinearity)
+                                                   nonlinearity)
 
         self.use_dropout = use_dropout
         self.training = training
@@ -33,7 +33,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         self.mdlstm_direction_one_parameters.set_bias_forget_gates_to_one()
 
         # For multi-directional rnn
-        if self.compute_multi_directional:
+        if self.compute_multi_directional_flag:
             self.mdlstm_direction_two_parameters = \
                 multi_dimensional_lstm_parameter_creator.create_multi_dimensional_lstm_parameters_one_direction(
                     self.hidden_states_size, self.input_channels, use_dropout)
@@ -58,7 +58,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
     def register_parameters_to_assure_same_gpu_is_used(self):
         self.state_convolutions.extend(self.mdlstm_direction_one_parameters.get_all_parameters_as_list())
 
-        if self.compute_multi_directional:
+        if self.compute_multi_directional_flag:
             self.state_convolutions.extend(self.mdlstm_direction_two_parameters.get_all_parameters_as_list())
             self.state_convolutions.extend(self.mdlstm_direction_three_parameters.get_all_parameters_as_list())
             self.state_convolutions.extend(self.mdlstm_direction_four_parameters.get_all_parameters_as_list())
@@ -66,10 +66,10 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
 
     @staticmethod
-    def create_multi_dimensional_lstm(hidden_states_size:int ,batch_size:int , compute_multi_directional: bool,
+    def create_multi_dimensional_lstm(input_channels: int, hidden_states_size: int, batch_size:int, compute_multi_directional: bool,
                                       use_dropout: bool,
                                      nonlinearity="tanh"):
-        return MultiDimensionalLSTM(hidden_states_size, batch_size, compute_multi_directional, use_dropout,
+        return MultiDimensionalLSTM(input_channels, hidden_states_size, batch_size, compute_multi_directional, use_dropout,
                                     True,
                                     MultiDimensionalLSTMParametersCreatorSlow(),
                                     nonlinearity)
@@ -87,7 +87,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
     def set_training(self, training):
         self.mdlstm_direction_one_parameters.set_training(training)
 
-        if self.compute_multi_directional:
+        if self.compute_multi_directional_flag:
             self.mdlstm_direction_two_parameters.set_training(training)
             self.mdlstm_direction_three_parameters.set_training(training)
             self.mdlstm_direction_four_parameters.set_training(training)
@@ -127,7 +127,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         skewed_image_columns = skewed_images_variable.size(3)
 
         # print("mdlstm_parameters.input_input_convolution: " + str(mdlstm_parameters.input_input_convolution))
-        # print("skewed_images_variable.size(): " + str(skewed_images_variable.size()))
+        # print("skewed_images_variable.get_device(): " + str(skewed_images_variable.get_device()))
         # print("mdlstm_parameters.input_input_convolution.bias: "
         # + str(mdlstm_parameters.input_input_convolution.bias))
         input_input_matrix = mdlstm_parameters.input_input_convolution(skewed_images_variable)
@@ -383,7 +383,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
     # Input tensor x is a batch of image tensors
     def forward(self, x):
-        if self.compute_multi_directional:
+        if self.compute_multi_directional_flag:
             # With distinct parameters for every direction
             return self.forward_multi_directional_multi_dimensional_lstm(x)
             # With same paramters for every direction
