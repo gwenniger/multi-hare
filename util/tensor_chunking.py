@@ -3,9 +3,21 @@ from util.utils import Utils
 from modules.size_two_dimensional import SizeTwoDimensional
 
 
+# This class takes care of chunking a four-dimensional image tensor with dimensions
+# 1: batch_size, 2: channels, 3: height, 4: width
+# into block tensors  with size 1: channels, 2: block_height, 3: block_width
+# these blocks ar concatenated along the batch_size dimension, to facilitate
+# parallellization of computations that are run on the blocks. Finally, the class
+# contains a method "dechunk_block_tensor_concatenated_along_batch_dimension"
+# that restores the original 2-dimensional block configuration. This method requires
+# the block dimension to remain the same, but allows the number of channels to change.
+# This is to facilitate the typical use case, where an input tensor is chunked into
+# blocks, features are computed for each of these blocks with an increased number of feature
+# channels in the output, and finally the output blocks are rearranged to be in the original
+# input configuration.
 class TensorChunking:
 
-    def __init__(self, batch_size:int, original_size: SizeTwoDimensional,
+    def __init__(self, batch_size: int, original_size: SizeTwoDimensional,
                  block_size: SizeTwoDimensional):
         self.batch_size = batch_size
         self.original_size = original_size
@@ -85,6 +97,22 @@ class TensorChunking:
             raise RuntimeError("Error: the original size is not a multiple of the"
                                "block size in the height dimension")
 
+    # Start from block_index 0
+    def height_span(self, block_index):
+        row_index = int(block_index / self.blocks_per_row)
+        span_begin = row_index * self.block_size.height
+        span_end = span_begin + self.block_size.height
+        return span_begin, span_end
+
+        # Start from block_index 0
+
+    def width_span(self, block_index):
+        column_index = int(block_index % self.blocks_per_row)
+        span_begin = column_index * self.block_size.width
+        span_end = span_begin + self.block_size.width
+        return span_begin, span_end
+
+
     # This function performs the inverse of
     # "chunk_tensor_into_blocks_concatenate_along_batch_dimension" : it takes
     # a tensor that is chunked into blocks, with the blocks stored along the
@@ -111,21 +139,37 @@ class TensorChunking:
         channels = tensor.size(1)
         result = torch.zeros(number_of_examples, channels, self.original_size.height,
                              self.original_size.width)
-        for i in range (0, tensor.size(0)):
-            raise RuntimeError("not yet implemented")
-            # TODO: Fix me
+        tensor_grouped_by_block = tensor.view(self.number_of_feature_blocks_per_example,
+                                              number_of_examples, channels,
+                                              self.block_size.height, self.block_size.width)
+
+        print("tensor_grouped_by_block.size(): " + str(tensor_grouped_by_block.size()))
+        for block_index in range(0, tensor_grouped_by_block.size(0)):
+            # print("i: " + str(block_index))
+
+            height_span_begin, height_span_end = self.height_span(block_index)
+            width_span_begin, width_span_end = self.width_span(block_index)
+            # print("height_span: " + str(height_span_begin) + ":"  + str(height_span_end))
+            # print("width_span: " + str(width_span_begin) + ":" + str(width_span_end))
+
+            # print("tensor_grouped_by_block[block_index, :, :, :]:" + str(
+            #    tensor_grouped_by_block[block_index, :, :, :]))
+
+            result[:, :, height_span_begin:height_span_end,
+                   width_span_begin:width_span_end] = \
+                tensor_grouped_by_block[block_index, :, :, :]
+
+        print("result: " + str(result))
+
+        return result
 
 
-        # blocks_per_example
-        return
-
-
-def test_tensor_block_chunking():
-    a = torch.Tensor([range(1, 97)]).view(2, 2, 4, 6)
-    print(a)
-    print("a[0, 0, :, :]: " + str(a[0, 0, :, :]))
+def test_tensor_block_chunking_followed_by_dechunking_reconstructs_original():
+    tensor = torch.Tensor([range(1, 97)]).view(2, 2, 4, 6)
+    print(tensor)
+    print("tensor[0, 0, :, :]: " + str(tensor[0, 0, :, :]))
     # chunking = chunk_tensor_into_blocks_return_as_list(
-    #     a, SizeTwoDimensional.create_size_two_dimensional(2, 2))
+    #     tensor, SizeTwoDimensional.create_size_two_dimensional(2, 2))
     # print("chunking: " + str(chunking))
     # for item in chunking:
     #     print("item.size(): " + str(item.size()))
@@ -133,14 +177,25 @@ def test_tensor_block_chunking():
     original_size = SizeTwoDimensional.create_size_two_dimensional(4, 6)
     block_size = SizeTwoDimensional.create_size_two_dimensional(2, 2)
     tensor_chunking = TensorChunking.create_tensor_chunking(batch_size, original_size, block_size)
-    chunking = tensor_chunking.chunk_tensor_into_blocks_concatenate_along_batch_dimension(a)
+    chunking = tensor_chunking.chunk_tensor_into_blocks_concatenate_along_batch_dimension(tensor)
     print("chunking: " + str(chunking))
     print("chunking.size(): " + str(chunking.size()))
-    tensor_chunking.dechunk_block_tensor_concatenated_along_batch_dimension(chunking)
+    dechunked_tensor = tensor_chunking.dechunk_block_tensor_concatenated_along_batch_dimension(chunking)
+
+    # https://stackoverflow.com/questions/32996281/how-to-check-if-two-torch-tensors-or-matrices-are-equal
+    # https://discuss.pytorch.org/t/tensor-math-logical-operations-any-and-all-functions/6624
+    tensors_are_equal = torch.eq(tensor, dechunked_tensor).all()
+    print("tensors_are_equal: " + str(tensors_are_equal))
+    if not tensors_are_equal:
+        raise RuntimeError("Error: original tensor " + str(tensor) +
+                           " and dechunked tensor " + str(dechunked_tensor) +
+                           " are not equal")
+    else:
+        print("Success: original tensor and dechunked(chunked(tensor)) are equal")
 
 
 def main():
-    test_tensor_block_chunking()
+    test_tensor_block_chunking_followed_by_dechunking_reconstructs_original()
 
 
 if __name__ == "__main__":
