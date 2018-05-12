@@ -8,7 +8,8 @@ from modules.multi_dimensional_rnn import MultiDimensionalRNN
 from modules.multi_dimensional_rnn import MultiDimensionalRNNToSingleClassNetwork
 from modules.multi_dimensional_rnn import MultiDimensionalRNNFast
 from modules.multi_dimensional_lstm import MultiDimensionalLSTM
-from modules.multi_dimensional_block_lstm import MultiDimensionalBlockLSTM
+from modules.block_multi_dimensional_lstm import BlockMultiDimensionalLSTM
+from modules.block_multi_dimensional_lstm_layer_pair import BlockMultiDimensionalLSTMLayerPair
 import data_preprocessing.load_mnist
 import data_preprocessing.load_cifar_ten
 from util.utils import Utils
@@ -156,21 +157,28 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
 
     # multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(input_channels,
     #                                                                                 hidden_states_size,
-    #                                                                                 batch_size,
     #                                                                                 compute_multi_directional,
     #                                                                                 use_dropout,
     #                                                                                 nonlinearity="sigmoid")
 
     original_size = SizeTwoDimensional.create_size_two_dimensional(32, 32)
     block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
-    multi_dimensional_rnn = MultiDimensionalBlockLSTM.create_multi_dimensional_block_lstm(input_channels,
+    # multi_dimensional_rnn = BlockMultiDimensionalLSTM.create_block_multi_dimensional_lstm(input_channels,
+    #                                                                                       hidden_states_size,
+    #                                                                                       block_size,
+    #                                                                                       compute_multi_directional,
+    #                                                                                       use_dropout,
+    #                                                                                       nonlinearity="sigmoid")
+    #
+    output_channels = 15
+    multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPair.create_block_multi_dimensional_lstm_layer_pair(input_channels,
                                                                                           hidden_states_size,
-                                                                                          batch_size,
-                                                                                          original_size,
+                                                                                          output_channels,
                                                                                           block_size,
                                                                                           compute_multi_directional,
                                                                                           use_dropout,
                                                                                           nonlinearity="sigmoid")
+
 
     network = MultiDimensionalRNNToSingleClassNetwork.\
         create_multi_dimensional_rnn_to_single_class_network(multi_dimensional_rnn, input_size)

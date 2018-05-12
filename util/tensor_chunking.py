@@ -17,9 +17,8 @@ from modules.size_two_dimensional import SizeTwoDimensional
 # input configuration.
 class TensorChunking:
 
-    def __init__(self, batch_size: int, original_size: SizeTwoDimensional,
+    def __init__(self, original_size: SizeTwoDimensional,
                  block_size: SizeTwoDimensional):
-        self.batch_size = batch_size
         self.original_size = original_size
         self.block_size = block_size
         TensorChunking.check_block_size_fits_into_original_size(block_size, original_size)
@@ -29,9 +28,9 @@ class TensorChunking:
         return
 
     @staticmethod
-    def create_tensor_chunking(batch_size:int, original_size: SizeTwoDimensional,
+    def create_tensor_chunking(original_size: SizeTwoDimensional,
                                block_size: SizeTwoDimensional):
-        return TensorChunking(batch_size, original_size, block_size)
+        return TensorChunking(original_size, block_size)
 
     @staticmethod
     def create_indices_list(number_of_examples: int, number_of_feature_blocks_per_example: int):
@@ -159,6 +158,10 @@ class TensorChunking:
 
 def test_tensor_block_chunking_followed_by_dechunking_reconstructs_original():
     tensor = torch.Tensor([range(1, 97)]).view(2, 2, 4, 6)
+
+    if Utils.use_cuda():
+        tensor = tensor.cuda()
+
     print(tensor)
     print("tensor[0, 0, :, :]: " + str(tensor[0, 0, :, :]))
     # chunking = chunk_tensor_into_blocks_return_as_list(
@@ -166,10 +169,9 @@ def test_tensor_block_chunking_followed_by_dechunking_reconstructs_original():
     # print("chunking: " + str(chunking))
     # for item in chunking:
     #     print("item.size(): " + str(item.size()))
-    batch_size = 2
     original_size = SizeTwoDimensional.create_size_two_dimensional(4, 6)
     block_size = SizeTwoDimensional.create_size_two_dimensional(2, 2)
-    tensor_chunking = TensorChunking.create_tensor_chunking(batch_size, original_size, block_size)
+    tensor_chunking = TensorChunking.create_tensor_chunking(original_size, block_size)
     chunking = tensor_chunking.chunk_tensor_into_blocks_concatenate_along_batch_dimension(tensor)
     print("chunking: " + str(chunking))
     print("chunking.size(): " + str(chunking.size()))

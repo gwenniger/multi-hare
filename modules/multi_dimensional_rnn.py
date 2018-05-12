@@ -167,7 +167,8 @@ class MultiDimensionalRNNToSingleClassNetwork(torch.nn.Module):
         super(MultiDimensionalRNNToSingleClassNetwork, self).__init__()
         self.multi_dimensional_rnn = multi_dimensional_rnn
         self.input_size = input_size
-        self.fc3 = nn.Linear(self.number_of_output_dimensions(), 10)
+        self.number_of_output_dimensions = multi_dimensional_rnn.get_number_of_output_dimensions(input_size)
+        self.fc3 = nn.Linear(self.number_of_output_dimensions, 10)
         # print("self.fc3 : " + str(self.fc3))
         # print("self.fc3.weight: " + str(self.fc3.weight))
         # print("self.fc3.bias: " + str(self.fc3.bias))
@@ -176,36 +177,52 @@ class MultiDimensionalRNNToSingleClassNetwork(torch.nn.Module):
     def create_multi_dimensional_rnn_to_single_class_network(multi_dimensional_rnn, input_size: SizeTwoDimensional):
         return MultiDimensionalRNNToSingleClassNetwork(multi_dimensional_rnn, input_size)
 
-    def number_of_output_dimensions(self):
-        result = self.input_size.height * self.input_size.width \
-                 * self.multi_dimensional_rnn.get_hidden_states_size()
-        if self.multi_dimensional_rnn.compute_multi_directional():
-            result = result * 4
-        return result
-
     def set_training(self, training):
         self.multi_dimensional_rnn.set_training(training)
 
     def forward(self, x):
         mdrnn_activations = self.multi_dimensional_rnn(x)
-        activations_one_dimensional = mdrnn_activations.view(-1, self.number_of_output_dimensions())
+        activations_one_dimensional = mdrnn_activations.view(-1, self.number_of_output_dimensions)
         return self.fc3(activations_one_dimensional)
 
 
 class MultiDimensionalRNNBase(torch.nn.Module):
     def __init__(self, input_channels: int, hidden_states_size: int,
-                 batch_size, compute_multi_directional: bool,
-                 nonlinearity="tanh", ):
+                 compute_multi_directional: bool,
+                 nonlinearity="tanh"):
         super(MultiDimensionalRNNBase, self).__init__()
 
         self.input_channels = input_channels
-        self.batch_size = batch_size
+        self.selection_tensors_dictionary = dict([])
         self.nonlinearity = nonlinearity
         self.hidden_states_size = hidden_states_size
-        self.selection_tensor = TensorChunking.create_torch_indices_selection_tensor(batch_size, 4)
-        if MultiDimensionalRNNBase.use_cuda():
-            self.selection_tensor = self.selection_tensor.cuda()
         self.compute_multi_directional_flag = compute_multi_directional
+
+    def get_number_of_output_dimensions(self, input_size: SizeTwoDimensional):
+        result = input_size.height * input_size.width \
+                 * self.multi_dimensional_rnn.get_hidden_states_size()
+        if self.multi_dimensional_rnn.compute_multi_directional():
+            result = result * 4
+        return result
+
+    # Selection tensors are dynamically stored in a dictionary or retrieved from it
+    # if already present. This avoids the need to keep a batch size to have a "default"
+    # selection tensor, which reduces the usability of the code for changing batch
+    # sizes
+    def get_or_add_and_get_selection_tensor(self, x):
+        number_of_examples = x.size(0)
+        # print("number of examples: " + str(number_of_examples))
+
+        if number_of_examples in self.selection_tensors_dictionary:
+            selection_tensor = self.selection_tensors_dictionary[number_of_examples]
+        else:
+            selection_tensor = TensorChunking.create_torch_indices_selection_tensor(
+                number_of_examples, 4)
+            if MultiDimensionalRNNBase.use_cuda():
+                device = x.get_device()
+                selection_tensor = selection_tensor.to(device)
+            self.selection_tensors_dictionary[number_of_examples] = selection_tensor
+        return selection_tensor
 
     # This function is slow because all four function calls for 4 directions are
     # executed sequentially. It isn't entirely clear how to optimize this.
@@ -219,19 +236,11 @@ class MultiDimensionalRNNBase(torch.nn.Module):
         x_direction_four = util.tensor_flipping.flip(util.tensor_flipping.flip(x, 2), 3)
         x_multiple_directions = torch.cat((x, x_direction_two, x_direction_three, x_direction_four), 0)
 
-        number_of_examples = x.size(0)
-        # print("number of examples: " + str(number_of_examples))
+
 
         # Original order
         activations_unskewed = self._compute_multi_dimensional_function_one_direction(x_multiple_directions)
-        if number_of_examples == self.batch_size:
-            selection_tensor = self.selection_tensor
-        else:
-            selection_tensor = TensorChunking.create_torch_indices_selection_tensor(
-                number_of_examples, 4)
-            if MultiDimensionalRNNBase.use_cuda():
-                device = x.get_device()
-                selection_tensor = selection_tensor.to(device)
+
 
         # print("activations_unskewed: " + str(activations_unskewed))
         # print("selection_tensor: " + str(selection_tensor))
@@ -239,6 +248,7 @@ class MultiDimensionalRNNBase(torch.nn.Module):
         # Using tor.index_select we can bring together the activations of the four
         # different rotations, while avoiding use of a for loop, making the whole thing
         # hopefully faster
+        selection_tensor = self.get_or_add_and_get_selection_tensor(x)
         activations_selected = torch.index_select(activations_unskewed, 0, selection_tensor)
         # print("activations_selected: " + str(activations_selected))
 
@@ -543,10 +553,10 @@ class MultiDimensionalRNNAbstract(MultiDimensionalRNNBase):
 
 
 class MultiDimensionalRNN(MultiDimensionalRNNAbstract):
-    def __init__(self, hidden_states_size, batch_size, compute_multi_directional: bool,
+    def __init__(self, hidden_states_size, compute_multi_directional: bool,
                  use_dropout: bool, training: bool,
                  nonlinearity="tanh"):
-        super(MultiDimensionalRNN, self).__init__(hidden_states_size, batch_size,
+        super(MultiDimensionalRNN, self).__init__(hidden_states_size,
                                                   compute_multi_directional,
                                                   use_dropout, training,
                                                   nonlinearity)
@@ -556,10 +566,10 @@ class MultiDimensionalRNN(MultiDimensionalRNNAbstract):
         self.state_convolutions = nn.ModuleList(self.state_update_block.get_state_convolutions_as_list())
 
     @staticmethod
-    def create_multi_dimensional_rnn(hidden_states_size: int, batch_size: int, compute_multi_directional: bool,
+    def create_multi_dimensional_rnn(hidden_states_size: int, compute_multi_directional: bool,
                                      use_dropout: bool,
                                      nonlinearity="tanh"):
-        return MultiDimensionalRNN(hidden_states_size, batch_size, compute_multi_directional,
+        return MultiDimensionalRNN(hidden_states_size, compute_multi_directional,
                                    use_dropout, True,
                                    nonlinearity)
 
@@ -575,11 +585,11 @@ class MultiDimensionalRNN(MultiDimensionalRNNAbstract):
 
 
 class MultiDimensionalRNNFast(MultiDimensionalRNNAbstract):
-    def __init__(self, input_channels: int, hidden_states_size, batch_size, compute_multi_directional: bool,
+    def __init__(self, input_channels: int, hidden_states_size, compute_multi_directional: bool,
                  use_dropout: bool,
                  training: bool,
                  nonlinearity="tanh"):
-        super(MultiDimensionalRNNFast, self).__init__(input_channels, hidden_states_size, batch_size,
+        super(MultiDimensionalRNNFast, self).__init__(input_channels, hidden_states_size,
                                                       compute_multi_directional,
                                                       use_dropout,
                                                       training,
@@ -595,11 +605,10 @@ class MultiDimensionalRNNFast(MultiDimensionalRNNAbstract):
             self.parallel_multiple_state_weighting_computation.get_state_convolutions_as_list())
 
     @staticmethod
-    def create_multi_dimensional_rnn_fast(hidden_states_size: int, batch_size: int,
+    def create_multi_dimensional_rnn_fast(hidden_states_size: int,
                                           compute_multi_directional: bool, use_dropout: bool,
                                           nonlinearity="tanh"):
         return MultiDimensionalRNNFast(hidden_states_size,
-                                       batch_size,
                                        compute_multi_directional, use_dropout, True,
                                        nonlinearity)
 
