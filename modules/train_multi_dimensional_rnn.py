@@ -10,6 +10,7 @@ from modules.multi_dimensional_rnn import MultiDimensionalRNNFast
 from modules.multi_dimensional_lstm import MultiDimensionalLSTM
 from modules.block_multi_dimensional_lstm import BlockMultiDimensionalLSTM
 from modules.block_multi_dimensional_lstm_layer_pair import BlockMultiDimensionalLSTMLayerPair
+from modules.block_multi_dimensional_lstm_layer_pair_stacking import BlockMultiDimensionalLSTMLayerPairStacking
 import data_preprocessing.load_mnist
 import data_preprocessing.load_cifar_ten
 from util.utils import Utils
@@ -162,22 +163,24 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     #                                                                                 nonlinearity="sigmoid")
 
     original_size = SizeTwoDimensional.create_size_two_dimensional(32, 32)
-    block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
+    mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
     # multi_dimensional_rnn = BlockMultiDimensionalLSTM.create_block_multi_dimensional_lstm(input_channels,
     #                                                                                       hidden_states_size,
-    #                                                                                       block_size,
+    #                                                                                       mdlstm_block_size,
     #                                                                                       compute_multi_directional,
     #                                                                                       use_dropout,
     #                                                                                       nonlinearity="sigmoid")
     #
-    output_channels = 15
-    multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPair.create_block_multi_dimensional_lstm_layer_pair(input_channels,
-                                                                                          hidden_states_size,
-                                                                                          output_channels,
-                                                                                          block_size,
-                                                                                          compute_multi_directional,
-                                                                                          use_dropout,
-                                                                                          nonlinearity="sigmoid")
+    block_strided_convolution_block_size =  SizeTwoDimensional.create_size_two_dimensional(4, 2)
+    output_channels = mdlstm_block_size.width * mdlstm_block_size.height * hidden_states_size
+    # multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPair.\
+    #     create_block_multi_dimensional_lstm_layer_pair(input_channels, hidden_states_size,
+    #                                                    output_channels, mdlstm_block_size,
+    #                                                    block_strided_convolution_block_size,
+    #                                                    compute_multi_directional,
+    #                                                    use_dropout,
+    #                                                    nonlinearity="sigmoid")
+    multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking.create_two_layer_pair_network()
 
 
     network = MultiDimensionalRNNToSingleClassNetwork.\
@@ -219,7 +222,7 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
 
     num_gradient_corrections = 0
 
-    for epoch in range(4):  # loop over the dataset multiple times
+    for epoch in range(8):  # loop over the dataset multiple times
 
         running_loss = 0.0
         for i, data in enumerate(train_loader, 0):
@@ -348,8 +351,8 @@ def cifar_ten_basic_recognition():
 
 
 def main():
-    #mnist_basic_recognition()
-    cifar_ten_basic_recognition()
+    mnist_basic_recognition()
+    #cifar_ten_basic_recognition()
 
 
 if __name__ == "__main__":

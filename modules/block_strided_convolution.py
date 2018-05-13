@@ -16,9 +16,12 @@ class BlockStridedConvolution(Module):
         # What types of convolutions are there:
         # https://github.com/vdumoulin/conv_arithmetic/blob/master/README.md
         # https://towardsdatascience.com/types-of-convolutions-in-deep-learning-717013397f4d
+        # Don't use bias in the convolution layer (?). This is suggested by
+        # "Dropout improves Recurrent Neural Networks for Handwriting Recognition"
         self.convolution = nn.Conv2d(self.input_channels, self.output_channels,
                                      (block_size.height, block_size.width),
-                                     stride=(block_size.height, block_size.width))
+                                     stride=(block_size.height, block_size.width),
+                                     bias=False)
 
     @staticmethod
     def create_block_strided_convolution(input_channels: int, output_channels: int, block_size: SizeTwoDimensional,

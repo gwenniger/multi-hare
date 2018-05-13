@@ -4,6 +4,7 @@ from torch.nn.modules.module import Module
 from modules.size_two_dimensional import SizeTwoDimensional
 from util.tensor_chunking import TensorChunking
 
+
 class BlockMultiDimensionalLSTMLayerPair(Module):
 
     def __init__(self, block_multi_dimensional_lstm: BlockMultiDimensionalLSTM,
@@ -15,25 +16,33 @@ class BlockMultiDimensionalLSTMLayerPair(Module):
     @staticmethod
     def create_block_multi_dimensional_lstm_layer_pair(
             input_channels: int, mdlstm_hidden_states_size: int,
-            output_channels: int, block_size: SizeTwoDimensional,
+            output_channels: int, mdlstm_block_size: SizeTwoDimensional,
+            block_strided_convolution_block_size: SizeTwoDimensional,
             compute_multi_directional: bool, use_dropout: bool, nonlinearity="tanh"):
         block_multi_dimensional_lstm = \
             BlockMultiDimensionalLSTM.create_block_multi_dimensional_lstm(
-                input_channels, mdlstm_hidden_states_size, block_size, compute_multi_directional, use_dropout,
+                input_channels, mdlstm_hidden_states_size, mdlstm_block_size, compute_multi_directional, use_dropout,
                 nonlinearity)
 
         block_strided_convolution = BlockStridedConvolution.\
             create_block_strided_convolution(mdlstm_hidden_states_size, output_channels,
-                                             block_size, nonlinearity)
+                                             block_strided_convolution_block_size, nonlinearity)
 
         return BlockMultiDimensionalLSTMLayerPair(block_multi_dimensional_lstm, block_strided_convolution)
 
     def get_number_of_output_dimensions(self, input_size: SizeTwoDimensional):
-        block_size = self.block_multi_dimensional_lstm.block_size
+        block_size = self.block_strided_convolution.block_size
         tensor_chunking = TensorChunking.create_tensor_chunking(input_size, block_size)
         feature_blocks_per_example = tensor_chunking.number_of_feature_blocks_per_example
+        print("feature_blocks_per_example : " + str(feature_blocks_per_example))
         result = feature_blocks_per_example * self.block_strided_convolution.output_channels
         return result
+
+    def get_output_size_two_dimensional(self, input_size: SizeTwoDimensional):
+        block_size = self.block_strided_convolution.block_size
+        height = int(input_size.height / block_size.height)
+        width = int(input_size.width / block_size.width)
+        return SizeTwoDimensional.create_size_two_dimensional(height, width)
 
     def set_training(self, training):
         self.block_multi_dimensional_lstm.set_training(training)
@@ -41,4 +50,5 @@ class BlockMultiDimensionalLSTMLayerPair(Module):
     def forward(self, x):
         block_mdlstm_output = self.block_multi_dimensional_lstm(x)
         convolution_output = self.block_strided_convolution(block_mdlstm_output)
+        # print("convolution_output.size():" + str( convolution_output.size()))
         return convolution_output

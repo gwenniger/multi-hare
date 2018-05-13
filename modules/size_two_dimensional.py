@@ -9,3 +9,7 @@ class SizeTwoDimensional:
     @staticmethod
     def create_size_two_dimensional(height: int, width: int):
         return SizeTwoDimensional(height, width)
+
+    def __str__(self):
+        result = "SizeTwoDimensional(" + str(self.height) + "," + str(self.width) + ")"
+        return result
