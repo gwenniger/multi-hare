@@ -179,7 +179,8 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     #                                                    compute_multi_directional,
     #                                                    use_dropout,
     #                                                    nonlinearity="tanh")
-    multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking.create_two_layer_pair_network()
+    multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking.\
+        create_two_layer_pair_network(hidden_states_size)
 
 
     network = MultiDimensionalRNNToSingleClassNetwork.\

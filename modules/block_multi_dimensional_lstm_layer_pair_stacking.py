@@ -62,7 +62,7 @@ class BlockMultiDimensionalLSTMLayerPairStacking(Module):
     # BlockMultiDimensionalLSTMLayerPair layers. It illustrates how
     # the block dimensions can be varied within layer pairs and across layer pairs.
     @staticmethod
-    def create_two_layer_pair_network():
+    def create_two_layer_pair_network(first_mdlstm_hidden_states_size):
         compute_multi_directional = False
         use_dropout = False
         nonlinearity = "tanh"
@@ -70,23 +70,25 @@ class BlockMultiDimensionalLSTMLayerPairStacking(Module):
         # Layer pair one
         input_channels = 1
         mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
-        mdlstm_hidden_states_size = 32
-        output_channels = mdlstm_block_size.width * mdlstm_block_size.height * mdlstm_hidden_states_size
         block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
+        number_of_elements_reduction_factor = block_strided_convolution_block_size.width * \
+                                              block_strided_convolution_block_size.height
+        output_channels = number_of_elements_reduction_factor * first_mdlstm_hidden_states_size
 
         pair_one_specific_parameters = LayerPairSpecificParameters.create_layer_pair_specific_parameters(
-            input_channels, mdlstm_hidden_states_size, output_channels, mdlstm_block_size,
+            input_channels, first_mdlstm_hidden_states_size, output_channels, mdlstm_block_size,
             block_strided_convolution_block_size)
 
         # Layer pair two
         input_channels = output_channels
-        mdlstm_hidden_states_size = mdlstm_block_size.width * mdlstm_block_size.height * mdlstm_hidden_states_size
-        output_channels = mdlstm_block_size.width * mdlstm_block_size.height * output_channels
-        mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
-        block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(1, 1)
+        # Here the number of mdstlm_hidden_states and output channels are increased with the
+        # number of elements reduction factor from the dimensionality reduction with the
+        # block_strided_convolution
+        second_mdlstm_hidden_states_size = number_of_elements_reduction_factor * first_mdlstm_hidden_states_size
+        output_channels = number_of_elements_reduction_factor * output_channels
 
         pair_two_specific_parameters = LayerPairSpecificParameters.create_layer_pair_specific_parameters(
-            input_channels, mdlstm_hidden_states_size, output_channels, mdlstm_block_size,
+            input_channels, second_mdlstm_hidden_states_size, output_channels, mdlstm_block_size,
             block_strided_convolution_block_size)
 
         # FIXME : With only one layer pair, performance is decent, but with two pairs
