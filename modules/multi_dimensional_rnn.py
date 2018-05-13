@@ -200,8 +200,8 @@ class MultiDimensionalRNNBase(torch.nn.Module):
 
     def get_number_of_output_dimensions(self, input_size: SizeTwoDimensional):
         result = input_size.height * input_size.width \
-                 * self.multi_dimensional_rnn.get_hidden_states_size()
-        if self.multi_dimensional_rnn.compute_multi_directional():
+                 * self.get_hidden_states_size()
+        if self.compute_multi_directional():
             result = result * 4
         return result
 

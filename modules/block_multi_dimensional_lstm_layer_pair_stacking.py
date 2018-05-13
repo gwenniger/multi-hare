@@ -69,9 +69,9 @@ class BlockMultiDimensionalLSTMLayerPairStacking(Module):
 
         # Layer pair one
         input_channels = 1
-        mdlstm_hidden_states_size = 16
-        output_channels = 16 * 16
         mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
+        mdlstm_hidden_states_size = 32
+        output_channels = mdlstm_block_size.width * mdlstm_block_size.height * mdlstm_hidden_states_size
         block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
 
         pair_one_specific_parameters = LayerPairSpecificParameters.create_layer_pair_specific_parameters(
@@ -80,16 +80,17 @@ class BlockMultiDimensionalLSTMLayerPairStacking(Module):
 
         # Layer pair two
         input_channels = output_channels
-        mdlstm_hidden_states_size = 32
-        output_channels = output_channels * 4
+        mdlstm_hidden_states_size = mdlstm_block_size.width * mdlstm_block_size.height * mdlstm_hidden_states_size
+        output_channels = mdlstm_block_size.width * mdlstm_block_size.height * output_channels
         mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
-        block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(2, 2)
+        block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(1, 1)
 
         pair_two_specific_parameters = LayerPairSpecificParameters.create_layer_pair_specific_parameters(
             input_channels, mdlstm_hidden_states_size, output_channels, mdlstm_block_size,
             block_strided_convolution_block_size)
 
-
+        # FIXME : With only one layer pair, performance is decent, but with two pairs
+        # performance is bad
         layer_pairs_specific_parameters_list = list([pair_one_specific_parameters, pair_two_specific_parameters])
         return BlockMultiDimensionalLSTMLayerPairStacking.\
             create_block_multi_dimensional_lstm_pair_stacking(layer_pairs_specific_parameters_list,
@@ -119,5 +120,7 @@ class BlockMultiDimensionalLSTMLayerPairStacking(Module):
         output = x
         for layer_pair in self.block_multi_dimensional_lstm_layer_pairs:
             output = layer_pair(output)
+            # print(">>> BlockMultiDimensionalLSTMLayerPairStacking.forward: - output.grad_fn "
+            #      + str(output.grad_fn))
             # print("output.size(): " + str(output.size()))
         return output

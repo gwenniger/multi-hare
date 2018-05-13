@@ -37,10 +37,18 @@ class BlockMultiDimensionalLSTM(Module):
     def set_training(self, training):
         self.multi_dimensional_lstm.set_training(training)
 
+    def get_number_of_output_dimensions(self, input_size: SizeTwoDimensional):
+        result = input_size.height * input_size.width \
+                 * self.get_hidden_states_size()
+        if self.compute_multi_directional():
+            result = result * 4
+        return result
+
     def forward(self, x):
         original_size = SizeTwoDimensional.create_size_two_dimensional(x.size(2), x.size(3))
         # Tensor chunking is created dynamically, so that every batch may have a different
         # two-dimensional size (within each batch, examples must still be of the same size)
+        # print("BlockMultiDimensionalLSTM - self.block_size: " + str(self.block_size))
         tensor_chunking = TensorChunking.create_tensor_chunking(original_size, self.block_size)
 
         x_chunked = tensor_chunking.chunk_tensor_into_blocks_concatenate_along_batch_dimension(x)

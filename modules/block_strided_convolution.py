@@ -21,7 +21,7 @@ class BlockStridedConvolution(Module):
         self.convolution = nn.Conv2d(self.input_channels, self.output_channels,
                                      (block_size.height, block_size.width),
                                      stride=(block_size.height, block_size.width),
-                                     bias=False)
+                                     bias=True)
 
     @staticmethod
     def create_block_strided_convolution(input_channels: int, output_channels: int, block_size: SizeTwoDimensional,

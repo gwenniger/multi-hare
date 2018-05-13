@@ -114,26 +114,76 @@ class TensorChunking:
         span_end = span_begin + self.block_size.width
         return span_begin, span_end
 
+    # Reconstructs a tensor block row from a 5 dimensional tensor whose first dimension
+    # goes over the blocks int he original tensor, and whose other four dimensions go over
+    # the batch dimensions, channel dimension and height and width dimensions of these blocks
+    def reconstruct_tensor_bloc_row(self, tensor_grouped_by_block, row_index):
+        first_block_index = row_index * self.blocks_per_row
+        # The result is initialized by the first (left-most) block of the row
+        result = tensor_grouped_by_block[first_block_index, :, :, :, :]
+
+        for block_index in range(first_block_index + 1, first_block_index + self.blocks_per_row):
+            # The result is gradually formed by concatenating more blocks on the right if the
+            # current block, in the width dimension
+            result = torch.cat((result, tensor_grouped_by_block[block_index, :, :, :, :]), 3)
+        return result
+
 
     # This function performs the inverse of
     # "chunk_tensor_into_blocks_concatenate_along_batch_dimension" : it takes
     # a tensor that is chunked into blocks, with the blocks stored along the
-    # first (batch) dimensions. It then reconstructs the original tensor from these blocks
+    # first (batch) dimensions. It then reconstructs the original tensor from these blocks.
+    # The reconstruction is done using the "torch.cat" method, which preserves gradient
+    # information. Simply pasting over tensor slices in a newly created zeros tensor
+    # leads to a faulty implementation, as this does not preserve gradient information.
     def dechunk_block_tensor_concatenated_along_batch_dimension(self, tensor: torch.tensor):
         number_of_examples = int(tensor.size(0) / self.number_of_feature_blocks_per_example)
 
+        # print(">>> dechunk_block_tensor_concatenated_along_batch_dimension: - tensor.grad_fn "
+        #      + str(tensor.grad_fn))
+
         # print("tensor.size(): " + str(tensor.size()))
         channels = tensor.size(1)
-        result = torch.zeros(number_of_examples, channels, self.original_size.height,
-                             self.original_size.width)
-        if Utils.use_cuda():
-            # https://discuss.pytorch.org/t/which-device-is-model-tensor-stored-on/4908/7
-            device = tensor.get_device()
-            result = result.to(device)
 
         tensor_grouped_by_block = tensor.view(self.number_of_feature_blocks_per_example,
                                               number_of_examples, channels,
                                               self.block_size.height, self.block_size.width)
+
+        tensor_block_row = self.reconstruct_tensor_bloc_row(tensor_grouped_by_block, 0)
+        result = tensor_block_row
+
+        for row_index in range(1, self.blocks_per_column):
+            tensor_block_row = self.reconstruct_tensor_bloc_row(tensor_grouped_by_block, row_index)
+            result = torch.cat((result, tensor_block_row), 2)
+
+        # print(">>> dechunk_block_tensor_concatenated_along_batch_dimension: - result.grad_fn "
+        #      + str(result.grad_fn))
+
+        return result
+
+    # This is the old implementation that turns out to break the gradient
+    def dechunk_block_tensor_concatenated_along_batch_dimension_breaks_gradient(self, tensor: torch.tensor):
+        number_of_examples = int(tensor.size(0) / self.number_of_feature_blocks_per_example)
+
+        print(">>> dechunk_block_tensor_concatenated_along_batch_dimension: - tensor.grad_fn "
+              + str(tensor.grad_fn))
+
+        # print("tensor.size(): " + str(tensor.size()))
+        channels = tensor.size(1)
+
+        tensor_grouped_by_block = tensor.view(self.number_of_feature_blocks_per_example,
+                                              number_of_examples, channels,
+                                              self.block_size.height, self.block_size.width)
+
+        result = torch.zeros(number_of_examples, channels, self.original_size.height,
+                             self.original_size.width)
+
+        # print("tensor.nelement(): " + str(tensor.nelement()))
+        # print("resuls.nelement(): " + str(result.nelement()))
+        if Utils.use_cuda():
+            # https://discuss.pytorch.org/t/which-device-is-model-tensor-stored-on/4908/7
+            device = tensor.get_device()
+            result = result.to(device)
 
         # print("tensor_grouped_by_block.size(): " + str(tensor_grouped_by_block.size()))
         for block_index in range(0, tensor_grouped_by_block.size(0)):
@@ -147,11 +197,18 @@ class TensorChunking:
             # print("tensor_grouped_by_block[block_index, :, :, :]:" + str(
             #    tensor_grouped_by_block[block_index, :, :, :]))
 
+            # Fixme: possibly copying like this destroys the gradient, as the grad_fn function of result
+            # shows" result.grad_fn <CopySlices object at 0x7f211cbfa208>
+            # instead of something like "<TanhBackward object" , "<CatBackward object"...
+            # Probably "cat" should be used to reconstruct the original configuration
+            # row by row. This was used previously also in the "extract_unskewed_activations"
+            # function
             result[:, :, height_span_begin:height_span_end,
-                   width_span_begin:width_span_end] = \
+            width_span_begin:width_span_end] = \
                 tensor_grouped_by_block[block_index, :, :, :]
 
-        # print("result: " + str(result))
+        print(">>> dechunk_block_tensor_concatenated_along_batch_dimension: - result.grad_fn "
+              + str(result.grad_fn))
 
         return result
 
@@ -177,9 +234,11 @@ def test_tensor_block_chunking_followed_by_dechunking_reconstructs_original():
     print("chunking.size(): " + str(chunking.size()))
     dechunked_tensor = tensor_chunking.dechunk_block_tensor_concatenated_along_batch_dimension(chunking)
 
+    print("dechunked_tensor: " + str(dechunked_tensor))
+
     # https://stackoverflow.com/questions/32996281/how-to-check-if-two-torch-tensors-or-matrices-are-equal
     # https://discuss.pytorch.org/t/tensor-math-logical-operations-any-and-all-functions/6624
-    tensors_are_equal = torch.eq(tensor, dechunked_tensor).all()
+    tensors_are_equal =  torch.eq(tensor, dechunked_tensor).all()
     print("tensors_are_equal: " + str(tensors_are_equal))
     if not tensors_are_equal:
         raise RuntimeError("Error: original tensor " + str(tensor) +
