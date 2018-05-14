@@ -1,5 +1,6 @@
 import torch
 from util.utils import Utils
+from torch.autograd import Variable
 
 
 class ImageInputTransformer:
@@ -75,7 +76,8 @@ class ImageInputTransformer:
     # using pytorch tensor indexing to select slices of rows from multiple images
     # at one, doing the operation for all images in parallel
     # Requirement: all images must be of the same size. This implementation seems
-    # break the gradient
+    # break the gradient, although this is not sure. In either case it is also slower
+    # than the pytorch.cat based implementation
     @staticmethod
     def create_row_diagonal_offset_tensors_parallel_breaks_gradient(image_tensors):
 
@@ -130,6 +132,13 @@ class ImageInputTransformer:
             transformed_images[:, :, y, :] = new_row
 
         # This method creates CopySlices objects as gradients. Not clear if this is ok.
+        # It may be harmless, but seems to be slower in any case
+        # Something can be found about CopySlices at
+        # https://github.com/pytorch/pytorch/blob/master/torch/csrc/autograd/functions/tensor.cpp
+        # but this is not also very conclusive
+        print("create_row_diagonal_offset_tensor_parallel_breaks_gradient: transformed_images.grad_fn: " +
+              str(transformed_images.grad_fn))
+        print("transformed_images.size(): " + str(transformed_images.size()))
         return transformed_images
 
     @staticmethod
@@ -237,3 +246,121 @@ class ImageInputTransformer:
         result = ImageInputTransformer.create_row_diagonal_offset_tensors_parallel(image_tensors[:, :, :, :])
         #print("result: " + str(result))
         return result
+
+    @staticmethod
+    def create_skewed_images_variable_four_dim(x):
+        # skewed_images = ImageInputTransformer.create_row_diagonal_offset_tensors(x)
+
+        ### Not clear if this method really causes the gradient to break or not.
+        # skewed_images = ImageInputTransformer.\
+        #    create_row_diagonal_offset_tensors_parallel_breaks_gradient(x)
+
+        skewed_images = ImageInputTransformer. \
+            create_row_diagonal_offset_tensors_parallel(x)
+
+        # print("skewed images columns: " + str(skewed_images_columns))
+        # print("skewed images rows: " + str(skewed_images_rows))
+        # print("skewed_images: " + str(skewed_images))
+        # See: https://pytorch.org/docs/stable/tensors.html
+
+        if Utils.use_cuda():
+            # https://discuss.pytorch.org/t/which-device-is-model-tensor-stored-on/4908/7
+            device = x.get_device()
+            skewed_images = skewed_images.to(device)
+        return skewed_images
+
+    @staticmethod
+    def convert_activation_columns_list_to_tensor(activation_columns,
+                                                  skewed_image_columns: int, ):
+
+        # How to unskew the activation matrix, and retrieve an activation
+        # matrix of the original image size?
+        activations_column = activation_columns[0]
+        # Columns will be horizontally concatenated, add extra dimension for this concatenation
+        activations_column_unsqueezed = torch.unsqueeze(activations_column, 3)
+        activations_as_tensor = activations_column_unsqueezed
+        # print("activations_as_tensor.requires_grad: " + str(activations_as_tensor.requires_grad))
+        for column_number in range(1, skewed_image_columns):
+            # print("activations[column_number]: " + str(activations[column_number]))
+            activations_column = activation_columns[column_number]
+            # print("activations column: " + str(activations_column))
+            activations_column_unsqueezed = torch.unsqueeze(activations_column, 3)
+            activations_as_tensor = torch.cat((activations_as_tensor, activations_column_unsqueezed), 3)
+        # print("activations_as_tensor.size(): " + str(activations_as_tensor.size()))
+
+        return activations_as_tensor
+
+    @staticmethod
+    def extract_unskewed_activations_from_activation_tensor(activations_as_tensor,
+                                                            original_image_columns: int,
+                                                            skewed_image_rows: int):
+        # print("original image columns: " + str(original_image_columns))
+
+        # print("activations: " + str(activations))
+
+        activations_unskewed = activations_as_tensor[:, :, 0, 0:original_image_columns]
+        activations_unskewed = torch.unsqueeze(activations_unskewed, 2)
+        # print("activations_unskewed before:" + str(activations_unskewed))
+        for row_number in range(1, skewed_image_rows):
+            # print("row_number: (original_image_columns + row_number: " +
+            #      str(row_number) + ":" + str(original_image_columns + row_number))
+            activation_columns = activations_as_tensor[:, :, row_number,
+                                 row_number: (original_image_columns + row_number)]
+            activation_columns = torch.unsqueeze(activation_columns, 2)
+            # print("activations.size():" + str(activations.size()))
+            # print("activations_unskewed.size():" + str(activations_unskewed.size()))
+            activations_unskewed = torch.cat((activations_unskewed, activation_columns), 2)
+
+        # activations_unskewed = MultiDimensionalRNNBase.break_activations_unskewed(activations_unskewed)
+
+        return activations_unskewed
+
+    # activation_columns is a list of activation columns
+    @staticmethod
+    def extract_unskewed_activations_from_activation_columns(activation_columns,
+                                                             original_image_columns: int,
+                                                             skewed_image_columns: int,
+                                                             skewed_image_rows: int):
+
+        activations_as_tensor = ImageInputTransformer. \
+            convert_activation_columns_list_to_tensor(activation_columns, skewed_image_columns)
+        return ImageInputTransformer. \
+            extract_unskewed_activations_from_activation_tensor(activations_as_tensor,
+                                                                original_image_columns,
+                                                                skewed_image_rows)
+
+    # Method that demonstrates and explains the bug of adding a superfluous variable
+    # wrapping. What happens is that the additional wrapping makes
+    # the variable into a leaf variable, with a non-existent (empty) gradient function
+    # graph trace. This breaks the path used by back-propagation to
+    # update previous upstream graph nodes, with catastrophic effect on the learning
+    # results
+    # See: https://pytorch.org/docs/0.2.0/_modules/torch/autograd/variable.html :
+    # "
+    # Variable is a thin wrapper around a Tensor object, that also holds
+    # the gradient w.r.t. to it, and a reference to a function that created it.
+    # This reference allows retracing the whole chain of operations that
+    # created the data. If the Variable has been created by the user, its grad_fn
+    # will be ``None`` and we call such objects *leaf* Variables.
+    # "
+    # So explicitly created Variables have an emtpy grad_fn field, in other words,
+    # the gradient backwards path is lost, and hence updating predecessor variables
+    # is made impossible, causing learning to fail.
+    #
+    @staticmethod
+    def break_non_leaf_variable_by_wrapping_with_additional_variable(activations_unskewed):
+        # If activations_unskewed is made a variable (again!) it still works but runs
+        # much faster, but results are much worse somehow!!!
+        # print("activations_unskewed before: " + str(activations_unskewed.grad))
+        # print("activation_unskewed.requires_grad: " + str(activations_unskewed.requires_grad))
+        # See: https://pytorch.org/docs/0.3.1/autograd.html
+        # Wrapping into an additional variable makes activations_unskewed into a graph
+        # leaf, which it isn't before the extra wrapping (what exactly does this mean?)
+        print("before: activations_unskewed.is_leaf: " + str(activations_unskewed.is_leaf))
+        print("before: activations_unskewed. grad_fn: " + str(activations_unskewed.grad_fn))
+        activations_unskewed = Variable(activations_unskewed)
+        print("after: activations_unskewed.is_leaf: " + str(activations_unskewed.is_leaf))
+        print("after: activations_unskewed. grad_fn: " + str(activations_unskewed.grad_fn))
+        # print("activations_unskewed after: " + str(activations_unskewed.grad))
+        return activations_unskewed
+

@@ -11,7 +11,7 @@ from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParame
 from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParametersCreator
 from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParametersCreatorSlow
 from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParametersCreatorFast
-
+from util.image_input_transformer import ImageInputTransformer
 
 class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
@@ -101,7 +101,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
         # Step 1: Create a skewed version of the input image
         # skewed_image = ImageInputTransformer.create_row_diagonal_offset_tensor(x)
-        skewed_images_variable = MultiDimensionalRNNBase.create_skewed_images_variable_four_dim(x)
+        skewed_images_variable = ImageInputTransformer.create_skewed_images_variable_four_dim(x)
         # print("list(x.size()): " + str(list(x.size())))
         image_height = x.size(2)
         number_of_images = x.size(0)
@@ -281,10 +281,10 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         original_image_columns = x.size(3)
         skewed_image_rows = skewed_images_variable.size(2)
 
-        activations_unskewed = MultiDimensionalRNNBase.extract_unskewed_activations(activations,
-                                                                                    original_image_columns,
-                                                                                    skewed_image_columns,
-                                                                                    skewed_image_rows)
+        activations_unskewed = ImageInputTransformer.extract_unskewed_activations_from_activation_columns(activations,
+                                                                                                            original_image_columns,
+                                                                                                            skewed_image_columns,
+                                                                                                            skewed_image_rows)
 
         # print("activations_unskewed: " + str(activations_unskewed))
         return activations_unskewed
@@ -375,16 +375,35 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         return forget_gate_weighted_states_plus_weighted_input
 
     def forward_one_directional_multi_dimensional_lstm(self, x):
-        activations_unskewed = self.compute_multi_dimensional_lstm_one_direction(self.mdlstm_direction_one_parameters, x)
-
-        # activations_re_skewed = MultiDimensionalRNN.create_skewed_images_variable_four_dim(activations_unskewed)
-        # original_image_columns = x.size(3)
-        # skewed_image_columns =
-        # skewed_image_rows: int
-        # result = MultiDimensionalRNN.extract_unskewed_activations(activations_re_skewed,
-
+        activations_unskewed = self.compute_multi_dimensional_lstm_one_direction(self.mdlstm_direction_one_parameters,
+                                                                                 x)
+        # print("activations_unskewed.size(): " + str(activations_unskewed.size()))
 
         return activations_unskewed
+
+    # This method computes the forward_one_directional_multi_dimensional_lstm but
+    # adds one additional skewing and unskewing step. This is for testing that the
+    # used methods for skewing and unskewing of the input do not mess up the gradient.
+    def forward_one_directional_multi_dimensional_lstm_with_additional_skewing_unskewing_step(self, x):
+        activations_unskewed = self.forward_one_directional_multi_dimensional_lstm(x)
+
+        # Additional re-skewing step
+        # print("activations_unskewed.size(): " + str(activations_unskewed.size()))
+        activations_re_skewed = ImageInputTransformer.create_skewed_images_variable_four_dim(activations_unskewed)
+
+        # print("activations_re_skewed.size(): " + str(activations_re_skewed.size()))
+        original_image_columns = x.size(3)
+        skewed_image_rows = x.size(2)
+
+        # Additional re-un-skewing step
+        activations_re_skewed_re_unskewed = ImageInputTransformer.\
+            extract_unskewed_activations_from_activation_tensor(activations_re_skewed,
+                                                                original_image_columns,
+                                                                skewed_image_rows)
+        # print("activations_re_skewed_re_unskewed.size(): " + str(activations_re_skewed_re_unskewed.size()))
+
+        return activations_re_skewed_re_unskewed
+        # return activations_unskewed
 
     # Needs to be implemented in the subclasses
     def _compute_multi_dimensional_function_one_direction(self, function_input):
@@ -399,3 +418,5 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             #return self.forward_multi_directional_multi_dimensional_function_fast(x)
         else:
             return self.forward_one_directional_multi_dimensional_lstm(x)
+            #return self.\
+            #    forward_one_directional_multi_dimensional_lstm_with_additional_skewing_unskewing_step(x)

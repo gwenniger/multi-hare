@@ -156,11 +156,11 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     # device is the initial device the model will be put on
     device_ids = [1]
 
-    # multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(input_channels,
-    #                                                                                 hidden_states_size,
-    #                                                                                 compute_multi_directional,
-    #                                                                                 use_dropout,
-    #                                                                                 nonlinearity="sigmoid")
+    multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(input_channels,
+                                                                                    hidden_states_size,
+                                                                                    compute_multi_directional,
+                                                                                    use_dropout,
+                                                                                    nonlinearity="sigmoid")
 
     mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
     # multi_dimensional_rnn = BlockMultiDimensionalLSTM.create_block_multi_dimensional_lstm(input_channels,
@@ -183,10 +183,10 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     #    create_two_layer_pair_network(hidden_states_size)
 
     # block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
-    mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
-    block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
-    multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking.\
-        create_two_layer_pair_network(hidden_states_size, mdlstm_block_size, block_strided_convolution_block_size)
+    # mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
+    # block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
+    # multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking.\
+    #     create_two_layer_pair_network(hidden_states_size, mdlstm_block_size, block_strided_convolution_block_size)
 
     network = MultiDimensionalRNNToSingleClassNetwork.\
         create_multi_dimensional_rnn_to_single_class_network(multi_dimensional_rnn, input_size)
