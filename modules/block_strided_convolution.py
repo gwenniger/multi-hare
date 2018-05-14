@@ -2,6 +2,7 @@ from modules.size_two_dimensional import SizeTwoDimensional
 from torch.nn.modules.module import Module
 import torch.nn as nn
 import torch.nn.functional as F
+from util.tensor_chunking import TensorChunking
 
 
 class BlockStridedConvolution(Module):
@@ -40,6 +41,23 @@ class BlockStridedConvolution(Module):
             raise RuntimeError(
                 "Unknown nonlinearity: {}".format(self.nonlinearity))
         return activation_function
+
+    def get_number_of_output_dimensions(self, input_size: SizeTwoDimensional):
+        block_size = self.block_size
+        tensor_chunking = TensorChunking.create_tensor_chunking(input_size, block_size)
+        feature_blocks_per_example = tensor_chunking.number_of_feature_blocks_per_example
+        print("feature_blocks_per_example : " + str(feature_blocks_per_example))
+        result = feature_blocks_per_example * self.output_channels
+        return result
+
+    def get_output_size_two_dimensional(self, input_size: SizeTwoDimensional):
+        block_size = self.block_size
+        height = int(input_size.height / block_size.height)
+        width = int(input_size.width / block_size.width)
+        return SizeTwoDimensional.create_size_two_dimensional(height, width)
+
+    def set_training(self, training):
+        return
 
     def forward(self, x):
         convolution_output = self.convolution(x)

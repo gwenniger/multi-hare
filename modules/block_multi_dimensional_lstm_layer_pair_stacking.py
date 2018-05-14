@@ -1,5 +1,7 @@
 from torch.nn.modules.module import Module
 from modules.block_multi_dimensional_lstm_layer_pair import BlockMultiDimensionalLSTMLayerPair
+from modules.block_multi_dimensional_lstm_layer_pair import BlockMultiDimensionalLSTM
+from modules.block_strided_convolution import BlockStridedConvolution
 import torch.nn as nn
 from modules.size_two_dimensional import SizeTwoDimensional
 
@@ -73,6 +75,7 @@ class BlockMultiDimensionalLSTMLayerPairStacking(Module):
         input_channels = 1
         number_of_elements_reduction_factor = block_strided_convolution_block_size.width * \
                                               block_strided_convolution_block_size.height
+        parameter_increase_factor = number_of_elements_reduction_factor
         output_channels = number_of_elements_reduction_factor * first_mdlstm_hidden_states_size
 
         pair_one_specific_parameters = LayerPairSpecificParameters.create_layer_pair_specific_parameters(
@@ -84,7 +87,7 @@ class BlockMultiDimensionalLSTMLayerPairStacking(Module):
         # Here the number of mdstlm_hidden_states and output channels are increased with the
         # number of elements reduction factor from the dimensionality reduction with the
         # block_strided_convolution
-        second_mdlstm_hidden_states_size = number_of_elements_reduction_factor * first_mdlstm_hidden_states_size
+        second_mdlstm_hidden_states_size = parameter_increase_factor * first_mdlstm_hidden_states_size
         output_channels = number_of_elements_reduction_factor * output_channels
 
         pair_two_specific_parameters = LayerPairSpecificParameters.create_layer_pair_specific_parameters(
@@ -95,6 +98,82 @@ class BlockMultiDimensionalLSTMLayerPairStacking(Module):
         return BlockMultiDimensionalLSTMLayerPairStacking.\
             create_block_multi_dimensional_lstm_pair_stacking(layer_pairs_specific_parameters_list,
                                                               compute_multi_directional, use_dropout, nonlinearity)
+
+        # This is an example of a network that stacks two
+        # BlockMultiDimensionalLSTMLayerPair layers. It illustrates how
+        # the block dimensions can be varied within layer pairs and across layer pairs.
+
+    @staticmethod
+    def create_one_layer_pair_plus_second_block_convolution_layer_network(first_mdlstm_hidden_states_size: int,
+                                      mdlstm_block_size: SizeTwoDimensional,
+                                      block_strided_convolution_block_size: SizeTwoDimensional):
+        compute_multi_directional = False
+        use_dropout = False
+        nonlinearity = "tanh"
+
+        # Layer pair one
+        input_channels = 1
+        number_of_elements_reduction_factor = block_strided_convolution_block_size.width * \
+                                              block_strided_convolution_block_size.height
+        output_channels = number_of_elements_reduction_factor * first_mdlstm_hidden_states_size
+
+        pair_one_specific_parameters = LayerPairSpecificParameters.create_layer_pair_specific_parameters(
+            input_channels, first_mdlstm_hidden_states_size, output_channels, mdlstm_block_size,
+            block_strided_convolution_block_size)
+
+        # Layer pair two
+        input_channels = output_channels
+        # Here the number of mdstlm_hidden_states and output channels are increased with the
+        # number of elements reduction factor from the dimensionality reduction with the
+        # block_strided_convolution
+        output_channels = number_of_elements_reduction_factor * output_channels
+
+        first_layer = BlockMultiDimensionalLSTMLayerPairStacking.\
+            create_block_multi_dimensional_lstm_layer_pair(pair_one_specific_parameters,
+                                                           compute_multi_directional, use_dropout,
+                                                           nonlinearity)
+        second_block_convolution = BlockStridedConvolution.\
+            create_block_strided_convolution(input_channels, output_channels,
+                                             block_strided_convolution_block_size)
+        layers = list([first_layer, second_block_convolution])
+        return BlockMultiDimensionalLSTMLayerPairStacking(layers)
+
+    @staticmethod
+    def create_one_layer_pair_plus_second_block_mdlstm_layer_network(first_mdlstm_hidden_states_size: int,
+                                                                          mdlstm_block_size: SizeTwoDimensional,
+                                                                          block_strided_convolution_block_size: SizeTwoDimensional):
+        compute_multi_directional = False
+        use_dropout = False
+        nonlinearity = "tanh"
+
+        # Layer pair one
+        input_channels = 1
+        number_of_elements_reduction_factor = block_strided_convolution_block_size.width * \
+                                              block_strided_convolution_block_size.height
+        output_channels = 4 * first_mdlstm_hidden_states_size
+
+        pair_one_specific_parameters = LayerPairSpecificParameters.create_layer_pair_specific_parameters(
+            input_channels, first_mdlstm_hidden_states_size, output_channels, mdlstm_block_size,
+            block_strided_convolution_block_size)
+
+        # Layer pair two
+        input_channels = output_channels
+        # Here the number of mdstlm_hidden_states and output channels are increased with the
+        # number of elements reduction factor from the dimensionality reduction with the
+        # block_strided_convolution
+
+        first_layer = BlockMultiDimensionalLSTMLayerPairStacking. \
+            create_block_multi_dimensional_lstm_layer_pair(pair_one_specific_parameters,
+                                                           compute_multi_directional, use_dropout,
+                                                           nonlinearity)
+        second_mdlstm_hidden_states_size = number_of_elements_reduction_factor * first_mdlstm_hidden_states_size
+        second_block_mdlstm = BlockMultiDimensionalLSTM.\
+            create_block_multi_dimensional_lstm(input_channels, second_mdlstm_hidden_states_size,
+                                                mdlstm_block_size, compute_multi_directional, use_dropout,
+                                                           nonlinearity)
+        layers = list([first_layer, second_block_mdlstm])
+        return BlockMultiDimensionalLSTMLayerPairStacking(layers)
+
     @staticmethod
     def create_module_list(block_multi_dimensional_lstm_layer_pairs):
         module_list = nn.ModuleList([])
@@ -116,10 +195,11 @@ class BlockMultiDimensionalLSTMLayerPairStacking(Module):
         return result
 
     def forward(self, x):
-        output = x
+        network_input = x
         for layer_pair in self.block_multi_dimensional_lstm_layer_pairs:
-            output = layer_pair(output)
+            output = layer_pair(network_input)
             # print(">>> BlockMultiDimensionalLSTMLayerPairStacking.forward: - output.grad_fn "
             #      + str(output.grad_fn))
             # print("output.size(): " + str(output.size()))
+            network_input = output
         return output

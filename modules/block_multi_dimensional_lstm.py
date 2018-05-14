@@ -44,6 +44,9 @@ class BlockMultiDimensionalLSTM(Module):
             result = result * 4
         return result
 
+    def get_output_size_two_dimensional(self, input_size: SizeTwoDimensional):
+        return input_size
+
     def forward(self, x):
         original_size = SizeTwoDimensional.create_size_two_dimensional(x.size(2), x.size(3))
         # Tensor chunking is created dynamically, so that every batch may have a different
