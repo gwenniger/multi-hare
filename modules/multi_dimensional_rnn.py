@@ -306,18 +306,13 @@ class MultiDimensionalRNNBase(torch.nn.Module):
         # print("skewed images columns: " + str(skewed_images_columns))
         # print("skewed images rows: " + str(skewed_images_rows))
         # print("skewed_images: " + str(skewed_images))
-
-        #skewed_images_four_dim_variable = torch.unsqueeze(skewed_images, 1)
-        skewed_images_four_dim_variable = skewed_images
         # See: https://pytorch.org/docs/stable/tensors.html
-        # This replaces explicit variable creation, which is deprecated
-        # skewed_images_four_dim_variable.requires_grad_(True)  # This is directly set for the original input
 
         if MultiDimensionalRNNBase.use_cuda():
             # https://discuss.pytorch.org/t/which-device-is-model-tensor-stored-on/4908/7
             device = x.get_device()
-            skewed_images_variable = skewed_images_four_dim_variable.to(device)
-        return skewed_images_variable
+            skewed_images = skewed_images.to(device)
+        return skewed_images
 
     # activations is a list of activation columns
     @staticmethod
@@ -344,17 +339,20 @@ class MultiDimensionalRNNBase(torch.nn.Module):
             # print("activations column: " + str(activations_column))
             activations_column_unsqueezed = torch.unsqueeze(activations_column, 3)
             activations_as_tensor = torch.cat((activations_as_tensor, activations_column_unsqueezed), 3)
-        # print("activations_as_tensor: " + str(activations_as_tensor))
+        # print("activations_as_tensor.size(): " + str(activations_as_tensor.size()))
 
         activations_unskewed = activations_as_tensor[:, :, 0, 0:original_image_columns]
         activations_unskewed = torch.unsqueeze(activations_unskewed, 2)
         # print("activations_unskewed before:" + str(activations_unskewed))
         for row_number in range(1, skewed_image_rows):
+            # print("row_number: (original_image_columns + row_number: " +
+            #      str(row_number) + ":" + str(original_image_columns + row_number))
             activations = activations_as_tensor[:, :, row_number, row_number: (original_image_columns + row_number)]
             activations = torch.unsqueeze(activations, 2)
-            # print("activations:" + str(activations))
+            # print("activations.size():" + str(activations.size()))
+            # print("activations_unskewed.size():" + str(activations_unskewed.size()))
             activations_unskewed = torch.cat((activations_unskewed, activations), 2)
-        # print("activations_unskewed: " + str(activations_unskewed))
+
 
         # activations_unskewed = MultiDimensionalRNNBase.break_activations_unskewed(activations_unskewed)
 
@@ -490,7 +488,8 @@ class MultiDimensionalRNNAbstract(MultiDimensionalRNNBase):
             activations.append(activation_column)
             #print("activations length: " + str(len(activations)))
 
-        original_image_columns = x.size(2)
+        original_image_columns = x.size(3)
+        print(">>> x.size(): " + str(x.size()))
         skewed_image_rows = skewed_images_variable.size(2)
         #print("Skewed image rows: " + str(skewed_image_rows))
 
@@ -504,6 +503,7 @@ class MultiDimensionalRNNAbstract(MultiDimensionalRNNBase):
     def forward_one_directional_multi_dimensional_rnn(self, x):
         activations_unskewed = self.compute_multi_dimensional_rnn_one_direction(x)
         # print("activations_one_dimensional: " + str(activations_one_dimensional))
+
         return activations_unskewed
 
     # This function is slow because all four function calls for 4 directions are

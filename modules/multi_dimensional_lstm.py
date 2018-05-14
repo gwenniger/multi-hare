@@ -277,7 +277,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # print("in loop: previous_memory_state_column.grad_fn: " + str(previous_memory_state_column.grad_fn))
             # print("in loop: previous_hidden_state_column.grad_fn: " + str(previous_hidden_state_column.grad_fn))
 
-        original_image_columns = x.size(2)
+        # print(">>> x.size(): " + str(x.size()))
+        original_image_columns = x.size(3)
         skewed_image_rows = skewed_images_variable.size(2)
 
         activations_unskewed = MultiDimensionalRNNBase.extract_unskewed_activations(activations,
@@ -375,6 +376,14 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
     def forward_one_directional_multi_dimensional_lstm(self, x):
         activations_unskewed = self.compute_multi_dimensional_lstm_one_direction(self.mdlstm_direction_one_parameters, x)
+
+        # activations_re_skewed = MultiDimensionalRNN.create_skewed_images_variable_four_dim(activations_unskewed)
+        # original_image_columns = x.size(3)
+        # skewed_image_columns =
+        # skewed_image_rows: int
+        # result = MultiDimensionalRNN.extract_unskewed_activations(activations_re_skewed,
+
+
         return activations_unskewed
 
     # Needs to be implemented in the subclasses

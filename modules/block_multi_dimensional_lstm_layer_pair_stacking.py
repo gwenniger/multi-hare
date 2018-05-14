@@ -62,15 +62,15 @@ class BlockMultiDimensionalLSTMLayerPairStacking(Module):
     # BlockMultiDimensionalLSTMLayerPair layers. It illustrates how
     # the block dimensions can be varied within layer pairs and across layer pairs.
     @staticmethod
-    def create_two_layer_pair_network(first_mdlstm_hidden_states_size):
+    def create_two_layer_pair_network(first_mdlstm_hidden_states_size: int,
+                                      mdlstm_block_size: SizeTwoDimensional,
+                                      block_strided_convolution_block_size: SizeTwoDimensional):
         compute_multi_directional = False
         use_dropout = False
         nonlinearity = "tanh"
 
         # Layer pair one
         input_channels = 1
-        mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
-        block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
         number_of_elements_reduction_factor = block_strided_convolution_block_size.width * \
                                               block_strided_convolution_block_size.height
         output_channels = number_of_elements_reduction_factor * first_mdlstm_hidden_states_size
@@ -91,13 +91,10 @@ class BlockMultiDimensionalLSTMLayerPairStacking(Module):
             input_channels, second_mdlstm_hidden_states_size, output_channels, mdlstm_block_size,
             block_strided_convolution_block_size)
 
-        # FIXME : With only one layer pair, performance is decent, but with two pairs
-        # performance is bad
         layer_pairs_specific_parameters_list = list([pair_one_specific_parameters, pair_two_specific_parameters])
         return BlockMultiDimensionalLSTMLayerPairStacking.\
             create_block_multi_dimensional_lstm_pair_stacking(layer_pairs_specific_parameters_list,
                                                               compute_multi_directional, use_dropout, nonlinearity)
-
     @staticmethod
     def create_module_list(block_multi_dimensional_lstm_layer_pairs):
         module_list = nn.ModuleList([])
