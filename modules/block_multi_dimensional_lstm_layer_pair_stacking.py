@@ -29,11 +29,16 @@ class BlockMultiDimensionalLSTMLayerPairStacking(Module):
 
     def __init__(self, block_multi_dimensional_lstm_layer_pairs):
         super(BlockMultiDimensionalLSTMLayerPairStacking, self).__init__()
-        self.block_multi_dimensional_lstm_layer_pairs = block_multi_dimensional_lstm_layer_pairs
         # A module list is used to assure the variable number of layers is properly registered
-        # so that things will be put on the right GPUs
-        self.module_list = BlockMultiDimensionalLSTMLayerPairStacking.\
-            create_module_list(block_multi_dimensional_lstm_layer_pairs)
+        # so that things will be put on the right GPUs. It is necessary to "only"
+        # use this module list and loop over the elements in this list in the forward method,
+        # previously storing in a normal list in addition to a module list, and reading
+        # from the normal list in the forward function caused things to still be put on
+        # different GPUs when using more than one GPU
+        self.block_multi_dimensional_lstm_layer_pairs = nn.ModuleList([])
+        self.block_multi_dimensional_lstm_layer_pairs.extend(block_multi_dimensional_lstm_layer_pairs)
+
+        print("len(self.block_multi_dimensional_lstm_layer_pairs): " + str(len(self.block_multi_dimensional_lstm_layer_pairs)))
 
     @staticmethod
     def create_block_multi_dimensional_lstm_pair_stacking(layer_pair_specific_parameters_list: list,
@@ -87,7 +92,7 @@ class BlockMultiDimensionalLSTMLayerPairStacking(Module):
         # Here the number of mdstlm_hidden_states and output channels are increased with the
         # number of elements reduction factor from the dimensionality reduction with the
         # block_strided_convolution
-        second_mdlstm_hidden_states_size = parameter_increase_factor * first_mdlstm_hidden_states_size
+        second_mdlstm_hidden_states_size = 4 * first_mdlstm_hidden_states_size
         output_channels = number_of_elements_reduction_factor * output_channels
 
         pair_two_specific_parameters = LayerPairSpecificParameters.create_layer_pair_specific_parameters(
@@ -176,9 +181,10 @@ class BlockMultiDimensionalLSTMLayerPairStacking(Module):
 
     @staticmethod
     def create_module_list(block_multi_dimensional_lstm_layer_pairs):
-        module_list = nn.ModuleList([])
+        module_list = list([])
         for layer_pair in block_multi_dimensional_lstm_layer_pairs:
             module_list.append(layer_pair)
+            module_list.extend(layer_pair.module_list)
         return module_list
 
     def set_training(self, training):

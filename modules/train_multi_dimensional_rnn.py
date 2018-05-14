@@ -150,11 +150,11 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     #                                                                           nonlinearity="sigmoid")
 
     # http://pytorch.org/docs/master/notes/cuda.html
-    device = torch.device("cuda:1")
+    device = torch.device("cuda:0")
     # device_ids should include device!
     # device_ids lists all the gpus that may be used for parallelization
     # device is the initial device the model will be put on
-    device_ids = [1]
+    device_ids = [0, 1]
 
     # multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(input_channels,
     #                                                                                 hidden_states_size,
@@ -190,23 +190,21 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     #     create_one_layer_pair_plus_second_block_convolution_layer_network(hidden_states_size, mdlstm_block_size,
     #                                                                       block_strided_convolution_block_size)
 
-    # An intermediate test case with first a layer-pair that consists of a
-    # BlockMultiDimensionalLSTM layer, followed by a BlockStructuredConvolution layer.
-    # After this comes an additional single mdlstm layer as
-    # opposed to another full layer pair
-    mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
-    block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
-    multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking.\
-        create_one_layer_pair_plus_second_block_mdlstm_layer_network(hidden_states_size, mdlstm_block_size,
-                                                                          block_strided_convolution_block_size)
-
-
-
+    # # An intermediate test case with first a layer-pair that consists of a
+    # # BlockMultiDimensionalLSTM layer, followed by a BlockStructuredConvolution layer.
+    # # After this comes an additional single mdlstm layer as
+    # # opposed to another full layer pair
     # mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
     # block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
     # multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking.\
-    #     create_two_layer_pair_network(hidden_states_size, mdlstm_block_size,
-    #                                   block_strided_convolution_block_size)
+    #     create_one_layer_pair_plus_second_block_mdlstm_layer_network(hidden_states_size, mdlstm_block_size,
+    #                                                                       block_strided_convolution_block_size)
+
+    mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
+    block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
+    multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking.\
+        create_two_layer_pair_network(hidden_states_size, mdlstm_block_size,
+                                      block_strided_convolution_block_size)
 
     network = MultiDimensionalRNNToSingleClassNetwork.\
         create_multi_dimensional_rnn_to_single_class_network(multi_dimensional_rnn, input_size)
