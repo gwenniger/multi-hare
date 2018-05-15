@@ -17,6 +17,7 @@ from modules.parallel_multiple_state_weightings_computation import ParallelMulti
 from modules.size_two_dimensional import SizeTwoDimensional
 from util.tensor_chunking import TensorChunking
 
+
 class MDRNNCellBase(Module):
 
     def __repr__(self):
@@ -423,18 +424,28 @@ class MultiDimensionalRNNAbstract(MultiDimensionalRNNBase):
         activations_unskewed_direction_one = self.compute_multi_dimensional_rnn_one_direction(x)
 
         # Flipping 2nd dimension
-        activations_unskewed_direction_two = self.compute_multi_dimensional_rnn_one_direction(
-            util.tensor_flipping.flip(x, 2))
+        height_flipping = util.tensor_flipping.TensorFlipping.create_tensor_flipping(True, False)
+        activations_unskewed_direction_two_flipped = self.compute_multi_dimensional_rnn_one_direction(
+            height_flipping.flip(x))
+        # Flip back the activations to get the retrieve the original orientation
+        activations_unskewed_direction_two = height_flipping.flip(activations_unskewed_direction_two_flipped)
 
         #print("activations_one_dimensional_two: " + str(activations_one_dimensional_two))
 
         # Flipping 3th dimension
-        activations_unskewed_direction_three = self.compute_multi_dimensional_rnn_one_direction(
-            util.tensor_flipping.flip(x, 3))
+        width_flipping = util.tensor_flipping.TensorFlipping.create_tensor_flipping(False, True)
+        activations_unskewed_direction_three_flipped = self.compute_multi_dimensional_rnn_one_direction(
+            width_flipping.flip(x))
+        # Flip back the activations to get the retrieve the original orientation
+        activations_unskewed_direction_three = width_flipping.flip(activations_unskewed_direction_three_flipped)
 
         # Flipping 2nd and 3th dimension combined
-        activations_unskewed_direction_four = self.compute_multi_dimensional_rnn_one_direction(
-            util.tensor_flipping.flip(util.tensor_flipping.flip(x, 2), 3))
+        height_and_width_flipping = util.tensor_flipping.TensorFlipping.create_tensor_flipping(True, True)
+        activations_unskewed_direction_four_flipped = self.compute_multi_dimensional_rnn_one_direction(
+            height_and_width_flipping.flip(x))
+        # Flip back the activations to get the retrieve the original orientation
+        activations_unskewed_direction_four = height_and_width_flipping.\
+            flip(activations_unskewed_direction_four_flipped)
 
         activations_combined = torch.cat((activations_unskewed_direction_one, activations_unskewed_direction_two,
                                          activations_unskewed_direction_three, activations_unskewed_direction_four), 1)

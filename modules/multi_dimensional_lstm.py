@@ -13,6 +13,7 @@ from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParame
 from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParametersCreatorFast
 from util.image_input_transformer import ImageInputTransformer
 
+
 class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
     def __init__(self, input_channels: int, hidden_states_size: int, compute_multi_directional: bool,
@@ -300,33 +301,34 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         # Original order
         activations_unskewed_direction_one = self.\
             compute_multi_dimensional_lstm_one_direction(self.mdlstm_direction_one_parameters, x)
-        activations_one_dimensional_one = activations_unskewed_direction_one.view(-1, 1024 * self.hidden_states_size)
 
         # Flipping 2nd dimension
-        activations_unskewed_direction_two = self.compute_multi_dimensional_lstm_one_direction(
-            self.mdlstm_direction_two_parameters, util.tensor_flipping.flip(x, 2))
-        activations_one_dimensional_two = activations_unskewed_direction_two.view(-1, 1024 * self.hidden_states_size)
+        height_flipping = util.tensor_flipping.TensorFlipping.create_tensor_flipping(True, False)
+        activations_unskewed_direction_two_flipped = self.compute_multi_dimensional_lstm_one_direction(
+            self.mdlstm_direction_two_parameters, height_flipping.flip(x))
+        # Flip back the activations to get the retrieve the original orientation
+        activations_unskewed_direction_two = height_flipping.flip(activations_unskewed_direction_two_flipped)
 
         # print("activations_one_dimensional_two: " + str(activations_one_dimensional_two))
 
         # Flipping 3th dimension
-        activations_unskewed_direction_three = self.compute_multi_dimensional_lstm_one_direction(
-            self.mdlstm_direction_three_parameters, util.tensor_flipping.flip(x, 3))
-        activations_one_dimensional_three = activations_unskewed_direction_three.view(-1, 1024 * self.hidden_states_size)
+        width_flipping = util.tensor_flipping.TensorFlipping.create_tensor_flipping(False, True)
+        activations_unskewed_direction_three_flipped = self.compute_multi_dimensional_lstm_one_direction(
+            self.mdlstm_direction_three_parameters, width_flipping.flip(x))
+        # Flip back the activations to get the retrieve the original orientation
+        activations_unskewed_direction_three = width_flipping.flip(activations_unskewed_direction_three_flipped)
 
         # Flipping 2nd and 3th dimension combined
-        activations_unskewed_direction_four = self.compute_multi_dimensional_lstm_one_direction(
-            self.mdlstm_direction_four_parameters, util.tensor_flipping.flip(util.tensor_flipping.flip(x, 2), 3))
-        activations_one_dimensional_four = activations_unskewed_direction_four.view(-1, 1024 * self.hidden_states_size)
+        height_and_width_flipping = util.tensor_flipping.TensorFlipping.create_tensor_flipping(True, True)
+        activations_unskewed_direction_four_flipped = self.compute_multi_dimensional_lstm_one_direction(
+            self.mdlstm_direction_four_parameters, height_and_width_flipping.flip(x))
+        # Flip back the activations to get the retrieve the original orientation
+        activations_unskewed_direction_four = height_and_width_flipping.flip(activations_unskewed_direction_four_flipped)
 
-        activations_combined = torch.cat((activations_one_dimensional_one, activations_one_dimensional_two,
-                                          activations_one_dimensional_three, activations_one_dimensional_four), 1)
+        activations_combined = torch.cat((activations_unskewed_direction_one, activations_unskewed_direction_two,
+                                          activations_unskewed_direction_three, activations_unskewed_direction_four), 1)
 
-        # print("activations_combined: " + str(activations_combined))
-
-        # print("activations_one_dimensional: " + str(activations_one_dimensional))
-        # It is nescessary to output a tensor of size 10, for 10 different output classes
-        result = self.fc3(activations_combined)
+        result = activations_combined
         return result
 
     @staticmethod
