@@ -245,7 +245,7 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
 
     num_gradient_corrections = 0
 
-    for epoch in range(2):  # loop over the dataset multiple times
+    for epoch in range(4):  # loop over the dataset multiple times
 
         running_loss = 0.0
         for i, data in enumerate(train_loader, 0):
