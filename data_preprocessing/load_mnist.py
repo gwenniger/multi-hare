@@ -59,7 +59,7 @@ def get_item_tensors_and_labels_combined(train_set: list, start_index: int, sequ
     item_one_label = item_one[1]
 
     item_tensors_combined = item_one_tensor
-    item_labels_combined = list([item_one_label])
+    item_labels_combined = torch.IntTensor([item_one_label])
 
     for j in range(start_index + 1, start_index + sequence_length):
         index = j
@@ -69,7 +69,7 @@ def get_item_tensors_and_labels_combined(train_set: list, start_index: int, sequ
         next_item_label = next_item[1]
 
         item_tensors_combined = torch.cat((item_tensors_combined, next_item_tensor), 2)
-        item_labels_combined.append(next_item_label)
+        item_labels_combined = torch.cat((item_labels_combined,  torch.IntTensor([next_item_label])), 0)
 
     print("item_tensors_combined.size(): " + str(item_tensors_combined.size()))
     print("item_labels_combined: " + str(item_labels_combined))
@@ -97,6 +97,8 @@ def get_multi_digit_loader_fixed_length(batch_size, sequence_length,
         item_tensors_combined, item_labels_combined = get_item_tensors_and_labels_combined(
             data_set, i, sequence_length)
         triples_train_set.append(tuple((item_tensors_combined, item_labels_combined)))
+
+        # print("triples_train_set: " + str(triples_train_set))
 
         # util.image_visualization.imshow(torchvision.utils.make_grid(item_tensors_combined))
         # plt.show()

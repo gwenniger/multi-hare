@@ -187,6 +187,59 @@ class MultiDimensionalRNNToSingleClassNetwork(torch.nn.Module):
         return self.fc3(activations_one_dimensional)
 
 
+class NetworkToSoftMaxNetwork(torch.nn.Module):
+    def __init__(self, network, input_size: SizeTwoDimensional, number_of_classes_excluding_blank: int):
+        super(NetworkToSoftMaxNetwork, self).__init__()
+        self.multi_dimensional_rnn = network
+        self.input_size = input_size
+        self.number_of_output_channels = network.get_number_of_output_channels()
+        self.number_of_classes_excluding_blank = number_of_classes_excluding_blank
+
+        print(">>> number_of_output_channels: " + str(self.number_of_output_channels))
+
+        self.fc3 = nn.Linear(self.number_of_output_channels, self.get_number_of_classes_including_blank())
+        # print("self.fc3 : " + str(self.fc3))
+        # print("self.fc3.weight: " + str(self.fc3.weight))
+        # print("self.fc3.bias: " + str(self.fc3.bias))
+
+    @staticmethod
+    def create_network_to_soft_max_network(multi_dimensional_rnn, input_size: SizeTwoDimensional,
+                                           number_of_classes_excluding_blank: int):
+        return NetworkToSoftMaxNetwork(multi_dimensional_rnn, input_size, number_of_classes_excluding_blank)
+
+    def get_number_of_classes_including_blank(self):
+        return self.number_of_classes_excluding_blank + 1
+
+    def set_training(self, training):
+        self.multi_dimensional_rnn.set_training(training)
+
+    def forward(self, x):
+        activations = self.multi_dimensional_rnn(x)
+        batch_size = activations.size(0)
+        print(">>> activations.size(): " + str(activations.size()))
+
+        if activations.size(2) != 1:
+            raise RuntimeError("Error: the height dimension of returned activations should be of size 1")
+        activations_height_removed = activations.squeeze(2)
+        activations_with_swapped_channels_and_width = activations_height_removed.transpose(1, 2)
+        print(">>> activations_with_swapped_channels_and_width.size(): " +
+              str(activations_with_swapped_channels_and_width.size()))
+        activations_resized_one_dimensional = activations_with_swapped_channels_and_width.contiguous().\
+            view(-1, self.number_of_output_channels)
+        class_activations = self.fc3(activations_resized_one_dimensional)
+        class_activations_resized = class_activations.view(batch_size, -1,
+                                                             self.get_number_of_classes_including_blank())
+        print(">>> class_activations_resized.size(): " +
+              str(class_activations_resized.size()))
+
+        print(">>> MultiDimensionalRNNToSoftMaxNetwork.forward.class activations: " + str(class_activations))
+        # The dimension along which softmax must make probabilities to sum to one is the classes dimension
+        probabilities_sum_to_one_dimension = 2
+        result = torch.nn.functional.log_softmax(class_activations_resized, probabilities_sum_to_one_dimension)
+        print(">>> MultiDimensionalRNNToSoftMaxNetwork.forward.result: " + str(result))
+        return result
+
+
 class MultiDimensionalRNNBase(torch.nn.Module):
     def __init__(self, input_channels: int, hidden_states_size: int,
                  compute_multi_directional: bool,

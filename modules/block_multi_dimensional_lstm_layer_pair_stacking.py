@@ -197,8 +197,14 @@ class BlockMultiDimensionalLSTMLayerPairStacking(Module):
             print("layer_input_size: " + str(layer_input_size))
             result = layer_pair.get_number_of_output_dimensions(layer_input_size)
             layer_input_size = layer_pair.get_output_size_two_dimensional(layer_input_size)
+            print("new layer_input_size: " + str(layer_input_size))
             print("number of output dimensions layer: " + str(result))
         return result
+
+    def get_number_of_output_channels(self):
+        last_layer_pair = self.block_multi_dimensional_lstm_layer_pairs[
+            len(self.block_multi_dimensional_lstm_layer_pairs) - 1]
+        return last_layer_pair.get_number_of_output_channels()
 
     def forward(self, x):
         network_input = x

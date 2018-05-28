@@ -211,7 +211,9 @@ def test_ctc_loss_probabilities_match_labels_third_baidu_example():
     # ]). \
     #    transpose(0, 1).contiguous()
 
-    print("probs.size(): " + str(probs.size()))
+    print("test_ctc_loss_probabilities_match_labels_third_baidu_example - probs: " + str(probs))
+
+    print("test_ctc_loss_probabilities_match_labels_third_baidu_example - probs.size(): " + str(probs.size()))
 
     # labels = Variable(torch.IntTensor([ [1, 0], [3, 3], [2, 3]]))
     # See: https://github.com/SeanNaren/warp-ctc/issues/29
@@ -509,6 +511,8 @@ def test_ctc_loss_probabilities_match_labels_three():
 
 
 def main():
+    # CTC Beam decoder: https://github.com/joshemorris/pytorch-ctc
+
     # test_ctc_loss()
     # test_ctc_loss_two()
     # test_ctc_loss_probabilities_match_labels()

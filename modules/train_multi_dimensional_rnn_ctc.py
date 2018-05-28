@@ -2,7 +2,7 @@ import torch
 import torch.nn
 import torch.nn as nn
 import time
-from modules.multi_dimensional_rnn import MDRNNCell
+from modules.multi_dimensional_rnn import MDRNNCell, NetworkToSoftMaxNetwork
 from modules.multi_dimensional_rnn import MultiDimensionalRNNBase
 from modules.multi_dimensional_rnn import MultiDimensionalRNN
 from modules.multi_dimensional_rnn import MultiDimensionalRNNToSingleClassNetwork
@@ -15,7 +15,8 @@ import data_preprocessing.load_mnist
 import data_preprocessing.load_cifar_ten
 from util.utils import Utils
 from modules.size_two_dimensional import SizeTwoDimensional
-
+import warpctc_pytorch
+from ctc_loss.warp_ctc_loss_interface import WarpCTCLossInterface
 
 def test_mdrnn_cell():
     print("Testing the MultDimensionalRNN Cell... ")
@@ -206,8 +207,9 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
         create_two_layer_pair_network(hidden_states_size, mdlstm_block_size,
                                       block_strided_convolution_block_size)
 
-    network = MultiDimensionalRNNToSingleClassNetwork.\
-        create_multi_dimensional_rnn_to_single_class_network(multi_dimensional_rnn, input_size)
+    number_of_classes = 10
+    network = NetworkToSoftMaxNetwork.create_network_to_soft_max_network(multi_dimensional_rnn,
+                                                                         input_size, number_of_classes )
 
     #multi_dimensional_rnn = Net()
 
@@ -245,6 +247,9 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
 
     num_gradient_corrections = 0
 
+    #ctc_loss = warpctc_pytorch.CTCLoss()
+    warp_ctc_loss_interface = WarpCTCLossInterface.create_warp_ctc_loss_interface()
+
     for epoch in range(4):  # loop over the dataset multiple times
 
         running_loss = 0.0
@@ -257,6 +262,7 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
                 inputs = inputs.to(device)
                 # Set requires_grad(True) directly and only for the input
                 inputs.requires_grad_(True)
+
 
 
             # wrap them in Variable
@@ -273,10 +279,22 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
             # forward + backward + optimize
             #outputs = multi_dimensional_rnn(Variable(inputs))  # For "Net" (Le Net)
             outputs = network(inputs)
+
+            print(">>> outputs.size(): " + str(outputs.size()))
+
+            print(">>> labels.size() : " + str(labels.size()))
+            print("labels: " + str(labels))
+            #warp_ctc_loss_interface.
+            #print(">>> labels_one_dimensional.size() : " + str(labels_one_dimensional.size()))
+            #print("labels_one_dimensional: " + str(labels_one_dimensional))
+
+
             # print("outputs: " + str(outputs))
             # print("outputs.size(): " + str(outputs.size()))
             #print("labels: " + str(labels))
-            loss = criterion(outputs, labels)
+            loss = warp_ctc_loss_interface.compute_ctc_loss(outputs, labels)
+            print("loss: " + str(loss))
+            #loss = criterion(outputs, labels)
             loss.backward()
 
             # Perform gradient clipping
@@ -312,9 +330,12 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
 
 
 def mnist_basic_recognition():
-    batch_size = 256
-    train_loader = data_preprocessing.load_mnist.get_train_loader(batch_size)
-    test_loader = data_preprocessing.load_mnist.get_test_loader(batch_size)
+    batch_size = 2
+    number_of_digits_per_example = 1
+    train_loader = data_preprocessing.load_mnist.\
+        get_multi_digit_train_loader_fixed_length(batch_size, number_of_digits_per_example)
+    test_loader = data_preprocessing.load_mnist.\
+        get_multi_digit_test_loader_fixed_length(batch_size, number_of_digits_per_example)
 
     # test_mdrnn_cell()
     #test_mdrnn()
@@ -327,37 +348,6 @@ def mnist_basic_recognition():
     #batch_size = 128
 
     compute_multi_directional = True
-    # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
-    use_dropout = False
-
-    # TODO: Add gradient clipping? This might also make training more stable?
-    # Interesting link with tips on how to fix training:
-    # https://blog.slavv.com/37-reasons-why-your-neural-network-is-not-working-4020854bd607
-    # https://discuss.pytorch.org/t/about-torch-nn-utils-clip-grad-norm/13873
-    # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191
-
-    input_size = SizeTwoDimensional.create_size_two_dimensional(input_height, input_width)
-    #with torch.autograd.profiler.profile(use_cuda=False) as prof:
-    train_mdrnn(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,  compute_multi_directional, use_dropout)
-    #print(prof)
-
-
-def cifar_ten_basic_recognition():
-    batch_size = 256
-    train_loader = data_preprocessing.load_cifar_ten.get_train_loader(batch_size)
-    test_loader = data_preprocessing.load_cifar_ten.get_test_loader(batch_size)
-
-    # test_mdrnn_cell()
-    #test_mdrnn()
-    input_height = 32
-    input_width = 32
-    input_channels = 3
-    hidden_states_size = 32
-    # https://stackoverflow.com/questions/45027234/strange-loss-curve-while-training-lstm-with-keras
-    # Possibly a batch size of 128 leads to more instability in training?
-    #batch_size = 128
-
-    compute_multi_directional = False
     # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
     use_dropout = False
 

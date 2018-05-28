@@ -36,6 +36,9 @@ class BlockMultiDimensionalLSTMLayerPair(Module):
     def get_output_size_two_dimensional(self, input_size: SizeTwoDimensional):
         return self.block_strided_convolution.get_output_size_two_dimensional(input_size)
 
+    def get_number_of_output_channels(self):
+        return self.block_strided_convolution.output_channels
+
     def set_training(self, training):
         self.block_multi_dimensional_lstm.set_training(training)
 
