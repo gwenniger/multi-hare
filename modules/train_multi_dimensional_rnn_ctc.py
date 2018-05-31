@@ -155,7 +155,8 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     # device_ids should include device!
     # device_ids lists all the gpus that may be used for parallelization
     # device is the initial device the model will be put on
-    device_ids = [0, 1]
+    # device_ids = [0, 1]
+    device_ids = [0]
 
     # multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(input_channels,
     #                                                                                 hidden_states_size,
@@ -231,6 +232,8 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
         #      "parallel_hidden_state_column_computation.parallel_convolution.bias :"
         #      + str(multi_dimensional_rnn.module.mdlstm_direction_one_parameters.
         #            parallel_hidden_state_column_computation.parallel_convolution.bias))
+    else:
+        raise RuntimeError("CUDA not available")
 
     print_number_of_parameters(multi_dimensional_rnn)
 
@@ -267,8 +270,10 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
 
             # wrap them in Variable
             # labels = Variable(labels)  # Labels need no gradient apparently
-            if Utils.use_cuda():
-                labels = labels.to(device)
+            #if Utils.use_cuda():
+
+            # Labels must remain on CPU for warp-ctc loss
+            # labels = labels.to(device)
 
             # zero the parameter gradients
             optimizer.zero_grad()
@@ -280,10 +285,10 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
             #outputs = multi_dimensional_rnn(Variable(inputs))  # For "Net" (Le Net)
             outputs = network(inputs)
 
-            print(">>> outputs.size(): " + str(outputs.size()))
+            # print(">>> outputs.size(): " + str(outputs.size()))
 
-            print(">>> labels.size() : " + str(labels.size()))
-            print("labels: " + str(labels))
+            # print(">>> labels.size() : " + str(labels.size()))
+            # print("labels: " + str(labels))
             #warp_ctc_loss_interface.
             #print(">>> labels_one_dimensional.size() : " + str(labels_one_dimensional.size()))
             #print("labels_one_dimensional: " + str(labels_one_dimensional))
@@ -292,7 +297,7 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
             # print("outputs: " + str(outputs))
             # print("outputs.size(): " + str(outputs.size()))
             #print("labels: " + str(labels))
-            loss = warp_ctc_loss_interface.compute_ctc_loss(outputs, labels)
+            loss = warp_ctc_loss_interface.compute_ctc_loss(outputs, labels, batch_size)
             print("loss: " + str(loss))
             #loss = criterion(outputs, labels)
             loss.backward()
@@ -330,8 +335,8 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
 
 
 def mnist_basic_recognition():
-    batch_size = 2
-    number_of_digits_per_example = 1
+    batch_size = 128
+    number_of_digits_per_example = 2
     train_loader = data_preprocessing.load_mnist.\
         get_multi_digit_train_loader_fixed_length(batch_size, number_of_digits_per_example)
     test_loader = data_preprocessing.load_mnist.\

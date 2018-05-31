@@ -167,6 +167,8 @@ def test_ctc_loss_probabilities_match_labels_second_baidu_example():
                                 [11, 12, 13, 14, 15]]]).\
         transpose(0, 1).contiguous()
 
+    probs.requires_grad_(True)
+
     print("probs.size(): " + str(probs.size()))
 
     labels = Variable(torch.IntTensor([3, 3]))
@@ -507,7 +509,6 @@ def test_ctc_loss_probabilities_match_labels_three():
     print("update probabilities...")
     optimizer.step()
     print("probs: " + str(probs))
-
 
 
 def main():
