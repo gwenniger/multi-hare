@@ -216,27 +216,47 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
     def forward(self, x):
         activations = self.multi_dimensional_rnn(x)
         batch_size = activations.size(0)
-        print(">>> activations.size(): " + str(activations.size()))
+        # print(">>> activations.size(): " + str(activations.size()))
+        # print("activations: " + str(activations))
 
         if activations.size(2) != 1:
             raise RuntimeError("Error: the height dimension of returned activations should be of size 1")
         activations_height_removed = activations.squeeze(2)
         activations_with_swapped_channels_and_width = activations_height_removed.transpose(1, 2)
-        print(">>> activations_with_swapped_channels_and_width.size(): " +
-              str(activations_with_swapped_channels_and_width.size()))
+        # print(">>> activations_with_swapped_channels_and_width.size(): " +
+        #      str(activations_with_swapped_channels_and_width.size()))
         activations_resized_one_dimensional = activations_with_swapped_channels_and_width.contiguous().\
             view(-1, self.number_of_output_channels)
+
+        # print("activations_resized_one_dimensional: " + str(activations_resized_one_dimensional))
         class_activations = self.fc3(activations_resized_one_dimensional)
+        # print("class_activations: " + str(class_activations))
         class_activations_resized = class_activations.view(batch_size, -1,
                                                              self.get_number_of_classes_including_blank())
-        print(">>> class_activations_resized.size(): " +
-              str(class_activations_resized.size()))
+        # print("class_activations.size(): " + str(class_activations.size()))
 
-        print(">>> MultiDimensionalRNNToSoftMaxNetwork.forward.class activations: " + str(class_activations))
+        # print("class_activation_resized: " + str(class_activations_resized))
+        # print(">>> class_activations_resized.size(): " +
+        #      str(class_activations_resized.size()))
+
+        # print(">>> MultiDimensionalRNNToSoftMaxNetwork.forward.class activations: " + str(class_activations))
         # The dimension along which softmax must make probabilities to sum to one is the classes dimension
         probabilities_sum_to_one_dimension = 2
-        result = torch.nn.functional.log_softmax(class_activations_resized, probabilities_sum_to_one_dimension)
-        print(">>> MultiDimensionalRNNToSoftMaxNetwork.forward.result: " + str(result))
+        # result = torch.nn.functional.log_softmax(class_activations_resized, probabilities_sum_to_one_dimension)
+        # result = torch.nn.functional.softmax(class_activations_resized, probabilities_sum_to_one_dimension)
+
+        # https://github.com/SeanNaren/deepspeech.pytorch/issues/136
+        # "SeanNaren:
+        # warp-ctc does the softmax in the function,
+        # which is why we have this inference based softmax added to the network!"
+        # Don't compute softmax
+        result = class_activations_resized
+
+        # print(">>> MultiDimensionalRNNToSoftMaxNetwork.forward.result: " + str(result))
+
+        soft_max_activations_summed = torch.sum(result, dim=probabilities_sum_to_one_dimension)
+        # print(">>> MultiDimensionalRNNToSoftMaxNetwork.forward - soft_max_activations_summed: " + str(soft_max_activations_summed))
+
         return result
 
 

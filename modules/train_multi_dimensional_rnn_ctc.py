@@ -119,7 +119,7 @@ def clip_gradient(model):
 
     if total_norm > max_norm:
         made_gradient_norm_based_correction = True
-        print("Made gradient norm based correction. total norm: " + str(total_norm))
+        # print("Made gradient norm based correction. total norm: " + str(total_norm))
 
     # Clipping the gradient value is an alternative to clipping the gradient norm,
     # and seems to be more effective
@@ -241,10 +241,17 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
 
 
     # Adding some weight decay seems to do magic, see: http://pytorch.org/docs/master/optim.html
-    optimizer = optim.SGD(network.parameters(), lr=0.001, momentum=0.9, weight_decay=1e-5)
+    # optimizer = optim.SGD(network.parameters(), lr=0.001, momentum=0.9, weight_decay=1e-5)
 
     # Faster learning
-    #optimizer = optim.SGD(multi_dimensional_rnn.parameters(), lr=0.01, momentum=0.9)
+    # optimizer = optim.SGD(multi_dimensional_rnn.parameters(), lr=0.01, momentum=0.9)
+
+
+    # https://github.com/SeanNaren/deepspeech.pytorch/blob/master/train.py
+    ### Reducing the learning rate seems to reduce the infinite loss problem
+    ### https://github.com/baidu-research/warp-ctc/issues/51
+    optimizer = optim.SGD(network.parameters(), lr=0.00001, momentum=0.9, weight_decay=1e-5,
+                          nesterov=True)
 
     start = time.time()
 
@@ -253,7 +260,7 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     #ctc_loss = warpctc_pytorch.CTCLoss()
     warp_ctc_loss_interface = WarpCTCLossInterface.create_warp_ctc_loss_interface()
 
-    for epoch in range(4):  # loop over the dataset multiple times
+    for epoch in range(10):  # loop over the dataset multiple times
 
         running_loss = 0.0
         for i, data in enumerate(train_loader, 0):
@@ -297,8 +304,25 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
             # print("outputs: " + str(outputs))
             # print("outputs.size(): " + str(outputs.size()))
             #print("labels: " + str(labels))
-            loss = warp_ctc_loss_interface.compute_ctc_loss(outputs, labels, batch_size)
-            print("loss: " + str(loss))
+            number_of_examples = inputs.size(0)
+            loss = warp_ctc_loss_interface.compute_ctc_loss(outputs, labels, number_of_examples )
+
+
+            # See: https://github.com/SeanNaren/deepspeech.pytorch/blob/master/train.py
+            # The averaging seems to help learning
+            loss = loss / inputs.size(0)  # average the loss by minibatch size
+
+            loss_sum = loss.data.sum()
+            inf = float("inf")
+            if loss_sum == inf or loss_sum == -inf:
+                print("WARNING: received an inf loss, setting loss value to 0")
+                loss_value = 0
+            else:
+                loss_value = loss.item()
+
+
+
+            # print("loss: " + str(loss))
             #loss = criterion(outputs, labels)
             loss.backward()
 
@@ -307,12 +331,13 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
             if made_gradient_norm_based_correction:
                 num_gradient_corrections += 1
 
-            optimizer.step()
+            if not (loss_sum == inf or loss_sum == -inf):
+                optimizer.step()
 
             # print statistics
             # print("loss.data: " + str(loss.data))
             # print("loss.data[0]: " + str(loss.data[0]))
-            running_loss += loss.data
+            running_loss += loss_value
             #if i % 2000 == 1999:  # print every 2000 mini-batches
             # See: https://stackoverflow.com/questions/5598181/python-multiple-prints-on-the-same-line
             #print(str(i)+",", end="", flush=True)
@@ -335,7 +360,7 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
 
 
 def mnist_basic_recognition():
-    batch_size = 128
+    batch_size = 32
     number_of_digits_per_example = 2
     train_loader = data_preprocessing.load_mnist.\
         get_multi_digit_train_loader_fixed_length(batch_size, number_of_digits_per_example)
