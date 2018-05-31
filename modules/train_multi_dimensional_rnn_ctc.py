@@ -309,8 +309,9 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
 
 
             # See: https://github.com/SeanNaren/deepspeech.pytorch/blob/master/train.py
-            # The averaging seems to help learning
-            loss = loss / inputs.size(0)  # average the loss by minibatch size
+            # The averaging seems to help learning (but a smaller learning rate
+            # might have the same effect!)
+            # loss = loss / inputs.size(0)  # average the loss by minibatch size
 
             loss_sum = loss.data.sum()
             inf = float("inf")
@@ -331,8 +332,8 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
             if made_gradient_norm_based_correction:
                 num_gradient_corrections += 1
 
-            if not (loss_sum == inf or loss_sum == -inf):
-                optimizer.step()
+            #if not (loss_sum == inf or loss_sum == -inf):
+            optimizer.step()
 
             # print statistics
             # print("loss.data: " + str(loss.data))
@@ -360,7 +361,7 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
 
 
 def mnist_basic_recognition():
-    batch_size = 32
+    batch_size = 128
     number_of_digits_per_example = 2
     train_loader = data_preprocessing.load_mnist.\
         get_multi_digit_train_loader_fixed_length(batch_size, number_of_digits_per_example)
