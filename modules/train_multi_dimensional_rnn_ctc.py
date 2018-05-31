@@ -311,7 +311,7 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
             # See: https://github.com/SeanNaren/deepspeech.pytorch/blob/master/train.py
             # The averaging seems to help learning (but a smaller learning rate
             # might have the same effect!)
-            # loss = loss / inputs.size(0)  # average the loss by minibatch size
+            loss = loss / inputs.size(0)  # average the loss by minibatch size
 
             loss_sum = loss.data.sum()
             inf = float("inf")
