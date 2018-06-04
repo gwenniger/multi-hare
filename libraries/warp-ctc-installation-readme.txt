@@ -21,3 +21,18 @@ https://stackoverflow.com/questions/913701/changing-remote-repository-for-a-git-
 ===
 Fixing problems with detached head state in the cloned repository:
 https://stackoverflow.com/questions/18770545/why-is-my-git-submodule-head-detached-from-master
+
+==== 
+CTC Decoder:
+
+A decoder for the output of a network trained with warp-ctc loss is 
+available from:
+https://github.com/parlance/ctcdecode
+cloned into
+https://github.com/gwenniger/ctcdecode.git
+
+Other code CTC decoder code is available in
+https://github.com/SeanNaren/deepspeech.pytorch
+which borrows the ctcdecode from the parlance repository 
+for implementing the beam decoder.
+
