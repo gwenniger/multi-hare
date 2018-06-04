@@ -250,8 +250,15 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     # https://github.com/SeanNaren/deepspeech.pytorch/blob/master/train.py
     ### Reducing the learning rate seems to reduce the infinite loss problem
     ### https://github.com/baidu-research/warp-ctc/issues/51
-    optimizer = optim.SGD(network.parameters(), lr=0.00001, momentum=0.9, weight_decay=1e-5,
-                          nesterov=True)
+    #optimizer = optim.SGD(network.parameters(), lr=0.00001, momentum=0.9, weight_decay=1e-5,
+    #                      nesterov=True)
+    #optimizer = optim.SGD(network.parameters(), lr=0.000005, momentum=0.9, weight_decay=1e-5,
+    #                      nesterov=True)
+
+    # Adam seems to be more robust against the infinite losses problem during weight
+    # optimization, see:
+    # https://github.com/SeanNaren/warp-ctc/issues/29
+    optimizer = optim.Adam(network.parameters(), lr=0.00001, weight_decay=1e-5)
 
     start = time.time()
 
@@ -260,7 +267,7 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     #ctc_loss = warpctc_pytorch.CTCLoss()
     warp_ctc_loss_interface = WarpCTCLossInterface.create_warp_ctc_loss_interface()
 
-    for epoch in range(10):  # loop over the dataset multiple times
+    for epoch in range(20):  # loop over the dataset multiple times
 
         running_loss = 0.0
         for i, data in enumerate(train_loader, 0):

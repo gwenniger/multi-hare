@@ -198,6 +198,9 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         print(">>> number_of_output_channels: " + str(self.number_of_output_channels))
 
         self.fc3 = nn.Linear(self.number_of_output_channels, self.get_number_of_classes_including_blank())
+        # Initialize the linear output layer with Xavier uniform  weights
+        torch.nn.init.xavier_normal_(self.fc3.weight)
+        #torch.nn.init.xavier_uniform_(self.fc3.weight)
         # print("self.fc3 : " + str(self.fc3))
         # print("self.fc3.weight: " + str(self.fc3.weight))
         # print("self.fc3.bias: " + str(self.fc3.bias))
