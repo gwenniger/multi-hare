@@ -21,6 +21,7 @@ class WarpCTCLossInterface:
     @staticmethod
     def create_one_dimensional_labels_tensor(labels_row_tensor):
         labels_one_dimensional = labels_row_tensor.view(-1)
+        # print("labels_one_dimensional: " + str(labels_one_dimensional))
         return labels_one_dimensional
 
     @staticmethod
@@ -92,7 +93,8 @@ class WarpCTCLossInterface:
     # 0: batch size, 1: sequence length, 2: number of symbol types + 1 (for blank)
 
     def compute_ctc_loss(self, probabilities, labels_row_tensor, batch_size):
-        labels = Variable(WarpCTCLossInterface.create_one_dimensional_labels_tensor(labels_row_tensor))
+        labels = Variable(WarpCTCLossInterface.
+                          create_one_dimensional_labels_tensor(labels_row_tensor))
         label_sizes = Variable(WarpCTCLossInterface.\
             create_sequence_lengths_specification_tensor_all_same_length(labels_row_tensor))
         probabilities_sizes = Variable(WarpCTCLossInterface.\

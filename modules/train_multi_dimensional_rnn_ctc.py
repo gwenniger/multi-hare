@@ -17,6 +17,8 @@ from util.utils import Utils
 from modules.size_two_dimensional import SizeTwoDimensional
 import warpctc_pytorch
 from ctc_loss.warp_ctc_loss_interface import WarpCTCLossInterface
+import ctcdecode
+
 
 def test_mdrnn_cell():
     print("Testing the MultDimensionalRNN Cell... ")
@@ -60,7 +62,26 @@ def print_number_of_parameters(model):
     print("total parameters: " + str(total_parameters))
 
 
-def evaluate_mdrnn(test_loader, multi_dimensional_rnn, batch_size, device):
+# Note that if seq_len=0 then the result will always be the empty String
+def convert_to_string(tokens, vocab, seq_len):
+    print("convert_to_string - tokens: " + str(tokens))
+    print("convert_to_string - vocab: " + str(vocab))
+    print("convert_to_string - seq_len: " + str(seq_len))
+    result = ''.join([vocab[x] for x in tokens[0:seq_len]])
+    print("convert_to_string - result: " + str(result))
+    return result
+
+
+def convert_labels_tensor_to_string(labels: torch.Tensor):
+    labels_as_list = labels.data.tolist()
+    result = ""
+    for i in range(0, labels.size(0)):
+        result = result + str(labels_as_list[i])
+    return result
+
+
+def evaluate_mdrnn(test_loader, multi_dimensional_rnn, batch_size, device,
+                   vocab_list):
 
     correct = 0
     total = 0
@@ -74,12 +95,46 @@ def evaluate_mdrnn(test_loader, multi_dimensional_rnn, batch_size, device):
 
         #outputs = multi_dimensional_rnn(Variable(images))  # For "Net" (Le Net)
         outputs = multi_dimensional_rnn(images)
-        _, predicted = torch.max(outputs.data, 1)
+
+        probabilities_sum_to_one_dimension = 2
+        # Outputs is the output of the linear layer which is the input to warp_ctc
+        # But to get probabilities for the decoder, the softmax function needs to
+        # be applied to the outputs
+        probabilities = torch.nn.functional.\
+            softmax(outputs, probabilities_sum_to_one_dimension)
+
+        print(">>> evaluate_mdrnn  - outputs.size: " + str(outputs.size()))
+        print(">>> evaluate_mdrnn  - probabilities.size: " + str(probabilities.size()))
+
+        beam_size = 20
+        print(">>> evaluate_mdrnn  - len(vocab_list: " + str(len(vocab_list)))
+        decoder = ctcdecode.CTCBeamDecoder(vocab_list, beam_width=beam_size,
+                                           blank_id=vocab_list.index('_'))
+        beam_results, beam_scores, timesteps, out_seq_len = \
+            decoder.decode(probabilities.data)
+        print(">>> evaluate_mdrnn  - beam_results: " + str(beam_results))
+
         total += labels.size(0)
-        correct += (predicted == labels).sum()
+
+        for example_index in range(0, beam_results.size(0)):
+            beam_results_sequence = beam_results[example_index][0]
+            print("beam_results_sequence: \"" + str(beam_results_sequence) + "\"")
+            output_string = convert_to_string(beam_results_sequence,
+                                              vocab_list, out_seq_len[example_index][0])
+            example_labels = labels[example_index]
+            print(">>> evaluate_mdrnn  - output_string: " + output_string)
+            print(">>> evaluate_mdrnn  - example_labels: " + str(example_labels))
+            example_labels_string = convert_labels_tensor_to_string(example_labels)
+            print(">>> evaluate_mdrnn  - example_labels_string: " + example_labels_string)
+
+            if example_labels_string == output_string:
+                print("Yaaaaah, got one correct!!!")
+                correct += 1
+
+        #correct += (predicted == labels).sum()
 
     print('Accuracy of the network on the 10000 test images: %d %%' % (
-            100 * correct / total))
+            float(100 * correct) / total))
 
 
 def clip_gradient(model):
@@ -129,8 +184,22 @@ def clip_gradient(model):
     return made_gradient_norm_based_correction
 
 
+# Method takes a tensor of labels starting from 0 and increases
+# all elements by one to get a tensor of labels starting form 1
+def create_labels_starting_from_one(labels):
+    y = torch.IntTensor([1])
+    # Increase all labels by 1. This is because 0 is reserved for
+    # the blank label in the warp_ctc_interface, so labels inside
+    # this interface are expected to start from 1
+    # See also: https://discuss.pytorch.org/t/adding-a-scalar/218
+    labels_starting_from_one = labels + y.expand_as(labels)
+
+    return labels_starting_from_one
+
+
 def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: SizeTwoDimensional, hidden_states_size: int, batch_size,
-                compute_multi_directional: bool, use_dropout: bool):
+                compute_multi_directional: bool, use_dropout: bool,
+                vocab_list: list):
     import torch.optim as optim
 
     criterion = nn.CrossEntropyLoss()
@@ -164,7 +233,6 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     #                                                                                 use_dropout,
     #                                                                                 nonlinearity="sigmoid")
 
-    mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
     # multi_dimensional_rnn = BlockMultiDimensionalLSTM.create_block_multi_dimensional_lstm(input_channels,
     #                                                                                       hidden_states_size,
     #                                                                                       mdlstm_block_size,
@@ -203,6 +271,7 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     #                                                                       block_strided_convolution_block_size)
     #
     mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
+    # mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
     block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
     multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking.\
         create_two_layer_pair_network(hidden_states_size, mdlstm_block_size,
@@ -258,7 +327,12 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     # Adam seems to be more robust against the infinite losses problem during weight
     # optimization, see:
     # https://github.com/SeanNaren/warp-ctc/issues/29
+    # If the learning rate is too large, then for some reason the loss increases
+    # after some epoch and then from that point onwards keeps increasing
+    # But the largest learning rate that still works also seems on things like
+    # the relative length of the output sequence
     optimizer = optim.Adam(network.parameters(), lr=0.00001, weight_decay=1e-5)
+#    optimizer = optim.Adam(network.parameters(), lr=0.000001, weight_decay=1e-5)
 
     start = time.time()
 
@@ -267,13 +341,17 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     #ctc_loss = warpctc_pytorch.CTCLoss()
     warp_ctc_loss_interface = WarpCTCLossInterface.create_warp_ctc_loss_interface()
 
-    for epoch in range(20):  # loop over the dataset multiple times
+    for epoch in range(5):  # loop over the dataset multiple times
 
         running_loss = 0.0
         for i, data in enumerate(train_loader, 0):
 
             # get the inputs
             inputs, labels = data
+
+            # Increase all labels by one, since that is the format
+            # expected by warp_ctc, which reserves the 0 label for blanks
+            labels = create_labels_starting_from_one(labels)
 
             if Utils.use_cuda():
                 inputs = inputs.to(device)
@@ -364,12 +442,15 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     # Run evaluation
     # multi_dimensional_rnn.set_training(False) # Normal case
     network.module.set_training(False)  # When using DataParallel
-    evaluate_mdrnn(test_loader, network, batch_size, device)
+    evaluate_mdrnn(test_loader, network, batch_size, device, vocab_list)
 
 
 def mnist_basic_recognition():
     batch_size = 128
     number_of_digits_per_example = 2
+    # In MNIST there are the digits 0-9, and we also add a symbol for blanks
+    # This vocab_list will be used by the decoder
+    vocab_list = list(['_', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'])
     train_loader = data_preprocessing.load_mnist.\
         get_multi_digit_train_loader_fixed_length(batch_size, number_of_digits_per_example)
     test_loader = data_preprocessing.load_mnist.\
@@ -397,7 +478,8 @@ def mnist_basic_recognition():
 
     input_size = SizeTwoDimensional.create_size_two_dimensional(input_height, input_width)
     #with torch.autograd.profiler.profile(use_cuda=False) as prof:
-    train_mdrnn(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,  compute_multi_directional, use_dropout)
+    train_mdrnn(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
+                compute_multi_directional, use_dropout, vocab_list)
     #print(prof)
 
 
