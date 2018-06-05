@@ -93,6 +93,18 @@ class WarpCTCLossInterface:
     # 0: batch size, 1: sequence length, 2: number of symbol types + 1 (for blank)
 
     def compute_ctc_loss(self, probabilities, labels_row_tensor, batch_size):
+
+        number_of_labels = labels_row_tensor.view(-1).size(0)
+        non_zeros = torch.nonzero(labels_row_tensor.view(-1).data).squeeze()
+        number_of_zero_labels = number_of_labels - non_zeros.size(0)
+
+        # A sanity check to make sure the labels_row_tensor does not contain zeros,
+        # which was an error in past usage
+        if number_of_zero_labels != 0:
+            raise RuntimeError("Error: label_row_tensor contains zero labels" +
+                               " only non-zero labels are allowed, since the 0 " +
+                               "label is reserved for blanks")
+
         labels = Variable(WarpCTCLossInterface.
                           create_one_dimensional_labels_tensor(labels_row_tensor))
         label_sizes = Variable(WarpCTCLossInterface.\
