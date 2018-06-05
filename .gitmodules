@@ -1,3 +1,6 @@
 [submodule "libraries/warp-ctc"]
 	path = libraries/warp-ctc
 	url = https://github.com/gwenniger/warp-ctc.git
+[submodule "libraries/ctcdecode"]
+	path = libraries/ctcdecode
+	url = https://github.com/gwenniger/ctcdecode.git
