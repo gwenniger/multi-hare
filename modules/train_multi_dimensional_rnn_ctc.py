@@ -81,7 +81,7 @@ def convert_labels_tensor_to_string(labels: torch.Tensor):
 
 
 def evaluate_mdrnn(test_loader, multi_dimensional_rnn, batch_size, device,
-                   vocab_list):
+                   vocab_list, max_num_digits: int):
 
     correct = 0
     total = 0
@@ -109,9 +109,22 @@ def evaluate_mdrnn(test_loader, multi_dimensional_rnn, batch_size, device,
         beam_size = 20
         print(">>> evaluate_mdrnn  - len(vocab_list: " + str(len(vocab_list)))
         decoder = ctcdecode.CTCBeamDecoder(vocab_list, beam_width=beam_size,
-                                           blank_id=vocab_list.index('_'))
+                                           blank_id=vocab_list.index('_'),
+                                           num_processes=16)
+        label_sizes = WarpCTCLossInterface.\
+            create_sequence_lengths_specification_tensor_different_lengths(labels)
+        # The sequence lengths are determined using the label_sizes, under the assumption
+        # that each label has a fixed number of output rows.
+        # TODO: Using pack_padded_sequence, it should be possible to pad the input
+        # with -1 rather than 0, since the padding is supposedly not processed when
+        # pack_padded_sequence is used. This would allow to directly determine the lengths
+        # from the image input, which is better, as it does not require a fixed relation
+        # between sequence length and number of rows (which may often not hold)
+        sequence_lengths = WarpCTCLossInterface.create_probabilities_lengths_specification_tensor_different_lengths(
+            probabilities, label_sizes, max_num_digits)
+        print(">>> evaluate_mdrnn  -  sequence lengths: " + str(sequence_lengths))
         beam_results, beam_scores, timesteps, out_seq_len = \
-            decoder.decode(probabilities.data)
+            decoder.decode(probabilities.data, sequence_lengths)
         print(">>> evaluate_mdrnn  - beam_results: " + str(beam_results))
 
         total += labels.size(0)
@@ -121,7 +134,9 @@ def evaluate_mdrnn(test_loader, multi_dimensional_rnn, batch_size, device,
             print("beam_results_sequence: \"" + str(beam_results_sequence) + "\"")
             output_string = convert_to_string(beam_results_sequence,
                                               vocab_list, out_seq_len[example_index][0])
-            example_labels = labels[example_index]
+            example_labels_with_padding = labels[example_index]
+            # Extract the real example labels, removing the padding labels
+            example_labels = example_labels_with_padding[0:label_sizes[example_index]]
             print(">>> evaluate_mdrnn  - output_string: " + output_string)
             print(">>> evaluate_mdrnn  - example_labels: " + str(example_labels))
             example_labels_string = convert_labels_tensor_to_string(example_labels)
@@ -131,7 +146,7 @@ def evaluate_mdrnn(test_loader, multi_dimensional_rnn, batch_size, device,
                 print("Yaaaaah, got one correct!!!")
                 correct += 1
 
-        #correct += (predicted == labels).sum()
+        # correct += (predicted == labels).sum()
 
     print('Accuracy of the network on the 10000 test images: %d %%' % (
             float(100 * correct) / total))
@@ -199,7 +214,7 @@ def create_labels_starting_from_one(labels):
 
 def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: SizeTwoDimensional, hidden_states_size: int, batch_size,
                 compute_multi_directional: bool, use_dropout: bool,
-                vocab_list: list):
+                vocab_list: list, max_num_digits: int):
     import torch.optim as optim
 
     criterion = nn.CrossEntropyLoss()
@@ -341,7 +356,7 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     #ctc_loss = warpctc_pytorch.CTCLoss()
     warp_ctc_loss_interface = WarpCTCLossInterface.create_warp_ctc_loss_interface()
 
-    for epoch in range(5):  # loop over the dataset multiple times
+    for epoch in range(2):  # loop over the dataset multiple times
 
         running_loss = 0.0
         for i, data in enumerate(train_loader, 0):
@@ -390,7 +405,10 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
             # print("outputs.size(): " + str(outputs.size()))
             #print("labels: " + str(labels))
             number_of_examples = inputs.size(0)
-            loss = warp_ctc_loss_interface.compute_ctc_loss(outputs, labels, number_of_examples )
+            loss = warp_ctc_loss_interface.compute_ctc_loss(outputs,
+                                                            labels,
+                                                            number_of_examples,
+                                                            max_num_digits)
 
 
             # See: https://github.com/SeanNaren/deepspeech.pytorch/blob/master/train.py
@@ -442,10 +460,10 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     # Run evaluation
     # multi_dimensional_rnn.set_training(False) # Normal case
     network.module.set_training(False)  # When using DataParallel
-    evaluate_mdrnn(test_loader, network, batch_size, device, vocab_list)
+    evaluate_mdrnn(test_loader, network, batch_size, device, vocab_list, max_num_digits)
 
 
-def mnist_basic_recognition():
+def mnist_recognition_fixed_length():
     batch_size = 128
     number_of_digits_per_example = 2
     # In MNIST there are the digits 0-9, and we also add a symbol for blanks
@@ -483,8 +501,48 @@ def mnist_basic_recognition():
     #print(prof)
 
 
+def mnist_recognition_variable_length():
+    batch_size = 128
+    min_num_digits = 1
+    max_num_digits = 2
+    # In MNIST there are the digits 0-9, and we also add a symbol for blanks
+    # This vocab_list will be used by the decoder
+    vocab_list = list(['_', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'])
+    train_loader = data_preprocessing.load_mnist.\
+        get_multi_digit_train_loader_random_length(batch_size, min_num_digits, max_num_digits)
+    test_loader = data_preprocessing.load_mnist.\
+        get_multi_digit_test_loader_random_length(batch_size, min_num_digits, max_num_digits)
+
+    # test_mdrnn_cell()
+    #test_mdrnn()
+    input_height = 16
+    input_width = 16
+    input_channels = 1
+    hidden_states_size = 32
+    # https://stackoverflow.com/questions/45027234/strange-loss-curve-while-training-lstm-with-keras
+    # Possibly a batch size of 128 leads to more instability in training?
+    #batch_size = 128
+
+    compute_multi_directional = True
+    # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
+    use_dropout = False
+
+    # TODO: Add gradient clipping? This might also make training more stable?
+    # Interesting link with tips on how to fix training:
+    # https://blog.slavv.com/37-reasons-why-your-neural-network-is-not-working-4020854bd607
+    # https://discuss.pytorch.org/t/about-torch-nn-utils-clip-grad-norm/13873
+    # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191
+
+    input_size = SizeTwoDimensional.create_size_two_dimensional(input_height, input_width)
+    #with torch.autograd.profiler.profile(use_cuda=False) as prof:
+    train_mdrnn(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
+                compute_multi_directional, use_dropout, vocab_list, max_num_digits)
+    #print(prof)
+
+
 def main():
-    mnist_basic_recognition()
+    # mnist_recognition_fixed_length()
+    mnist_recognition_variable_length()
     #cifar_ten_basic_recognition()
 
 

@@ -17,12 +17,15 @@ class WarpCTCLossInterface:
     # This method takes a tensor of size batch_size * sequence_length
     # that is, every row is a sequence of labels for an example
     # It then returns a one-dimensional label tensor formed by
-    # concatenating all the row tensors
+    # concatenating all the row tensors, and removing padding labels,
+    # which have negative values
     @staticmethod
-    def create_one_dimensional_labels_tensor(labels_row_tensor):
+    def create_one_dimensional_labels_tensor_removing_padding_labels(labels_row_tensor):
         labels_one_dimensional = labels_row_tensor.view(-1)
         # print("labels_one_dimensional: " + str(labels_one_dimensional))
-        return labels_one_dimensional
+        mask = labels_one_dimensional.ge(0)
+        elements_greater_or_equal_than_zero = torch.masked_select(labels_one_dimensional, mask)
+        return elements_greater_or_equal_than_zero
 
     @staticmethod
     def create_sequence_lengths_specification_tensor_all_same_length(labels_row_tensor):
@@ -35,11 +38,51 @@ class WarpCTCLossInterface:
         return result
 
     @staticmethod
+    def get_real_label_sequence_length(label_row_tensor_slice):
+        mask = label_row_tensor_slice.ge(0)
+        elements_greater_or_equal_than_zero = torch.masked_select(label_row_tensor_slice, mask)
+        # print("warp_ctc_loss_interface - elements_greater_or_equal_than_zero: " +
+        #      str(elements_greater_or_equal_than_zero))
+        result = elements_greater_or_equal_than_zero.size(0)
+        # print("warp_ctc_loss_interface - number of elements_greater_or_equal_than_zero: " +
+        #      str(result))
+        return result
+
+    @staticmethod
+    def create_sequence_lengths_specification_tensor_different_lengths(
+            labels_row_tensor_with_negative_values_for_padding):
+        number_of_examples = labels_row_tensor_with_negative_values_for_padding.size(0)
+        sequence_length = WarpCTCLossInterface.\
+            get_real_label_sequence_length(labels_row_tensor_with_negative_values_for_padding[0])
+        result = torch.IntTensor([sequence_length])
+        for i in range(1, number_of_examples):
+            sequence_length = WarpCTCLossInterface. \
+                get_real_label_sequence_length(labels_row_tensor_with_negative_values_for_padding[i])
+            result = torch.cat((result, torch.IntTensor([sequence_length])), 0)
+
+        return result
+
+    @staticmethod
     def create_probabilities_lengths_specification_tensor_all_same_length(probabilities):
         number_of_examples = probabilities.size(0)
         sequence_length = probabilities.size(1)
         result = torch.IntTensor([sequence_length])
         for i in range(1, number_of_examples):
+            result = torch.cat((result, torch.IntTensor([sequence_length])), 0)
+
+        return result
+
+    @staticmethod
+    def create_probabilities_lengths_specification_tensor_different_lengths(probabilities,
+                                                                            label_sizes,
+                                                                            max_sequence_length_within_batch: int):
+        number_of_examples = probabilities.size(0)
+        max_sequence_length_rows = probabilities.size(1)
+        rows_per_sequence_element = int(max_sequence_length_rows / max_sequence_length_within_batch)
+        sequence_length = label_sizes[0] * rows_per_sequence_element
+        result = torch.IntTensor([sequence_length])
+        for i in range(1, number_of_examples):
+            sequence_length = label_sizes[i] * rows_per_sequence_element
             result = torch.cat((result, torch.IntTensor([sequence_length])), 0)
 
         return result
@@ -92,7 +135,8 @@ class WarpCTCLossInterface:
     # Computes the ctc_loss for a probabilities tensor of dimensions:
     # 0: batch size, 1: sequence length, 2: number of symbol types + 1 (for blank)
 
-    def compute_ctc_loss(self, probabilities, labels_row_tensor, batch_size):
+    def compute_ctc_loss(self, probabilities, labels_row_tensor, batch_size: int,
+                         max_sequence_length_within_batch: int):
 
         number_of_labels = labels_row_tensor.view(-1).size(0)
         non_zeros = torch.nonzero(labels_row_tensor.view(-1).data).squeeze()
@@ -103,14 +147,21 @@ class WarpCTCLossInterface:
         if number_of_zero_labels != 0:
             raise RuntimeError("Error: label_row_tensor contains zero labels" +
                                " only non-zero labels are allowed, since the 0 " +
-                               "label is reserved for blanks")
+                               "label is reserved for blanks - labels_row_tensor: " +
+                               str(labels_row_tensor))
 
         labels = Variable(WarpCTCLossInterface.
-                          create_one_dimensional_labels_tensor(labels_row_tensor))
+                          create_one_dimensional_labels_tensor_removing_padding_labels(labels_row_tensor))
+        # label_sizes = Variable(WarpCTCLossInterface.\
+        #    create_sequence_lengths_specification_tensor_all_same_length(labels_row_tensor))
         label_sizes = Variable(WarpCTCLossInterface.\
-            create_sequence_lengths_specification_tensor_all_same_length(labels_row_tensor))
-        probabilities_sizes = Variable(WarpCTCLossInterface.\
-            create_probabilities_lengths_specification_tensor_all_same_length(probabilities))
+                               create_sequence_lengths_specification_tensor_different_lengths(labels_row_tensor))
+        # probabilities_sizes = Variable(WarpCTCLossInterface.\
+        #                               create_probabilities_lengths_specification_tensor_all_same_length(probabilities))
+        probabilities_sizes = \
+            Variable(WarpCTCLossInterface.
+                     create_probabilities_lengths_specification_tensor_different_lengths(
+                        probabilities, label_sizes, max_sequence_length_within_batch))
 
         # The ctc_loss interface expects the second dimension to be the batch size,
         # so the first and second dimension must be swapped

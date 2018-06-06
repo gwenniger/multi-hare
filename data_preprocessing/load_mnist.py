@@ -7,7 +7,10 @@ import matplotlib.pyplot as plt
 import torchvision
 from util.image_input_transformer import ImageInputTransformer
 from random import randint
+import torch.nn.functional
 
+IMAGE_HEIGHT = 16
+IMAGE_WIDTH = 16
 
 def get_train_set():
     # http://docs.python-guide.org/en/latest/writing/structure/
@@ -23,7 +26,7 @@ def get_train_set():
 
     # Scaling to size 32*32
     trans = transforms.Compose(
-        [transforms.Resize((16, 16)), transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
+        [transforms.Resize((IMAGE_HEIGHT, IMAGE_WIDTH)), transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
     # trans = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
     train_set = dset.MNIST(root=root, train=True, transform=trans, download=download)
     return train_set
@@ -45,7 +48,7 @@ def get_test_set():
 
     # Scaling to size 32*32
     trans = transforms.Compose(
-        [transforms.Resize((16, 16)), transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
+        [transforms.Resize((IMAGE_HEIGHT, IMAGE_WIDTH)), transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
     # trans = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
     test_set = dset.MNIST(root=root, train=False, transform=trans)
     return test_set
@@ -130,7 +133,24 @@ def get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_dig
 
         item_tensors_combined, item_labels_combined = get_item_tensors_and_labels_combined(
             data_set, i, sequence_length)
-        triples_train_set.append(tuple((item_tensors_combined, item_labels_combined)))
+        print("item_tensors_combined.size(): " + str(item_tensors_combined.size()))
+        print("item_labels_combined.size(): " + str(item_labels_combined.size()))
+
+        # https://pytorch.org/docs/master/nn.html#torch.nn.functional.pad
+        digits_padding_required = max_num_digits - sequence_length
+        columns_padding_required = digits_padding_required * IMAGE_WIDTH
+
+        p1d = (0, columns_padding_required)  # pad last dim by 1 on end side
+        item_tensors_combined_padded = torch.nn.functional.\
+            pad(item_tensors_combined, p1d, "constant", 0)
+        p1d = (0, digits_padding_required)  # pad last dim by 1 on end side
+        item_labels_combined_padded = torch.nn.functional.\
+            pad(item_labels_combined, p1d, "constant", -2)
+        print("item_tensors_combined_padded.size(): " + str(item_tensors_combined_padded.size()))
+        print("item_labels_combined_padded.size(): " + str(item_labels_combined_padded.size()))
+        print("item_labels_combined_padded: " + str(item_labels_combined_padded))
+
+        triples_train_set.append(tuple((item_tensors_combined_padded, item_labels_combined_padded)))
 
         #util.image_visualization.imshow(torchvision.utils.make_grid(item_tensors_combined))
         #plt.show()
@@ -154,13 +174,13 @@ def get_multi_digit_test_loader_fixed_length(batch_size, sequence_length):
 
 
 def get_multi_digit_train_loader_random_length(batch_size, min_num_digits, max_num_digits):
-    get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_digits,
-                                         get_train_set())
+    return get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_digits,
+                                                get_train_set())
 
 
 def get_multi_digit_test_loader_random_length(batch_size, min_num_digits, max_num_digits):
-    get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_digits,
-                                         get_test_set())
+    return get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_digits,
+                                                get_test_set())
 
 
 def get_train_loader(batch_size):
