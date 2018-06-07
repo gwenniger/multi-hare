@@ -113,6 +113,14 @@ def get_multi_digit_loader_fixed_length(batch_size, sequence_length,
     return train_loader
 
 
+def get_item_labels_with_probabilities_length_and_real_sequence_length(item_labels_combined_padded,
+                                                                       labels_sequence_length):
+    result = item_labels_combined_padded.clone()
+    probabilities_sequence_length = labels_sequence_length * IMAGE_WIDTH
+    result = torch.cat((result, torch.IntTensor([-probabilities_sequence_length])), 0)
+    result = torch.cat((result, torch.IntTensor([-labels_sequence_length])), 0)
+    return result
+
 # This data loader creates examples with elements that are concatenated
 # sequences of a random length of min_num_digits (including)
 # to max_num_digits (including) elements
@@ -146,6 +154,11 @@ def get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_dig
         p1d = (0, digits_padding_required)  # pad last dim by 1 on end side
         item_labels_combined_padded = torch.nn.functional.\
             pad(item_labels_combined, p1d, "constant", -2)
+        # Add the (negative) probabilities length at the end of the padded labels, so it can later
+        # be retrieved as the last item
+        item_labels_combined_padded = \
+            get_item_labels_with_probabilities_length_and_real_sequence_length(item_labels_combined_padded,
+                                                                                sequence_length)
         print("item_tensors_combined_padded.size(): " + str(item_tensors_combined_padded.size()))
         print("item_labels_combined_padded.size(): " + str(item_labels_combined_padded.size()))
         print("item_labels_combined_padded: " + str(item_labels_combined_padded))

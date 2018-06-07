@@ -81,7 +81,7 @@ def convert_labels_tensor_to_string(labels: torch.Tensor):
 
 
 def evaluate_mdrnn(test_loader, multi_dimensional_rnn, batch_size, device,
-                   vocab_list, max_num_digits: int):
+                   vocab_list, horizontal_reduction_factor: int):
 
     correct = 0
     total = 0
@@ -121,7 +121,7 @@ def evaluate_mdrnn(test_loader, multi_dimensional_rnn, batch_size, device,
         # from the image input, which is better, as it does not require a fixed relation
         # between sequence length and number of rows (which may often not hold)
         sequence_lengths = WarpCTCLossInterface.create_probabilities_lengths_specification_tensor_different_lengths(
-            probabilities, label_sizes, max_num_digits)
+            labels, horizontal_reduction_factor)
         print(">>> evaluate_mdrnn  -  sequence lengths: " + str(sequence_lengths))
         beam_results, beam_scores, timesteps, out_seq_len = \
             decoder.decode(probabilities.data, sequence_lengths)
@@ -207,9 +207,26 @@ def create_labels_starting_from_one(labels):
     # the blank label in the warp_ctc_interface, so labels inside
     # this interface are expected to start from 1
     # See also: https://discuss.pytorch.org/t/adding-a-scalar/218
-    labels_starting_from_one = labels + y.expand_as(labels)
+    #ones_with_last_two_elements_zero = y.expand_as(labels)
+    ones_with_last_two_elements_zero = torch.ones(labels.size(0), labels.size(1), dtype=torch.int)
+    # print("ones_with_last_two_elements_zero before: " + str(ones_with_last_two_elements_zero))
+    # The last two elements are not labels but the negative probabilities_sequence
+    # length and the negative labels_sequence length respectively. These last two
+    # values should be left unchanged
+    ones_with_last_two_elements_zero[:, ones_with_last_two_elements_zero.size(1) - 1] = 0
+    ones_with_last_two_elements_zero[:, ones_with_last_two_elements_zero.size(1) - 2] = 0
+    # print("ones_with_last_two_elements_zero: " + str(ones_with_last_two_elements_zero))
+    labels_starting_from_one = labels + ones_with_last_two_elements_zero
+    # print("labels_starting_from_one: " + str(labels_starting_from_one))
 
     return labels_starting_from_one
+
+
+# https://stackoverflow.com/questions/45384684/replace-all-nonzero-values-by-zero-and-all-zero-values-by-a-specific-value
+def replace_all_negative_values_by_zero(tensor):
+    result = tensor.clone()
+    result[tensor < 0] = 0
+    return result
 
 
 def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: SizeTwoDimensional, hidden_states_size: int, batch_size,
@@ -355,6 +372,7 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
 
     #ctc_loss = warpctc_pytorch.CTCLoss()
     warp_ctc_loss_interface = WarpCTCLossInterface.create_warp_ctc_loss_interface()
+    horizontal_reduction_factor = mdlstm_block_size.width * 2
 
     for epoch in range(2):  # loop over the dataset multiple times
 
@@ -363,6 +381,7 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
 
             # get the inputs
             inputs, labels = data
+
 
             # Increase all labels by one, since that is the format
             # expected by warp_ctc, which reserves the 0 label for blanks
@@ -405,10 +424,11 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
             # print("outputs.size(): " + str(outputs.size()))
             #print("labels: " + str(labels))
             number_of_examples = inputs.size(0)
+
             loss = warp_ctc_loss_interface.compute_ctc_loss(outputs,
                                                             labels,
                                                             number_of_examples,
-                                                            max_num_digits)
+                                                            horizontal_reduction_factor)
 
 
             # See: https://github.com/SeanNaren/deepspeech.pytorch/blob/master/train.py
@@ -460,7 +480,8 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     # Run evaluation
     # multi_dimensional_rnn.set_training(False) # Normal case
     network.module.set_training(False)  # When using DataParallel
-    evaluate_mdrnn(test_loader, network, batch_size, device, vocab_list, max_num_digits)
+    evaluate_mdrnn(test_loader, network, batch_size, device, vocab_list,
+                   horizontal_reduction_factor)
 
 
 def mnist_recognition_fixed_length():
