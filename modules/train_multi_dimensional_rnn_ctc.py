@@ -256,8 +256,8 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     # device_ids should include device!
     # device_ids lists all the gpus that may be used for parallelization
     # device is the initial device the model will be put on
-    # device_ids = [0, 1]
-    device_ids = [0]
+    device_ids = [0, 1]
+    # device_ids = [0]
 
     # multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(input_channels,
     #                                                                                 hidden_states_size,
@@ -374,7 +374,7 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     warp_ctc_loss_interface = WarpCTCLossInterface.create_warp_ctc_loss_interface()
     horizontal_reduction_factor = mdlstm_block_size.width * 2
 
-    for epoch in range(2):  # loop over the dataset multiple times
+    for epoch in range(4):  # loop over the dataset multiple times
 
         running_loss = 0.0
         for i, data in enumerate(train_loader, 0):
