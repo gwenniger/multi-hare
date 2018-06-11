@@ -27,6 +27,12 @@ class StringToIndexMappingTable:
     def get_index(self, string: str):
         return self.string_to_index_map[string]
 
+    def get_indices(self, strings: list):
+        result = list([])
+        for string in strings:
+            result.append(self.get_index(string))
+        return result
+
     def add_string(self, string: str):
         if string in self.string_to_index_map:
             return

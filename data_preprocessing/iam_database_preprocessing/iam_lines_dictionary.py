@@ -94,7 +94,7 @@ class IamLineInformation():
                    (self.bounding_box == other.bounding_box) and \
                    (self.words == other.words)
 
-    def get_letters(self):
+    def get_characters(self):
         result = list([])
 
         for word in self.words:

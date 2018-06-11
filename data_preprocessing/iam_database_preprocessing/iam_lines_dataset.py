@@ -4,6 +4,7 @@ from data_preprocessing.iam_database_preprocessing.iam_lines_dictionary import I
 from data_preprocessing.iam_database_preprocessing.string_to_index_mapping_table import StringToIndexMappingTable
 from skimage import io, transform
 import torch
+import numpy
 import os
 
 
@@ -44,7 +45,7 @@ class IamLinesDataset(Dataset):
         string_to_index_mapping_table = StringToIndexMappingTable.create_string_to_index_mapping_table()
         # print("examples_line_information: \n" + str(examples_line_information))
         for iam_line_information in examples_line_information:
-            letters = iam_line_information.get_letters()
+            letters = iam_line_information.get_characters()
             string_to_index_mapping_table.add_strings(letters)
         return string_to_index_mapping_table
 
@@ -58,6 +59,28 @@ class IamLinesDataset(Dataset):
         return IamLinesDataset(iam_lines_dictionary, examples_line_information, string_to_index_mapping_table,
                                transformation)
 
+    def split_random_train_set_and_test_set(self, test_examples_fraction):
+        random_permutation = numpy.random.permutation(len(self.examples_line_information))
+        last_train_index = len(self.examples_line_information) * (1 - test_examples_fraction) - 1
+        examples_line_information_train = \
+            [self.examples_line_information[i] for i in random_permutation[0:last_train_index]]
+        examples_line_information_test = \
+            [self.examples_line_information[i] for i in random_permutation[last_train_index:]]
+        train_set = IamLinesDataset(self.iam_lines_dictionary, examples_line_information_train,
+                        self.string_to_index_mapping_table, self.transform)
+        test_set = IamLinesDataset(self.iam_lines_dictionary, examples_line_information_test,
+                                    self.string_to_index_mapping_table, self.transform)
+        return train_set, test_set
+
+    def get_random_train_set_test_set_data_loaders(self, batch_size: int,
+                                                   test_examples_fraction: float):
+        train_set, test_set = self.split_random_train_set_and_test_set(test_examples_fraction)
+        train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=batch_size,
+                                                   shuffle=True)
+        test_loader = torch.utils.data.DataLoader(dataset=test_set, batch_size=batch_size,
+                                                  shuffle=False)
+        return train_loader, test_loader
+
     def __len__(self):
         return len(self.get_examples())
 
@@ -68,10 +91,12 @@ class IamLinesDataset(Dataset):
         print("image_file_path: " + str(image_file_path))
 
         image = io.imread(image_file_path)
-        labels = []
-        # FIXME: labels should contain the labels as an ndarray of integers
-        # collected using string_to_index_mapping_table
-        sample = {'image': image, 'labels': labels}
+
+        characters = line_information.get_characters()
+        indices = self.string_to_index_mapping_table.get_indices(characters)
+
+        indices_array = numpy.ndarray((len(indices)), buffer=numpy.array(indices), dtype=int)
+        sample = {'image': image, 'labels': indices_array}
 
         if self.transform:
             sample = self.transform(sample)
@@ -106,8 +131,17 @@ def test_iam_lines_dataset():
     print("iam_lines_dataset[0]: " + str(sample))
     print("(iam_lines_dataset[0])[image]: " + str(sample["image"]))
     to_tensor = ToTensor()
-    torch_tensor = to_tensor(sample)
-    print("torch_tensor.size(): " + str(to_tensor.size()))
+    sample_image = sample["image"]
+    print("sample_image: " + str(sample_image))
+    torch_tensors = to_tensor(sample)
+    print("torch_tensor['image'].size(): " + str(torch_tensors['image'].size()))
+    print("torch_tensor['labels'].size(): " + str(torch_tensors['labels'].size()))
+
+    print("torch_tensor['image']: " + str(torch_tensors['image']))
+    print("torch_tensor['labels']: " + str(torch_tensors['labels']))
+
+    # for i in range(0, torch_tensors['image'].view(-1).size(0)):
+    #    print("torch_tensor['image'][" + str(i) + "]: " + str(torch_tensors['image'].view(-1)[i]))
 
 
 def main():

@@ -121,6 +121,7 @@ def get_item_labels_with_probabilities_length_and_real_sequence_length(item_labe
     result = torch.cat((result, torch.IntTensor([-labels_sequence_length])), 0)
     return result
 
+
 # This data loader creates examples with elements that are concatenated
 # sequences of a random length of min_num_digits (including)
 # to max_num_digits (including) elements
