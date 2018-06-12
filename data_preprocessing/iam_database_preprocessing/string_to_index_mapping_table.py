@@ -2,6 +2,8 @@
 
 class StringToIndexMappingTable:
 
+    BLANK_SYMBOL = "<BLANK>"
+
     def __init__(self, string_to_index_map: dict, index_to_string_table: list, last_added_index: int):
         self.string_to_index_map = string_to_index_map
         self.index_to_string_table = index_to_string_table
@@ -17,9 +19,11 @@ class StringToIndexMappingTable:
     def create_string_to_index_mapping_table():
         string_to_index_map =  dict([])
         index_to_string_table =  list([])
-        # The index 0 will be skipped, as it will be used for the blank symbol
-        last_added_index = 0
-        return StringToIndexMappingTable(string_to_index_map, index_to_string_table, last_added_index)
+        last_added_index = -1
+        result = StringToIndexMappingTable(string_to_index_map, index_to_string_table, last_added_index)
+        # The blank symbol is added at at the beginning
+        result.add_string(StringToIndexMappingTable.BLANK_SYMBOL)
+        return result
 
     def get_string(self, index: int):
         return self.index_to_string_table[index]
@@ -45,4 +49,9 @@ class StringToIndexMappingTable:
     def add_strings(self, strings: list):
         for string in strings:
             self.add_string(string)
+
+    def get_vocabulary_list(self):
+        return list(self.index_to_string_table)
+
+
 

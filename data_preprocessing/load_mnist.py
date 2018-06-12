@@ -12,6 +12,7 @@ import torch.nn.functional
 IMAGE_HEIGHT = 16
 IMAGE_WIDTH = 16
 
+
 def get_train_set():
     # http://docs.python-guide.org/en/latest/writing/structure/
 
@@ -128,7 +129,7 @@ def get_item_labels_with_probabilities_length_and_real_sequence_length(item_labe
 # https://discuss.pytorch.org/t/solved-training-lstm-by-using-samples-of-various-sequence-length/9641
 def get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_digits,
                                          data_set):
-    triples_train_set = list([])
+    train_set_pairs = list([])
     print("data_set: " + str(data_set))
     i = 0
     while i < len(data_set):
@@ -164,14 +165,14 @@ def get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_dig
         print("item_labels_combined_padded.size(): " + str(item_labels_combined_padded.size()))
         print("item_labels_combined_padded: " + str(item_labels_combined_padded))
 
-        triples_train_set.append(tuple((item_tensors_combined_padded, item_labels_combined_padded)))
+        train_set_pairs.append(tuple((item_tensors_combined_padded, item_labels_combined_padded)))
 
         #util.image_visualization.imshow(torchvision.utils.make_grid(item_tensors_combined))
         #plt.show()
         i += sequence_length
 
     train_loader = torch.utils.data.DataLoader(
-        dataset=triples_train_set,
+        dataset=train_set_pairs,
         batch_size=batch_size,
         shuffle=True)
     return train_loader

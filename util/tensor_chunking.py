@@ -92,12 +92,14 @@ class TensorChunking:
             original_size: SizeTwoDimensional):
         # Check that things fit
         if (original_size.width % block_size.width) != 0:
-            raise RuntimeError("Error: the original size is not a multiple of the"
-                               "block size in the width dimension")
+            raise RuntimeError("Error: the original size.width (" + str(original_size.width) +
+                               ") is not a multiple of the block_size.width dimension (" +
+                               str(block_size.width) + ")")
 
         if (original_size.height % block_size.height) != 0:
-            raise RuntimeError("Error: the original size is not a multiple of the"
-                               "block size in the height dimension")
+            raise RuntimeError("Error: the original size.height (" + str(original_size.height) +
+                               ") is not a multiple of the block_size.height dimension (" +
+                               str(block_size.height) + ")")
 
     # Start from block_index 0
     def height_span(self, block_index):

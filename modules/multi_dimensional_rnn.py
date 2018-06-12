@@ -222,8 +222,19 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         # print(">>> activations.size(): " + str(activations.size()))
         # print("activations: " + str(activations))
 
-        if activations.size(2) != 1:
-            raise RuntimeError("Error: the height dimension of returned activations should be of size 1")
+        activations_height = activations.size(2)
+
+        # It can be that the activations dimensionality is not exactly 1, in which case it is reduced to 1
+        # by simple summation
+        if activations_height != 1:
+            # raise RuntimeError("Error: the height dimension of returned activations should be of size 1, but it " +
+            #                   "was: " + str(activations.size(2)))
+            print("WARNING: activations height is " + str(activations_height) + " ( > 1) :\n" +
+                  "Converting to a height of 1 by summing over the rows")
+            activations = torch.sum(activations, dim=2)
+
+
+
         activations_height_removed = activations.squeeze(2)
         activations_with_swapped_channels_and_width = activations_height_removed.transpose(1, 2)
         # print(">>> activations_with_swapped_channels_and_width.size(): " +

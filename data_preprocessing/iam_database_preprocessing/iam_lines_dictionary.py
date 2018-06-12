@@ -103,7 +103,6 @@ class IamLineInformation():
         return result
 
 
-
 class IamLinesDictionary():
 
     COMMENT_SYMBOL = "#"
@@ -224,10 +223,10 @@ def test_iam_lines_dictionary():
                            str(reference_line_information_one))
 
     for line_information_key in iam_lines_dicionary.ok_lines_dictionary:
-        print("line_information_key: " + str(line_information_key))
+        # print("line_information_key: " + str(line_information_key))
         line_information = iam_lines_dicionary.ok_lines_dictionary[line_information_key]
         image_file_path = iam_lines_dicionary.get_image_file_path(line_information)
-        print("image_file_path: " + str(image_file_path))
+        # print("image_file_path: " + str(image_file_path))
 
     return
 

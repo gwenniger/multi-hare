@@ -9,7 +9,6 @@ class WarpCTCLossInterface:
     def __init__(self):
         self.ctc_loss = warpctc_pytorch.CTCLoss()
 
-
     @staticmethod
     def create_warp_ctc_loss_interface():
         return WarpCTCLossInterface()
@@ -46,6 +45,11 @@ class WarpCTCLossInterface:
         return result
 
     @staticmethod
+    def get_real_probabilities_length(label_row_tensor_slice, horizontal_reduction_factor: int):
+        result = -(label_row_tensor_slice[label_row_tensor_slice.size(0) - 2] / horizontal_reduction_factor)
+        return result
+
+    @staticmethod
     def create_sequence_lengths_specification_tensor_different_lengths(
             labels_row_tensor_with_negative_values_for_padding):
         number_of_examples = labels_row_tensor_with_negative_values_for_padding.size(0)
@@ -76,10 +80,12 @@ class WarpCTCLossInterface:
         number_of_examples = labels_row_tensor.size(0)
         probabilities_sequence_length_index = labels_row_tensor.size(1) - 2
         # print("probabilities_sequence_length_index: " + str(probabilities_sequence_length_index))
-        sequence_length = -(labels_row_tensor[0, probabilities_sequence_length_index] / horizontal_reduction_factor)
+        sequence_length = WarpCTCLossInterface.get_real_probabilities_length(labels_row_tensor[0],
+                                                                             horizontal_reduction_factor)
         result = torch.IntTensor([sequence_length])
         for i in range(1, number_of_examples):
-            sequence_length = -(labels_row_tensor[i, labels_row_tensor.size(1) - 2] / horizontal_reduction_factor)
+            sequence_length = WarpCTCLossInterface.get_real_probabilities_length(labels_row_tensor[i],
+                                                                                 horizontal_reduction_factor)
             # print("probabilities sequence length: " + str(sequence_length))
             result = torch.cat((result, torch.IntTensor([sequence_length])), 0)
 

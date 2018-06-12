@@ -13,6 +13,8 @@ from modules.block_multi_dimensional_lstm_layer_pair import BlockMultiDimensiona
 from modules.block_multi_dimensional_lstm_layer_pair_stacking import BlockMultiDimensionalLSTMLayerPairStacking
 import data_preprocessing.load_mnist
 import data_preprocessing.load_cifar_ten
+from data_preprocessing.iam_database_preprocessing.iam_lines_dataset import IamLinesDataset
+from data_preprocessing.iam_database_preprocessing.iam_lines_dictionary import IamLinesDictionary
 from util.utils import Utils
 from modules.size_two_dimensional import SizeTwoDimensional
 import warpctc_pytorch
@@ -305,8 +307,11 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
     # mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
     block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
-    multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking.\
-        create_two_layer_pair_network(hidden_states_size, mdlstm_block_size,
+    #multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking.\
+    #    create_two_layer_pair_network(hidden_states_size, mdlstm_block_size,
+    #                                  block_strided_convolution_block_size)
+    multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
+        create_three_layer_pair_network(hidden_states_size, mdlstm_block_size,
                                       block_strided_convolution_block_size)
 
     number_of_classes = 10
@@ -382,7 +387,6 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
             # get the inputs
             inputs, labels = data
 
-
             # Increase all labels by one, since that is the format
             # expected by warp_ctc, which reserves the 0 label for blanks
             labels = create_labels_starting_from_one(labels)
@@ -409,6 +413,9 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
 
             # forward + backward + optimize
             #outputs = multi_dimensional_rnn(Variable(inputs))  # For "Net" (Le Net)
+            print("train_multi_dimensional_rnn_ctc.train_mdrnn - labels.size(): " + str(labels.size()))
+            print("train_multi_dimensional_rnn_ctc.train_mdrnn - inputs.size(): " + str(inputs.size()))
+            # print("train_multi_dimensional_rnn_ctc.train_mdrnn - inputs: " + str(inputs))
             outputs = network(inputs)
 
             # print(">>> outputs.size(): " + str(outputs.size()))
@@ -444,9 +451,7 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
             else:
                 loss_value = loss.item()
 
-
-
-            # print("loss: " + str(loss))
+            print("loss: " + str(loss))
             #loss = criterion(outputs, labels)
             loss.backward()
 
@@ -561,9 +566,55 @@ def mnist_recognition_variable_length():
     #print(prof)
 
 
+def iam_recognition():
+    batch_size = 32
+    max_num_digits = 2
+
+    lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
+    iam_database_line_images_root_folder_path = "/datastore/data/iam-database/lines"
+    iam_lines_dicionary = IamLinesDictionary.create_iam_dictionary(lines_file_path,
+                                                                   iam_database_line_images_root_folder_path)
+    iam_lines_dataset = IamLinesDataset.create_iam_lines_dataset(iam_lines_dicionary, "ok", None)
+
+    # This vocab_list will be used by the decoder
+    vocab_list = iam_lines_dataset.get_vocabulary_list()
+
+    test_examples_fraction = 0.20
+    train_loader, test_loader = iam_lines_dataset.\
+        get_random_train_set_test_set_data_loaders(batch_size, test_examples_fraction)
+
+    # test_mdrnn_cell()
+    #test_mdrnn()
+    input_height = 16
+    input_width = 16
+    input_channels = 1
+    # hidden_states_size = 32
+    hidden_states_size = 8  # Start with a lower initial hidden states size since there are more layers
+    # https://stackoverflow.com/questions/45027234/strange-loss-curve-while-training-lstm-with-keras
+    # Possibly a batch size of 128 leads to more instability in training?
+    #batch_size = 128
+
+    compute_multi_directional = True
+    # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
+    use_dropout = False
+
+    # TODO: Add gradient clipping? This might also make training more stable?
+    # Interesting link with tips on how to fix training:
+    # https://blog.slavv.com/37-reasons-why-your-neural-network-is-not-working-4020854bd607
+    # https://discuss.pytorch.org/t/about-torch-nn-utils-clip-grad-norm/13873
+    # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191
+
+    input_size = SizeTwoDimensional.create_size_two_dimensional(input_height, input_width)
+    #with torch.autograd.profiler.profile(use_cuda=False) as prof:
+    train_mdrnn(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
+                compute_multi_directional, use_dropout, vocab_list, max_num_digits)
+    #print(prof)
+
+
 def main():
     # mnist_recognition_fixed_length()
-    mnist_recognition_variable_length()
+    # mnist_recognition_variable_length()
+    iam_recognition()
     #cifar_ten_basic_recognition()
 
 

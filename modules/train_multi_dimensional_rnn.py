@@ -338,7 +338,8 @@ def mnist_basic_recognition():
 
     input_size = SizeTwoDimensional.create_size_two_dimensional(input_height, input_width)
     #with torch.autograd.profiler.profile(use_cuda=False) as prof:
-    train_mdrnn(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,  compute_multi_directional, use_dropout)
+    train_mdrnn(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
+                compute_multi_directional, use_dropout)
     #print(prof)
 
 
