@@ -190,7 +190,7 @@ class MultiDimensionalRNNToSingleClassNetwork(torch.nn.Module):
 class NetworkToSoftMaxNetwork(torch.nn.Module):
     def __init__(self, network, input_size: SizeTwoDimensional, number_of_classes_excluding_blank: int):
         super(NetworkToSoftMaxNetwork, self).__init__()
-        self.multi_dimensional_rnn = network
+        self.network = network
         self.input_size = input_size
         self.number_of_output_channels = network.get_number_of_output_channels()
         self.number_of_classes_excluding_blank = number_of_classes_excluding_blank
@@ -214,10 +214,10 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         return self.number_of_classes_excluding_blank + 1
 
     def set_training(self, training):
-        self.multi_dimensional_rnn.set_training(training)
+        self.network.set_training(training)
 
     def forward(self, x):
-        activations = self.multi_dimensional_rnn(x)
+        activations = self.network(x)
         batch_size = activations.size(0)
         # print(">>> activations.size(): " + str(activations.size()))
         # print("activations: " + str(activations))
@@ -272,6 +272,11 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         # print(">>> MultiDimensionalRNNToSoftMaxNetwork.forward - soft_max_activations_summed: " + str(soft_max_activations_summed))
 
         return result
+
+    # Get the factor by which the original input width is reduced in the output
+    # of the network
+    def get_width_reduction_factor(self):
+        return self.network.get_width_reduction_factor()
 
 
 class MultiDimensionalRNNBase(torch.nn.Module):

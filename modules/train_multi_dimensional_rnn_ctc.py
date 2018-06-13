@@ -17,10 +17,8 @@ from data_preprocessing.iam_database_preprocessing.iam_lines_dataset import IamL
 from data_preprocessing.iam_database_preprocessing.iam_lines_dictionary import IamLinesDictionary
 from util.utils import Utils
 from modules.size_two_dimensional import SizeTwoDimensional
-import warpctc_pytorch
 from ctc_loss.warp_ctc_loss_interface import WarpCTCLossInterface
 import ctcdecode
-
 import util.timing
 
 
@@ -383,7 +381,9 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
 
     #ctc_loss = warpctc_pytorch.CTCLoss()
     warp_ctc_loss_interface = WarpCTCLossInterface.create_warp_ctc_loss_interface()
-    horizontal_reduction_factor = mdlstm_block_size.width * 2
+    # Get the width reduction factor which will be needed to compute the real widths
+    # in the output from the real input width information in the warp_ctc_loss function
+    width_reduction_factor = network.module.get_width_reduction_factor()
 
     for epoch in range(4):  # loop over the dataset multiple times
 
@@ -400,7 +400,7 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
 
             # Increase all labels by one, since that is the format
             # expected by warp_ctc, which reserves the 0 label for blanks
-            labels = create_labels_starting_from_one(labels)
+            # labels = create_labels_starting_from_one(labels)
 
             if Utils.use_cuda():
                 inputs = inputs.to(device)
@@ -451,7 +451,7 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
             loss = warp_ctc_loss_interface.compute_ctc_loss(outputs,
                                                             labels,
                                                             number_of_examples,
-                                                            horizontal_reduction_factor)
+                                                            width_reduction_factor)
 
             print("Time used for ctc loss computation: " + str(util.timing.time_since(time_start_ctc_loss_computation)))
 
@@ -516,7 +516,7 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     # multi_dimensional_rnn.set_training(False) # Normal case
     network.module.set_training(False)  # When using DataParallel
     evaluate_mdrnn(test_loader, network, batch_size, device, vocab_list,
-                   horizontal_reduction_factor)
+                   width_reduction_factor)
 
 
 def mnist_recognition_fixed_length():

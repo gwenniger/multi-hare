@@ -64,3 +64,7 @@ class BlockStridedConvolution(Module):
         # print("convolution output: " + str(convolution_output))
         result = self.get_activation_function()(convolution_output)
         return result
+
+    def get_width_reduction_factor(self):
+        return self.block_size.width
+
