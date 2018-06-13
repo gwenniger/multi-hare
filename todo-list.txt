@@ -6,21 +6,41 @@ TODO list (high level)
 
 3. Create a network of MDRNN Cells with height equal to the height of the image 
 that can be used to scan the image in parallel, one transformed image colum at a time
-(what about padding for the cells on the boundary?)
+(what about padding for the cells on the boundary?)  DONE
 
 4. Create a method that, using the network of step 3, computes the MDRNN activation for 
-   each pixel. Save these activations to a "context vector / image representation vector".
+   each pixel. Save these activations to a "context vector / image representation vector". DONE
 
-5. Train a classifier using the representation computed in 4. Use it for MNIST prediction
+5. Train a classifier using the representation computed in 4. Use it for MNIST prediction DONE
 
 6. Repeat step 4 in 4 different directions, combine the 4 representations. This is now 
-   the multi-directional multi-dimensional RNN. See how classification performance improves.
+   the multi-directional multi-dimensional RNN. See how classification performance improves. DONE
 
-7. Implement the Multi-dimensional LSTM, analogous to the Multi-dimensional RNN implementation.
+7. Implement the Multi-dimensional LSTM, analogous to the Multi-dimensional RNN implementation. DONE
 
-8. Repeat the previous steps with the Multi-dimensional LSTM cell.
+8. Repeat the previous steps with the Multi-dimensional LSTM cell. DONE
 
 9. Combine the Multi-Dimensional LSTM image representations with convolutional network components 
-   and other network components into a more complex neural network.
+   and other network components into a more complex neural network. DONE
+
+10. Test the more complex network for MNIST prediction. DONE
+
+11. Extend with CTC loss and CTC beam search decoding.
+	
+	a. Fix CTC loss for single digits DONE
+	b. Fix CTC loss for MNIST digit sequences of fixed length DONE
+	c. Fix CTC loss for MNIST digit sequences of variable, random length  DONE
+
+12. Implement a data reader for the IAM dataset  DONE
+
+13. Add the right padding to the IAM dataset reader, so that it produces pytorch image and labels tensors that are all 
+    correctly padded with zeros to the same size. DONE
+
+14. Test the IAM dataset reader with CTC loss 
+    a. Make sure the training works and loss decreases: make sure there are no remaining infininite or zero loss problems
+    b. Test that the network has also learned something useful during the test stage
+    c. Optimize for speed, so that the network trains at a practically usable speed.
+	
+
 
 10. Add ab attention mechanism.

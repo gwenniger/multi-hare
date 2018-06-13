@@ -108,7 +108,6 @@ class WarpCTCLossInterface:
 
         return result
 
-
     def compute_ctc_loss_version_two(self, probabilities, labels_row_tensor):
         ctc_loss = warpctc_pytorch.CTCLoss()
 
