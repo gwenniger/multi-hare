@@ -21,6 +21,8 @@ import warpctc_pytorch
 from ctc_loss.warp_ctc_loss_interface import WarpCTCLossInterface
 import ctcdecode
 
+import util.timing
+
 
 def test_mdrnn_cell():
     print("Testing the MultDimensionalRNN Cell... ")
@@ -233,7 +235,7 @@ def replace_all_negative_values_by_zero(tensor):
 
 def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: SizeTwoDimensional, hidden_states_size: int, batch_size,
                 compute_multi_directional: bool, use_dropout: bool,
-                vocab_list: list, max_num_digits: int):
+                vocab_list: list):
     import torch.optim as optim
 
     criterion = nn.CrossEntropyLoss()
@@ -312,9 +314,9 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     #                                  block_strided_convolution_block_size)
     multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
         create_three_layer_pair_network(hidden_states_size, mdlstm_block_size,
-                                      block_strided_convolution_block_size)
+                                     block_strided_convolution_block_size)
 
-    number_of_classes = 10
+    number_of_classes = len(vocab_list) - 1
     network = NetworkToSoftMaxNetwork.create_network_to_soft_max_network(multi_dimensional_rnn,
                                                                          input_size, number_of_classes )
 
@@ -382,7 +384,10 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     for epoch in range(4):  # loop over the dataset multiple times
 
         running_loss = 0.0
+        time_start = time.time()
         for i, data in enumerate(train_loader, 0):
+
+            time_start_batch = time.time()
 
             # get the inputs
             inputs, labels = data
@@ -416,7 +421,11 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
             print("train_multi_dimensional_rnn_ctc.train_mdrnn - labels.size(): " + str(labels.size()))
             print("train_multi_dimensional_rnn_ctc.train_mdrnn - inputs.size(): " + str(inputs.size()))
             # print("train_multi_dimensional_rnn_ctc.train_mdrnn - inputs: " + str(inputs))
+
+            time_start_network_forward = time.time()
             outputs = network(inputs)
+            print("Time used for network forward: " + str(util.timing.time_since(time_start_network_forward)))
+
 
             # print(">>> outputs.size(): " + str(outputs.size()))
 
@@ -432,10 +441,13 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
             #print("labels: " + str(labels))
             number_of_examples = inputs.size(0)
 
+            time_start_ctc_loss_computation = time.time()
             loss = warp_ctc_loss_interface.compute_ctc_loss(outputs,
                                                             labels,
                                                             number_of_examples,
                                                             horizontal_reduction_factor)
+
+            print("Time used for ctc loss computation: " + str(util.timing.time_since(time_start_ctc_loss_computation)))
 
 
             # See: https://github.com/SeanNaren/deepspeech.pytorch/blob/master/train.py
@@ -453,7 +465,10 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
 
             print("loss: " + str(loss))
             #loss = criterion(outputs, labels)
+
+            time_start_loss_backward = time.time()
             loss.backward()
+            print("Time used for loss backward: " + str(util.timing.time_since(time_start_loss_backward)))
 
             # Perform gradient clipping
             made_gradient_norm_based_correction = clip_gradient(multi_dimensional_rnn)
@@ -479,6 +494,15 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
                 print("Number of gradient norm-based corrections: " + str(num_gradient_corrections))
                 running_loss = 0.0
                 num_gradient_corrections = 0
+
+            print("Time used for this batch: " + str(util.timing.time_since(time_start_batch)))
+
+            percent = (i + 1) / float(len(train_loader))
+            examples_processed = (i + 1) * batch_size
+            total_examples = len(train_loader.dataset)
+            print("Processed " + str(examples_processed) + " of " + str(total_examples) + " examples in this epoch")
+            print(">>> Total time used during this epoch: " +
+                  str(util.timing.time_since_and_expected_remaining_time(time_start, percent)))
 
     print('Finished Training')
 
@@ -530,7 +554,7 @@ def mnist_recognition_fixed_length():
 def mnist_recognition_variable_length():
     batch_size = 128
     min_num_digits = 1
-    max_num_digits = 2
+    max_num_digits = 30
     # In MNIST there are the digits 0-9, and we also add a symbol for blanks
     # This vocab_list will be used by the decoder
     vocab_list = list(['_', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'])
@@ -562,13 +586,12 @@ def mnist_recognition_variable_length():
     input_size = SizeTwoDimensional.create_size_two_dimensional(input_height, input_width)
     #with torch.autograd.profiler.profile(use_cuda=False) as prof:
     train_mdrnn(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
-                compute_multi_directional, use_dropout, vocab_list, max_num_digits)
+                compute_multi_directional, use_dropout, vocab_list)
     #print(prof)
 
 
 def iam_recognition():
     batch_size = 32
-    max_num_digits = 2
 
     lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
     iam_database_line_images_root_folder_path = "/datastore/data/iam-database/lines"
@@ -607,7 +630,7 @@ def iam_recognition():
     input_size = SizeTwoDimensional.create_size_two_dimensional(input_height, input_width)
     #with torch.autograd.profiler.profile(use_cuda=False) as prof:
     train_mdrnn(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
-                compute_multi_directional, use_dropout, vocab_list, max_num_digits)
+                compute_multi_directional, use_dropout, vocab_list)
     #print(prof)
 
 

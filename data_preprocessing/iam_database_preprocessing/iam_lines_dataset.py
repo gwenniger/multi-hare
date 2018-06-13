@@ -6,6 +6,7 @@ from skimage import io, transform
 import torch
 import numpy
 import os
+import sys
 
 
 class IamLinesDataset(Dataset):
@@ -192,9 +193,6 @@ class IamLinesDataset(Dataset):
         test_loader = self.get_data_loader_with_appropriate_padding(test_set, max_image_height, max_image_width,
                                                                     max_labels_length, batch_size)
 
-
-
-
         return train_loader, test_loader
 
     def __len__(self):
@@ -236,16 +234,45 @@ class IamLinesDataset(Dataset):
 
         return indices_array
 
+    # Print statistics about the size of the images in the dataset. This useful to get an idea about how much
+    # computation we "waste" by padding everything to the maximum width and maximum height
+    @staticmethod
+    def print_image_dimension_statistics(min_height, max_height, mean_height, min_width, max_width, mean_width):
+        print(">>> IamLinesDataset.get_max_image_dimensions: ")
+        print(" min_height: " + str(min_height) + " max_height: " + str(max_height) +
+              " mean_height: " + str(mean_height))
+        print(" min_width: " + str(min_width) + " max_width: " + str(max_width) +
+              " mean_width: " + str(mean_width))
+
     def get_max_image_dimension(self):
+        # Initialize the minimum to the maximum integer value
+        min_height = sys.maxsize
         max_height = 0
+        summed_heights = 0
+
+        # Initialize the minimum to the maximum integer value
+        min_width = sys.maxsize
         max_width = 0
+        summed_widths = 0
 
         for index in range(0, self.__len__()):
             image = self.get_image(index)
             height, width = image.shape
 
+            min_height = min(min_height, height)
+            min_width = min(min_width, width)
+
             max_height = max(max_height, height)
             max_width = max(max_width, width)
+
+            summed_heights += height
+            summed_widths += width
+
+        mean_height = summed_heights / float(self.__len__())
+        mean_width = summed_widths / float(self.__len__())
+
+        IamLinesDataset.print_image_dimension_statistics(min_height, max_height, mean_height,
+                                                         min_width, max_width, mean_width)
 
         return max_height, max_width
 
@@ -290,7 +317,7 @@ class Rescale(object):
 
         new_h, new_w = int(new_h), int(new_w)
 
-        img = transform.resize(image, (new_h, new_w))
+        img = transform.resize(image, (new_h, new_w), mode="constant", anti_aliasing=True)
 
         return {'image': img, 'labels': labels}
 

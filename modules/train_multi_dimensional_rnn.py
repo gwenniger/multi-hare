@@ -15,6 +15,7 @@ import data_preprocessing.load_mnist
 import data_preprocessing.load_cifar_ten
 from util.utils import Utils
 from modules.size_two_dimensional import SizeTwoDimensional
+import util.timing
 
 
 def test_mdrnn_cell():
@@ -272,12 +273,20 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
 
             # forward + backward + optimize
             #outputs = multi_dimensional_rnn(Variable(inputs))  # For "Net" (Le Net)
+            time_start_network_forward = time.time()
             outputs = network(inputs)
+            print("Time used for network forward: " + str(util.timing.time_since(time_start_network_forward)))
             # print("outputs: " + str(outputs))
             # print("outputs.size(): " + str(outputs.size()))
             #print("labels: " + str(labels))
+
+            time_start_loss_computation = time.time()
             loss = criterion(outputs, labels)
+            print("Time used for loss computation: " + str(util.timing.time_since(time_start_loss_computation)))
+
+            time_start_loss_backward = time.time()
             loss.backward()
+            print("Time used for loss backward: " + str(util.timing.time_since(time_start_loss_backward)))
 
             # Perform gradient clipping
             made_gradient_norm_based_correction = clip_gradient(multi_dimensional_rnn)
