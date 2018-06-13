@@ -317,6 +317,7 @@ class Rescale(object):
 
         new_h, new_w = int(new_h), int(new_w)
 
+        # img = transform.resize(image, (new_h, new_w))
         img = transform.resize(image, (new_h, new_w), mode="constant", anti_aliasing=True)
 
         return {'image': img, 'labels': labels}

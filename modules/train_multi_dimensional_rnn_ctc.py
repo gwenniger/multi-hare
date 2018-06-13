@@ -312,13 +312,17 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     #multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking.\
     #    create_two_layer_pair_network(hidden_states_size, mdlstm_block_size,
     #                                  block_strided_convolution_block_size)
+    #multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
+    #    create_three_layer_pair_network(hidden_states_size, mdlstm_block_size,
+    #                                 block_strided_convolution_block_size)
     multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
-        create_three_layer_pair_network(hidden_states_size, mdlstm_block_size,
-                                     block_strided_convolution_block_size)
+        create_three_layer_pair_network_linear_parameter_size_increase(hidden_states_size, mdlstm_block_size,
+                                                                       block_strided_convolution_block_size)
 
-    number_of_classes = len(vocab_list) - 1
+    number_of_classes_excluding_blank = len(vocab_list) - 1
+    # number_of_classes_excluding_blank = 10
     network = NetworkToSoftMaxNetwork.create_network_to_soft_max_network(multi_dimensional_rnn,
-                                                                         input_size, number_of_classes )
+                                                                         input_size, number_of_classes_excluding_blank)
 
     #multi_dimensional_rnn = Net()
 
@@ -391,6 +395,8 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
 
             # get the inputs
             inputs, labels = data
+
+            print("labels: " + str(labels))
 
             # Increase all labels by one, since that is the format
             # expected by warp_ctc, which reserves the 0 label for blanks

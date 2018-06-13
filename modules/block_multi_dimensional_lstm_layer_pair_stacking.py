@@ -157,6 +157,61 @@ class BlockMultiDimensionalLSTMLayerPairStacking(Module):
             create_block_multi_dimensional_lstm_pair_stacking(layer_pairs_specific_parameters_list,
                                                               compute_multi_directional, use_dropout, nonlinearity)
 
+    # Following "Handwriting Recognition with Large Multidimensional Long Short-Term
+    # Memory Recurrent Neural Networks" (Voigtlander et.al, 2016)
+    # Both the hidden states sizes and the output channels (which are like the hidden states
+    # for the convolution layers) are now made into a linear factor of the layer number
+    @staticmethod
+    def create_three_layer_pair_network_linear_parameter_size_increase(first_mdlstm_hidden_states_size: int,
+                                      mdlstm_block_size: SizeTwoDimensional,
+                                      block_strided_convolution_block_size: SizeTwoDimensional):
+
+
+        compute_multi_directional = False
+        use_dropout = False
+        nonlinearity = "tanh"
+
+        # Layer pair one
+        input_channels = 1
+        #number_of_elements_reduction_factor = block_strided_convolution_block_size.width * \
+        #                                      block_strided_convolution_block_size.height
+        # output_channels = number_of_elements_reduction_factor * first_mdlstm_hidden_states_size
+        output_channels = 2 * first_mdlstm_hidden_states_size
+
+        pair_one_specific_parameters = LayerPairSpecificParameters.create_layer_pair_specific_parameters(
+            input_channels, first_mdlstm_hidden_states_size, output_channels, mdlstm_block_size,
+            block_strided_convolution_block_size)
+
+        # Layer pair two
+        input_channels = output_channels
+        # Here the number of mdstlm_hidden_states and output channels are increased with a factor that is
+        # equal to the layer number
+        second_mdlstm_hidden_states_size = 3 * first_mdlstm_hidden_states_size
+        # output_channels = number_of_elements_reduction_factor * output_channels
+        output_channels = 4 * first_mdlstm_hidden_states_size
+
+        pair_two_specific_parameters = LayerPairSpecificParameters.create_layer_pair_specific_parameters(
+            input_channels, second_mdlstm_hidden_states_size, output_channels, mdlstm_block_size,
+            block_strided_convolution_block_size)
+
+        # Layer pair three
+        input_channels = output_channels
+        # Here the number of mdstlm_hidden_states and output channels are increased with a factor that is
+        # equal to the layer number
+        third_mdlstm_hidden_states_size = 5 * first_mdlstm_hidden_states_size
+        # output_channels = number_of_elements_reduction_factor * output_channels
+        output_channels = 6 * first_mdlstm_hidden_states_size
+
+        pair_three_specific_parameters = LayerPairSpecificParameters.create_layer_pair_specific_parameters(
+            input_channels, third_mdlstm_hidden_states_size, output_channels, mdlstm_block_size,
+            block_strided_convolution_block_size)
+
+        layer_pairs_specific_parameters_list = list([pair_one_specific_parameters, pair_two_specific_parameters,
+                                                     pair_three_specific_parameters])
+        return BlockMultiDimensionalLSTMLayerPairStacking. \
+            create_block_multi_dimensional_lstm_pair_stacking(layer_pairs_specific_parameters_list,
+                                                              compute_multi_directional, use_dropout, nonlinearity)
+
 
 
     @staticmethod
