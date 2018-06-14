@@ -47,7 +47,6 @@ class TensorChunking:
         result = torch.LongTensor(indices)
         return result
 
-
     # Chunks a four-dimensional tensor into blocks.
     # The fist dimension is the batch dimension, the second dimension the input channels,
     # the third and forth dimension are the height and width respectively, along which
@@ -70,21 +69,40 @@ class TensorChunking:
     # the firs (batch) dimension
     def chunk_tensor_into_blocks_concatenate_along_batch_dimension(self,
             tensor: torch.tensor):
-        result = torch.zeros(0, tensor.size(1), self.block_size.height,
-                             self.block_size.width)
-        if Utils.use_cuda():
-            # https://discuss.pytorch.org/t/which-device-is-model-tensor-stored-on/4908/7
-            device = tensor.get_device()
-            result = result.to(device)
+
+        # if Utils.use_cuda():
+        #     device = tensor.get_device()
+        #     with torch.cuda.device(device):
+        #         # creating the zeros directly on the gpu, which is faster
+        #         # See: https://discuss.pytorch.org/t/creating-tensors-on-gpu-directly/2714/5
+        #         # https://discuss.pytorch.org/t/which-device-is-model-tensor-stored-on/4908/7
+        #         result = torch.cuda.FloatTensor(0, tensor.size(1), self.block_size.height,
+        #                              self.block_size.width).fill_(0)
+        #
+        #         #result = result.to(device)
+        # else:
+        #     result = torch.zeros(0, tensor.size(1), self.block_size.height,
+        #                          self.block_size.width)
 
         tensor_split_on_height = torch.split(tensor, self.block_size.height, 2)
+
+        # The old implementation, calls torch.cat many times
+        # for row_block in tensor_split_on_height:
+        #     blocks = torch.split(row_block, self.block_size.width, 3)
+        #     list_for_cat = list([])
+        #     list_for_cat.append(result)
+        #     list_for_cat.extend(blocks)
+        #     result = torch.cat(list_for_cat, 0)
+        #     # print("result.size(): " + str(result.size()))
+
+        # New implementation: collect everything and call torch.cat only once
+        list_for_cat = list([])
         for row_block in tensor_split_on_height:
             blocks = torch.split(row_block, self.block_size.width, 3)
-            list_for_cat = list([])
-            list_for_cat.append(result)
             list_for_cat.extend(blocks)
-            result = torch.cat(list_for_cat, 0)
-            # print("result.size(): " + str(result.size()))
+        result = torch.cat(list_for_cat, 0)
+        print("chunk_tensor_into_blocks_concatenate_along_batch_dimension - result.size(): " + str(result.size()))
+
         return result
 
     @staticmethod
@@ -117,9 +135,9 @@ class TensorChunking:
         return span_begin, span_end
 
     # Reconstructs a tensor block row from a 5 dimensional tensor whose first dimension
-    # goes over the blocks int he original tensor, and whose other four dimensions go over
+    # goes over the blocks int the original tensor, and whose other four dimensions go over
     # the batch dimensions, channel dimension and height and width dimensions of these blocks
-    def reconstruct_tensor_bloc_row(self, tensor_grouped_by_block, row_index):
+    def reconstruct_tensor_block_row(self, tensor_grouped_by_block, row_index):
         first_block_index = row_index * self.blocks_per_row
         # The result is initialized by the first (left-most) block of the row
         result = tensor_grouped_by_block[first_block_index, :, :, :, :]
@@ -151,11 +169,11 @@ class TensorChunking:
                                               number_of_examples, channels,
                                               self.block_size.height, self.block_size.width)
 
-        tensor_block_row = self.reconstruct_tensor_bloc_row(tensor_grouped_by_block, 0)
+        tensor_block_row = self.reconstruct_tensor_block_row(tensor_grouped_by_block, 0)
         result = tensor_block_row
 
         for row_index in range(1, self.blocks_per_column):
-            tensor_block_row = self.reconstruct_tensor_bloc_row(tensor_grouped_by_block, row_index)
+            tensor_block_row = self.reconstruct_tensor_block_row(tensor_grouped_by_block, row_index)
             result = torch.cat((result, tensor_block_row), 2)
 
         # print(">>> dechunk_block_tensor_concatenated_along_batch_dimension: - result.grad_fn "

@@ -232,6 +232,7 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
             print("WARNING: activations height is " + str(activations_height) + " ( > 1) :\n" +
                   "Converting to a height of 1 by summing over the rows")
             activations = torch.sum(activations, dim=2)
+            # activations = activations[:, :, 0, :] # Wrong and not really faster
 
 
 
