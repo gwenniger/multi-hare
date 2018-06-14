@@ -151,16 +151,17 @@ class ImageInputTransformer:
 
         if leading_zeros > 0:
 
-            # To get a sub-tensor with everything from the 0th and 3th dimension,
-            # and specific values for the 1th  and 2nd dimension you use
-            # image_tensors[:, 0, y, :]
-            # See:
-            # https://stackoverflow.com/questions/47374172/how-to-select-index-over-two-dimension-in-pytorch?rq=1
-            leading_zeros_tensor = torch.zeros(number_of_image_tensors, number_of_channels,
-                                               leading_zeros)
-
             if Utils.use_cuda():
-                leading_zeros_tensor = leading_zeros_tensor.to(device)
+                with torch.cuda.device(device):
+                    # creating the zeros directly on the gpu, which is faster
+                    # See: https://discuss.pytorch.org/t/creating-tensors-on-gpu-directly/2714/5
+
+                    leading_zeros_tensor = torch.cuda.FloatTensor(number_of_image_tensors, number_of_channels,
+                                                                  leading_zeros).fill_(0)
+            else:
+
+                leading_zeros_tensor = torch.zeros(number_of_image_tensors, number_of_channels,
+                                                   leading_zeros)
 
             # print("leading_zeros_tensor.size()" + str(leading_zeros_tensor.size()))
 
@@ -171,10 +172,18 @@ class ImageInputTransformer:
 
         if tailing_zeros > 0:
             # print("number of channels: " + str(number_of_channels))
-            tailing_zeros_tensor = torch.zeros(number_of_image_tensors,
-                                               number_of_channels, tailing_zeros)
+
             if Utils.use_cuda():
-                tailing_zeros_tensor = tailing_zeros_tensor.to(device)
+
+                with torch.cuda.device(device):
+                    # creating the zeros directly on the gpu, which is faster
+                    # See: https://discuss.pytorch.org/t/creating-tensors-on-gpu-directly/2714/5
+
+                    tailing_zeros_tensor = torch.\
+                        cuda.FloatTensor(number_of_image_tensors, number_of_channels, tailing_zeros).fill_(0)
+            else:
+                tailing_zeros_tensor = torch.zeros(number_of_image_tensors,
+                                                   number_of_channels, tailing_zeros)
 
             # print("new_row.size(): " + str(new_row.size()))
             # print("tailing_zeros_tensor.size(): " + str(tailing_zeros_tensor.size()))

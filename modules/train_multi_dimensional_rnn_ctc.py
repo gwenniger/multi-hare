@@ -243,8 +243,8 @@ def train_mdrnn_no_ctc(train_loader, test_loader, input_channels: int, input_siz
     # device_ids should include device!
     # device_ids lists all the gpus that may be used for parallelization
     # device is the initial device the model will be put on
-    device_ids = [0, 1]
-    # device_ids = [0]
+    #device_ids = [0, 1]
+    device_ids = [0]
 
     mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
     # mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
@@ -259,6 +259,9 @@ def train_mdrnn_no_ctc(train_loader, test_loader, input_channels: int, input_siz
 
     number_of_classes_excluding_blank = len(vocab_list) - 1
     # number_of_classes_excluding_blank = 10
+
+
+
     network = NetworkToSoftMaxNetwork.create_network_to_soft_max_network(multi_dimensional_rnn,
                                                                          input_size, number_of_classes_excluding_blank)
     if Utils.use_cuda():
@@ -280,7 +283,7 @@ def train_mdrnn_no_ctc(train_loader, test_loader, input_channels: int, input_siz
 
     width_reduction_factor = network.module.get_width_reduction_factor()
 
-    for epoch in range(4):  # loop over the dataset multiple times
+    for epoch in range(1):  # loop over the dataset multiple times
 
         running_loss = 0.0
         time_start = time.time()
@@ -331,23 +334,36 @@ def train_mdrnn_no_ctc(train_loader, test_loader, input_channels: int, input_siz
             outputs = network(inputs)
             print("Time used for network forward: " + str(util.timing.time_since(time_start_network_forward)))
 
-            time_start_loss_computation = time.time()
-            loss = criterion(outputs, labels)
-            print("Time used for loss computation: " + str(util.timing.time_since(time_start_loss_computation)))
+            with torch.autograd.profiler.profile(use_cuda=True) as prof:
+                time_start_loss_computation = time.time()
+                loss = criterion(outputs, labels)
+                print("Time used for loss computation: " + str(util.timing.time_since(time_start_loss_computation)))
 
-            loss_sum = loss.data.sum()
-            inf = float("inf")
-            if loss_sum == inf or loss_sum == -inf:
-                print("WARNING: received an inf loss, setting loss value to 0")
-                loss_value = 0
-            else:
-                loss_value = loss.item()
+                loss_sum = loss.data.sum()
+                inf = float("inf")
+                if loss_sum == inf or loss_sum == -inf:
+                    print("WARNING: received an inf loss, setting loss value to 0")
+                    loss_value = 0
+                else:
+                    loss_value = loss.item()
 
-            print("loss: " + str(loss))
+                print("loss: " + str(loss))
 
-            time_start_loss_backward = time.time()
-            loss.backward()
-            print("Time used for loss backward: " + str(util.timing.time_since(time_start_loss_backward)))
+                time_start_loss_backward = time.time()
+                loss.backward()
+                print("Time used for loss backward: " + str(util.timing.time_since(time_start_loss_backward)))
+
+            print("Finished profiling block...")
+            print("len(prof.function_events): " + str(len(prof.function_events)))
+
+            print("Computing log string...")
+            log_string = prof.table(sort_by="cpu_time")
+            print("Done...")
+            print("Saving to log file...")
+            text_file = open('/home/gemaille/AI/handwriting-recognition/log_iam_test.txt', 'w')
+            text_file.write(log_string)
+            text_file.close()
+            print("Finished...")
 
             # Perform gradient clipping
             made_gradient_norm_based_correction = clip_gradient(multi_dimensional_rnn)
@@ -377,13 +393,15 @@ def train_mdrnn_no_ctc(train_loader, test_loader, input_channels: int, input_siz
             print(">>> Total time used during this epoch: " +
                   str(util.timing.time_since_and_expected_remaining_time(time_start, percent)))
 
+            break
+
     print('Finished Training')
 
     # Run evaluation
     # multi_dimensional_rnn.set_training(False) # Normal case
     network.module.set_training(False)  # When using DataParallel
-    evaluate_mdrnn(test_loader, network, batch_size, device, vocab_list,
-                   width_reduction_factor)
+    # evaluate_mdrnn(test_loader, network, batch_size, device, vocab_list,
+    #               width_reduction_factor)
 
 
 def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: SizeTwoDimensional, hidden_states_size: int, batch_size,
@@ -753,49 +771,51 @@ def mnist_recognition_variable_length():
 
 
 def iam_recognition():
-    batch_size = 32
 
-    lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
-    iam_database_line_images_root_folder_path = "/datastore/data/iam-database/lines"
-    iam_lines_dicionary = IamLinesDictionary.create_iam_dictionary(lines_file_path,
-                                                                   iam_database_line_images_root_folder_path)
-    iam_lines_dataset = IamLinesDataset.create_iam_lines_dataset(iam_lines_dicionary, "ok", None)
+        batch_size = 1
 
-    # This vocab_list will be used by the decoder
-    vocab_list = iam_lines_dataset.get_vocabulary_list()
+        lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
+        iam_database_line_images_root_folder_path = "/datastore/data/iam-database/lines"
+        iam_lines_dicionary = IamLinesDictionary.create_iam_dictionary(lines_file_path,
+                                                                       iam_database_line_images_root_folder_path)
+        iam_lines_dataset = IamLinesDataset.create_iam_lines_dataset(iam_lines_dicionary, "ok", None)
 
-    test_examples_fraction = 0.20
-    train_loader, test_loader = iam_lines_dataset.\
-        get_random_train_set_test_set_data_loaders(batch_size, test_examples_fraction)
+        # This vocab_list will be used by the decoder
+        vocab_list = iam_lines_dataset.get_vocabulary_list()
 
-    # test_mdrnn_cell()
-    #test_mdrnn()
-    input_height = 16
-    input_width = 16
-    input_channels = 1
-    # hidden_states_size = 32
-    hidden_states_size = 8  # Start with a lower initial hidden states size since there are more layers
-    # https://stackoverflow.com/questions/45027234/strange-loss-curve-while-training-lstm-with-keras
-    # Possibly a batch size of 128 leads to more instability in training?
-    #batch_size = 128
+        test_examples_fraction = 0.20
+        train_loader, test_loader = iam_lines_dataset.\
+            get_random_train_set_test_set_data_loaders(batch_size, test_examples_fraction)
 
-    compute_multi_directional = False
-    # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
-    use_dropout = False
+        # test_mdrnn_cell()
+        #test_mdrnn()
+        input_height = 16
+        input_width = 16
+        input_channels = 1
+        # hidden_states_size = 32
+        hidden_states_size = 8  # Start with a lower initial hidden states size since there are more layers
+        # https://stackoverflow.com/questions/45027234/strange-loss-curve-while-training-lstm-with-keras
+        # Possibly a batch size of 128 leads to more instability in training?
+        #batch_size = 128
 
-    # TODO: Add gradient clipping? This might also make training more stable?
-    # Interesting link with tips on how to fix training:
-    # https://blog.slavv.com/37-reasons-why-your-neural-network-is-not-working-4020854bd607
-    # https://discuss.pytorch.org/t/about-torch-nn-utils-clip-grad-norm/13873
-    # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191
+        compute_multi_directional = False
+        # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
+        use_dropout = False
 
-    input_size = SizeTwoDimensional.create_size_two_dimensional(input_height, input_width)
-    #with torch.autograd.profiler.profile(use_cuda=False) as prof:
-    # train_mdrnn_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
-    #                compute_multi_directional, use_dropout, vocab_list)
-    train_mdrnn_no_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
-                    compute_multi_directional, use_dropout, vocab_list)
-    #print(prof)
+        # TODO: Add gradient clipping? This might also make training more stable?
+        # Interesting link with tips on how to fix training:
+        # https://blog.slavv.com/37-reasons-why-your-neural-network-is-not-working-4020854bd607
+        # https://discuss.pytorch.org/t/about-torch-nn-utils-clip-grad-norm/13873
+        # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191
+
+        input_size = SizeTwoDimensional.create_size_two_dimensional(input_height, input_width)
+        #with torch.autograd.profiler.profile(use_cuda=False) as prof:
+        # train_mdrnn_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
+        #                compute_multi_directional, use_dropout, vocab_list)
+        train_mdrnn_no_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
+                        compute_multi_directional, use_dropout, vocab_list)
+
+
 
 
 def main():
