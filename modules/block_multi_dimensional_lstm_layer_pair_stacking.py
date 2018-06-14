@@ -162,17 +162,14 @@ class BlockMultiDimensionalLSTMLayerPairStacking(Module):
     # Both the hidden states sizes and the output channels (which are like the hidden states
     # for the convolution layers) are now made into a linear factor of the layer number
     @staticmethod
-    def create_three_layer_pair_network_linear_parameter_size_increase(first_mdlstm_hidden_states_size: int,
-                                      mdlstm_block_size: SizeTwoDimensional,
-                                      block_strided_convolution_block_size: SizeTwoDimensional):
+    def create_three_layer_pair_network_linear_parameter_size_increase(
+            input_channels, first_mdlstm_hidden_states_size: int,
+            mdlstm_block_size: SizeTwoDimensional, block_strided_convolution_block_size: SizeTwoDimensional,
+            compute_multi_directional: bool, use_dropout: bool):
 
-
-        compute_multi_directional = False
-        use_dropout = False
         nonlinearity = "tanh"
 
         # Layer pair one
-        input_channels = 1
         #number_of_elements_reduction_factor = block_strided_convolution_block_size.width * \
         #                                      block_strided_convolution_block_size.height
         # output_channels = number_of_elements_reduction_factor * first_mdlstm_hidden_states_size

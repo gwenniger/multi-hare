@@ -231,9 +231,164 @@ def replace_all_negative_values_by_zero(tensor):
     return result
 
 
-def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: SizeTwoDimensional, hidden_states_size: int, batch_size,
-                compute_multi_directional: bool, use_dropout: bool,
-                vocab_list: list):
+def train_mdrnn_no_ctc(train_loader, test_loader, input_channels: int, input_size: SizeTwoDimensional, hidden_states_size: int, batch_size,
+                    compute_multi_directional: bool, use_dropout: bool,
+                    vocab_list: list):
+    import torch.optim as optim
+
+    criterion = nn.CrossEntropyLoss()
+
+    # http://pytorch.org/docs/master/notes/cuda.html
+    device = torch.device("cuda:0")
+    # device_ids should include device!
+    # device_ids lists all the gpus that may be used for parallelization
+    # device is the initial device the model will be put on
+    device_ids = [0, 1]
+    # device_ids = [0]
+
+    mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
+    # mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
+    block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
+
+    multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
+        create_three_layer_pair_network_linear_parameter_size_increase(input_channels, hidden_states_size,
+                                                                       mdlstm_block_size,
+                                                                       block_strided_convolution_block_size,
+                                                                       compute_multi_directional,
+                                                                       use_dropout)
+
+    number_of_classes_excluding_blank = len(vocab_list) - 1
+    # number_of_classes_excluding_blank = 10
+    network = NetworkToSoftMaxNetwork.create_network_to_soft_max_network(multi_dimensional_rnn,
+                                                                         input_size, number_of_classes_excluding_blank)
+    if Utils.use_cuda():
+
+        network = nn.DataParallel(network, device_ids=device_ids)
+
+        network.to(device)
+    else:
+        raise RuntimeError("CUDA not available")
+
+    print_number_of_parameters(multi_dimensional_rnn)
+
+    optimizer = optim.Adam(network.parameters(), lr=0.00001, weight_decay=1e-5)
+#    optimizer = optim.Adam(network.parameters(), lr=0.000001, weight_decay=1e-5)
+
+    start = time.time()
+
+    num_gradient_corrections = 0
+
+    width_reduction_factor = network.module.get_width_reduction_factor()
+
+    for epoch in range(4):  # loop over the dataset multiple times
+
+        running_loss = 0.0
+        time_start = time.time()
+        for i, data in enumerate(train_loader, 0):
+
+            time_start_batch = time.time()
+
+            # get the inputs
+            inputs, labels = data
+
+            # Hack the labels to be of the right size. These labels are not really
+            # meaningful, but that's OK, since the method is mainly meant to test
+            # the speed of the different steps
+            labels = torch.zeros(batch_size, 81, dtype=torch.int64)
+            print("labels: " + str(labels))
+
+            print("labels: " + str(labels))
+
+            # Increase all labels by one, since that is the format
+            # expected by warp_ctc, which reserves the 0 label for blanks
+            # labels = create_labels_starting_from_one(labels)
+
+            if Utils.use_cuda():
+                inputs = inputs.to(device)
+                # Set requires_grad(True) directly and only for the input
+                inputs.requires_grad_(True)
+
+
+
+            # wrap them in Variable
+            # labels = Variable(labels)  # Labels need no gradient apparently
+            if Utils.use_cuda():
+                labels = labels.to(device)
+
+            # zero the parameter gradients
+            optimizer.zero_grad()
+
+            #print("inputs: " + str(inputs))
+
+
+            # forward + backward + optimize
+            #outputs = multi_dimensional_rnn(Variable(inputs))  # For "Net" (Le Net)
+            print("train_multi_dimensional_rnn_ctc.train_mdrnn - labels.size(): " + str(labels.size()))
+            print("train_multi_dimensional_rnn_ctc.train_mdrnn - inputs.size(): " + str(inputs.size()))
+            # print("train_multi_dimensional_rnn_ctc.train_mdrnn - inputs: " + str(inputs))
+
+            time_start_network_forward = time.time()
+            outputs = network(inputs)
+            print("Time used for network forward: " + str(util.timing.time_since(time_start_network_forward)))
+
+            time_start_loss_computation = time.time()
+            loss = criterion(outputs, labels)
+            print("Time used for loss computation: " + str(util.timing.time_since(time_start_loss_computation)))
+
+            loss_sum = loss.data.sum()
+            inf = float("inf")
+            if loss_sum == inf or loss_sum == -inf:
+                print("WARNING: received an inf loss, setting loss value to 0")
+                loss_value = 0
+            else:
+                loss_value = loss.item()
+
+            print("loss: " + str(loss))
+
+            time_start_loss_backward = time.time()
+            loss.backward()
+            print("Time used for loss backward: " + str(util.timing.time_since(time_start_loss_backward)))
+
+            # Perform gradient clipping
+            made_gradient_norm_based_correction = clip_gradient(multi_dimensional_rnn)
+            if made_gradient_norm_based_correction:
+                num_gradient_corrections += 1
+
+            optimizer.step()
+
+            running_loss += loss_value
+
+            if i % 100 == 99:  # print every 100 mini-batches
+                end = time.time()
+                running_time = end - start
+                print('[%d, %5d] loss: %.3f' %
+                      (epoch + 1, i + 1, running_loss / 100) +
+                      " Running time: " + str(running_time))
+                print("Number of gradient norm-based corrections: " + str(num_gradient_corrections))
+                running_loss = 0.0
+                num_gradient_corrections = 0
+
+            print("Time used for this batch: " + str(util.timing.time_since(time_start_batch)))
+
+            percent = (i + 1) / float(len(train_loader))
+            examples_processed = (i + 1) * batch_size
+            total_examples = len(train_loader.dataset)
+            print("Processed " + str(examples_processed) + " of " + str(total_examples) + " examples in this epoch")
+            print(">>> Total time used during this epoch: " +
+                  str(util.timing.time_since_and_expected_remaining_time(time_start, percent)))
+
+    print('Finished Training')
+
+    # Run evaluation
+    # multi_dimensional_rnn.set_training(False) # Normal case
+    network.module.set_training(False)  # When using DataParallel
+    evaluate_mdrnn(test_loader, network, batch_size, device, vocab_list,
+                   width_reduction_factor)
+
+
+def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: SizeTwoDimensional, hidden_states_size: int, batch_size,
+                    compute_multi_directional: bool, use_dropout: bool,
+                    vocab_list: list):
     import torch.optim as optim
 
     criterion = nn.CrossEntropyLoss()
@@ -314,8 +469,11 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     #    create_three_layer_pair_network(hidden_states_size, mdlstm_block_size,
     #                                 block_strided_convolution_block_size)
     multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
-        create_three_layer_pair_network_linear_parameter_size_increase(hidden_states_size, mdlstm_block_size,
-                                                                       block_strided_convolution_block_size)
+        create_three_layer_pair_network_linear_parameter_size_increase(input_channels, hidden_states_size,
+                                                                       mdlstm_block_size,
+                                                                       block_strided_convolution_block_size,
+                                                                       compute_multi_directional,
+                                                                       use_dropout)
 
     number_of_classes_excluding_blank = len(vocab_list) - 1
     # number_of_classes_excluding_blank = 10
@@ -395,8 +553,6 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
 
             # get the inputs
             inputs, labels = data
-
-            print("labels: " + str(labels))
 
             # Increase all labels by one, since that is the format
             # expected by warp_ctc, which reserves the 0 label for blanks
@@ -552,8 +708,8 @@ def mnist_recognition_fixed_length():
 
     input_size = SizeTwoDimensional.create_size_two_dimensional(input_height, input_width)
     #with torch.autograd.profiler.profile(use_cuda=False) as prof:
-    train_mdrnn(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
-                compute_multi_directional, use_dropout, vocab_list)
+    train_mdrnn_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
+                    compute_multi_directional, use_dropout, vocab_list)
     #print(prof)
 
 
@@ -591,8 +747,8 @@ def mnist_recognition_variable_length():
 
     input_size = SizeTwoDimensional.create_size_two_dimensional(input_height, input_width)
     #with torch.autograd.profiler.profile(use_cuda=False) as prof:
-    train_mdrnn(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
-                compute_multi_directional, use_dropout, vocab_list)
+    train_mdrnn_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
+                    compute_multi_directional, use_dropout, vocab_list)
     #print(prof)
 
 
@@ -623,7 +779,7 @@ def iam_recognition():
     # Possibly a batch size of 128 leads to more instability in training?
     #batch_size = 128
 
-    compute_multi_directional = True
+    compute_multi_directional = False
     # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
     use_dropout = False
 
@@ -635,8 +791,10 @@ def iam_recognition():
 
     input_size = SizeTwoDimensional.create_size_two_dimensional(input_height, input_width)
     #with torch.autograd.profiler.profile(use_cuda=False) as prof:
-    train_mdrnn(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
-                compute_multi_directional, use_dropout, vocab_list)
+    # train_mdrnn_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
+    #                compute_multi_directional, use_dropout, vocab_list)
+    train_mdrnn_no_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
+                    compute_multi_directional, use_dropout, vocab_list)
     #print(prof)
 
 
