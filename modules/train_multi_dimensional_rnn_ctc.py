@@ -334,36 +334,36 @@ def train_mdrnn_no_ctc(train_loader, test_loader, input_channels: int, input_siz
             outputs = network(inputs)
             print("Time used for network forward: " + str(util.timing.time_since(time_start_network_forward)))
 
-            with torch.autograd.profiler.profile(use_cuda=True) as prof:
-                time_start_loss_computation = time.time()
-                loss = criterion(outputs, labels)
-                print("Time used for loss computation: " + str(util.timing.time_since(time_start_loss_computation)))
+            #with torch.autograd.profiler.profile(use_cuda=True) as prof:
+            time_start_loss_computation = time.time()
+            loss = criterion(outputs, labels)
+            print("Time used for loss computation: " + str(util.timing.time_since(time_start_loss_computation)))
 
-                loss_sum = loss.data.sum()
-                inf = float("inf")
-                if loss_sum == inf or loss_sum == -inf:
-                    print("WARNING: received an inf loss, setting loss value to 0")
-                    loss_value = 0
-                else:
-                    loss_value = loss.item()
+            loss_sum = loss.data.sum()
+            inf = float("inf")
+            if loss_sum == inf or loss_sum == -inf:
+                print("WARNING: received an inf loss, setting loss value to 0")
+                loss_value = 0
+            else:
+                loss_value = loss.item()
 
-                print("loss: " + str(loss))
+            print("loss: " + str(loss))
 
-                time_start_loss_backward = time.time()
-                loss.backward()
-                print("Time used for loss backward: " + str(util.timing.time_since(time_start_loss_backward)))
+            time_start_loss_backward = time.time()
+            loss.backward()
+            print("Time used for loss backward: " + str(util.timing.time_since(time_start_loss_backward)))
 
             print("Finished profiling block...")
-            print("len(prof.function_events): " + str(len(prof.function_events)))
+            # print("len(prof.function_events): " + str(len(prof.function_events)))
 
-            print("Computing log string...")
-            log_string = prof.table(sort_by="cpu_time")
-            print("Done...")
-            print("Saving to log file...")
-            text_file = open('/home/gemaille/AI/handwriting-recognition/log_iam_test.txt', 'w')
-            text_file.write(log_string)
-            text_file.close()
-            print("Finished...")
+            # print("Computing log string...")
+            # log_string = prof.table(sort_by="cpu_time")
+            # print("Done...")
+            # print("Saving to log file...")
+            # text_file = open('/home/gemaille/AI/handwriting-recognition/log_iam_test.txt', 'w')
+            # text_file.write(log_string)
+            # text_file.close()
+            # print("Finished...")
 
             # Perform gradient clipping
             made_gradient_norm_based_correction = clip_gradient(multi_dimensional_rnn)
@@ -392,8 +392,6 @@ def train_mdrnn_no_ctc(train_loader, test_loader, input_channels: int, input_siz
             print("Processed " + str(examples_processed) + " of " + str(total_examples) + " examples in this epoch")
             print(">>> Total time used during this epoch: " +
                   str(util.timing.time_since_and_expected_remaining_time(time_start, percent)))
-
-            break
 
     print('Finished Training')
 
@@ -772,7 +770,7 @@ def mnist_recognition_variable_length():
 
 def iam_recognition():
 
-        batch_size = 1
+        batch_size = 16
 
         lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
         iam_database_line_images_root_folder_path = "/datastore/data/iam-database/lines"
@@ -810,12 +808,10 @@ def iam_recognition():
 
         input_size = SizeTwoDimensional.create_size_two_dimensional(input_height, input_width)
         #with torch.autograd.profiler.profile(use_cuda=False) as prof:
-        # train_mdrnn_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
-        #                compute_multi_directional, use_dropout, vocab_list)
-        train_mdrnn_no_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
-                        compute_multi_directional, use_dropout, vocab_list)
-
-
+        train_mdrnn_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
+                       compute_multi_directional, use_dropout, vocab_list)
+        # train_mdrnn_no_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
+        #                 compute_multi_directional, use_dropout, vocab_list)
 
 
 def main():

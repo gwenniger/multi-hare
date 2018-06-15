@@ -61,14 +61,49 @@ class TensorChunking:
             result.extend(blocks)
         return result
 
-
-    # Chunks a four-dimensional tensor into blocks.
-    # The fist dimension is the batch dimension, the second dimension the input channels,
-    # the third and forth dimension are the height and width respectively, along which
-    # the chunking will be done. The result is formed by concatenating the blocks along
-    # the firs (batch) dimension
-    def chunk_tensor_into_blocks_concatenate_along_batch_dimension(self,
+    def chunk_tensor_into_blocks_concatenate_along_batch_dimension_no_cat(self,
             tensor: torch.tensor):
+
+        tensor_split_on_height = torch.split(tensor, self.block_size.height, 2)
+
+        # New implementation: completely without use of cat
+        # https://discuss.pytorch.org/t/best-way-to-split-process-merge/18702
+        total_blocks = self.blocks_per_column * self.blocks_per_row
+        batch_size = tensor.size(0)
+        # The height in the batch dimension must be such that it fits all stacked
+        # blocks, i.e. stacked in a single column, and also keeping the batch dimension
+        height_in_batch_dimension = total_blocks * batch_size
+        print("height in batch dimension: " + str(height_in_batch_dimension))
+
+        if Utils.use_cuda():
+            device = tensor.get_device()
+            with torch.cuda.device(device):
+                # creating the zeros directly on the gpu, which is faster
+                # See: https://discuss.pytorch.org/t/creating-tensors-on-gpu-directly/2714/5
+                result = torch.cuda.FloatTensor(height_in_batch_dimension, tensor.size(1),
+                                                self.block_size.height, self.block_size.width).fill_(0)
+        else:
+            result = torch.FloatTensor(height_in_batch_dimension, tensor.size(1),
+                                       self.block_size.height, self.block_size.width).fill_(0)
+        index = 0
+        for row_block in tensor_split_on_height:
+            blocks = torch.split(row_block, self.block_size.width, 3)
+            for column_block in blocks:
+                # print("column_block.size(): " + str(column_block.size()))
+                # print("result.size(): " + str(result.size()))
+                # print("result slice.size() : " +
+                #      str(result[index * batch_size:((index + 1) * batch_size),
+                #                 :, :, :].size())
+                #      )
+                # https://discuss.pytorch.org/t/best-way-to-split-process-merge/18702
+                result[index * batch_size:((index + 1) * batch_size),
+                       :, :, :] = column_block
+        return result
+
+    def chunk_tensor_into_blocks_concatenate_along_batch_dimension_cat_once(self,
+            tensor: torch.tensor):
+
+        tensor_split_on_height = torch.split(tensor, self.block_size.height, 2)
 
         # if Utils.use_cuda():
         #     device = tensor.get_device()
@@ -105,6 +140,18 @@ class TensorChunking:
 
         return result
 
+    # Chunks a four-dimensional tensor into blocks.
+    # The fist dimension is the batch dimension, the second dimension the input channels,
+    # the third and forth dimension are the height and width respectively, along which
+    # the chunking will be done. The result is formed by concatenating the blocks along
+    # the firs (batch) dimension
+    def chunk_tensor_into_blocks_concatenate_along_batch_dimension(self,
+            tensor: torch.tensor):
+        return self.chunk_tensor_into_blocks_concatenate_along_batch_dimension_cat_once(tensor)
+
+        # No-cat implementation: slower on loss.backward
+        # return self.chunk_tensor_into_blocks_concatenate_along_batch_dimension_no_cat(tensor)
+
     @staticmethod
     def check_block_size_fits_into_original_size(block_size: SizeTwoDimensional,
             original_size: SizeTwoDimensional):
@@ -134,10 +181,31 @@ class TensorChunking:
         span_end = span_begin + self.block_size.width
         return span_begin, span_end
 
-    # Reconstructs a tensor block row from a 5 dimensional tensor whose first dimension
-    # goes over the blocks int the original tensor, and whose other four dimensions go over
-    # the batch dimensions, channel dimension and height and width dimensions of these blocks
-    def reconstruct_tensor_block_row(self, tensor_grouped_by_block, row_index):
+    # Reconstruct the tensor block row, using a combination of torch.split, squeeze and torch.cat operations
+    # which for some reason yields better loss.backward performance than the original
+    # implementation using torch.cat with a for loop and slicing
+    def reconstruct_tensor_block_row_split_squeeze_cat(self, tensor_grouped_by_block, row_index):
+        first_block_index = row_index * self.blocks_per_row
+
+        # >>> IMPORTANT <<<
+        # This alternate computation using split in combination with squeeze to remove
+        # the spurious dimension after splitting seems to work and gives much faster performance for
+        # loss.backward. Why this is the case is not very clear. Perhaps avoiding slicing
+        # when possible helps?
+        # print("tensor_grouped_by_block.size(): " + str(tensor_grouped_by_block.size()))
+        row_slice = tensor_grouped_by_block[first_block_index:first_block_index+self.blocks_per_row, :, :, :, :]
+        tensors_split = torch.split(row_slice, 1, 0)
+        # print("tensors_split[0].size(): " + str(tensors_split[0].size()))
+        # Splitting still retains the extra first dimension, which must be removed then
+        # for all list elements using squeeze
+        tensors_split_squeezed = list([])
+        for element in tensors_split:
+            tensors_split_squeezed.append(element.squeeze(0))
+        # In "one go" with a combination of split, squeeze and cat
+        return torch.cat(tensors_split_squeezed, 3)
+
+    def reconstruct_tensor_block_row_original(self, tensor_grouped_by_block, row_index):
+        #
         first_block_index = row_index * self.blocks_per_row
         # The result is initialized by the first (left-most) block of the row
         result = tensor_grouped_by_block[first_block_index, :, :, :, :]
@@ -148,6 +216,13 @@ class TensorChunking:
             result = torch.cat((result, tensor_grouped_by_block[block_index, :, :, :, :]), 3)
         return result
 
+    # Reconstructs a tensor block row from a 5 dimensional tensor whose first dimension
+    # goes over the blocks int the original tensor, and whose other four dimensions go over
+    # the batch dimensions, channel dimension and height and width dimensions of these blocks
+    def reconstruct_tensor_block_row(self, tensor_grouped_by_block, row_index):
+        # return self.reconstruct_tensor_block_row_original(tensor_grouped_by_block, row_index)
+        # This implementation somehow yields much faster loss.backward performance than the original
+        return self.reconstruct_tensor_block_row_split_squeeze_cat(tensor_grouped_by_block, row_index)
 
     # This function performs the inverse of
     # "chunk_tensor_into_blocks_concatenate_along_batch_dimension" : it takes
