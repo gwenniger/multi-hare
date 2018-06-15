@@ -770,7 +770,7 @@ def mnist_recognition_variable_length():
 
 def iam_recognition():
 
-        batch_size = 16
+        batch_size = 32
 
         lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
         iam_database_line_images_root_folder_path = "/datastore/data/iam-database/lines"

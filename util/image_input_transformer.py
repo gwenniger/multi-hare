@@ -145,7 +145,7 @@ class ImageInputTransformer:
     def create_transformed_images_row(row_number: int, number_of_image_tensors: int,
                                       number_of_channels: int,
                                       width: int, transformed_images_width,
-                                      image_tensors, device):
+                                      image_tensors_row, device):
         leading_zeros = row_number
         tailing_zeros = transformed_images_width - width - row_number
 
@@ -165,10 +165,12 @@ class ImageInputTransformer:
 
             # print("leading_zeros_tensor.size()" + str(leading_zeros_tensor.size()))
 
-            new_row = torch.cat((leading_zeros_tensor,
-                                 image_tensors[:, :, row_number, :]), 2)
+            #new_row = torch.cat((leading_zeros_tensor,
+            #                     image_tensors[:, :, row_number, :]), 2)
+            new_row = torch.cat((leading_zeros_tensor, image_tensors_row), 2)
         else:
-            new_row = image_tensors[:, :, row_number, :]
+            # new_row = image_tensors[:, :, row_number, :]
+            new_row = image_tensors_row
 
         if tailing_zeros > 0:
             # print("number of channels: " + str(number_of_channels))
@@ -224,15 +226,16 @@ class ImageInputTransformer:
         transformed_images = ImageInputTransformer. \
             create_transformed_images_row(0, number_of_image_tensors,
                                           number_of_channels,
-                                          width, transformed_images_width, image_tensors, device)
+                                          width, transformed_images_width, image_tensors[:, :, 0, :], device)
         transformed_images = transformed_images.unsqueeze(2)
-        # print("transformed_images.size(): " + str(transformed_images.size()))
+        print("transformed_images.size(): " + str(transformed_images.size()))
 
         for row_number in range(1, height):
             new_row = ImageInputTransformer. \
                 create_transformed_images_row(row_number, number_of_image_tensors,
                                               number_of_channels,
-                                               width, transformed_images_width, image_tensors, device)
+                                              width, transformed_images_width, image_tensors[:, :, row_number, :],
+                                              device)
             new_row = new_row.unsqueeze(2)
             # print("new_row.size(): " + str(new_row.size()))
             # print("new row.size(): " + str(new_row.size()))
@@ -248,11 +251,75 @@ class ImageInputTransformer:
         # print("transformed_images.size(): " + str(transformed_images.size()))
         return transformed_images
 
+    # Alternative implementation of "create_row_diagonal_offset_tensors_parallel"
+    # that uses split instead of tensor slicing to go over the tensor rows.
+    # It was hoped this implementation might be faster than the original, but there
+    # seems to be no difference.
+    @staticmethod
+    def create_row_diagonal_offset_tensors_parallel_using_split(image_tensors):
+
+        if Utils.use_cuda():
+            # https://discuss.pytorch.org/t/which-device-is-model-tensor-stored-on/4908/7
+            device = image_tensors.get_device()
+
+        # See: https://stackoverflow.com/questions/46826218/pytorch-how-to-get-the-shape-of-a-tensor-as-a-list-of-int
+
+        # print("list(image_tensor.size()): " + str(list(image_tensors.size())))
+        # See: https://discuss.pytorch.org/t/indexing-a-2d-tensor/1667/2
+        number_of_channels = image_tensors.size(1)
+        height = image_tensors.size(2)
+        width = image_tensors.size(3)
+        # print("height: " + str(height))
+        # print("width: " + str(width))
+
+        number_of_image_tensors = image_tensors.size(0)
+        # print("number of image tensors: " + str(number_of_image_tensors))
+        # The width of the transformed images is width+height-1 (important for unequal sized input_
+        # transformed_images = torch.zeros(number_of_image_tensors, number_of_channels, height, (width + height) - 1)
+        # print("transformed_image: " + str(transformed_image))
+        # print("transformed_im   age.size(): " + str(transformed_image.size()))
+
+        # The width of the transformed images is width+height-1 (important for unequal sized input_
+        transformed_images_width = ImageInputTransformer.get_skewed_images_width(image_tensors)
+
+        # In one go with split and cat on entire list
+
+        list_for_cat = list([])
+        row_number = 0
+        for image_tensors_row in torch.split(image_tensors, 1, 2):
+            # print("before - image_tensors_row.size(): " + str(image_tensors_row.size()))
+            image_tensors_row = image_tensors_row.squeeze(2)
+            # print("after - image_tensors_row.size(): " + str(image_tensors_row.size()))
+            new_row = ImageInputTransformer. \
+                create_transformed_images_row(row_number, number_of_image_tensors,
+                                              number_of_channels,
+                                              width, transformed_images_width, image_tensors_row, device)
+            # print("before - new_row.size(): " + str(new_row.size()))
+            new_row = new_row.unsqueeze(2)
+            # print("after - new_row.size(): " + str(new_row.size()))
+            # print("new row.size(): " + str(new_row.size()))
+            # print("transformed_image[:, :, y, :].size()" + str(transformed_images[:, :, y, :].size()))
+            #  transformed_images[:, :, y, :] = new_row
+
+            # Use torch.cat instead of copying of a tensor slice into a zeros tensor.
+            # torch.cat clearly preserves the backward gradient pointer, but with
+            # copying to a zeros tensor it is not quite clear if this happens
+            list_for_cat.append(new_row)
+            row_number += 1
+        transformed_images = torch.cat(list_for_cat, 2)
+
+        # print("create_row_diagonal_offset_tensor: transformed_images.grad_fn: " + str(transformed_images.grad_fn))
+        # print("transformed_images.size(): " + str(transformed_images.size()))
+        return transformed_images
+
     @staticmethod
     def create_row_diagonal_offset_tensors(image_tensors):
 
         #result = ImageInputTransformer.create_row_diagonal_offset_tensors_serial(image_tensors[:, :, :, :])
-        result = ImageInputTransformer.create_row_diagonal_offset_tensors_parallel(image_tensors[:, :, :, :])
+        result = ImageInputTransformer.create_row_diagonal_offset_tensors_parallel(image_tensors)
+        # Experimental lternative implementation using split instead of tensor slicing,
+        # uses almost exactly the same time as the original implementation
+        # result = ImageInputTransformer.create_row_diagonal_offset_tensors_parallel_using_split(image_tensors)
         #print("result: " + str(result))
         return result
 
@@ -265,7 +332,7 @@ class ImageInputTransformer:
         #    create_row_diagonal_offset_tensors_parallel_breaks_gradient(x)
 
         skewed_images = ImageInputTransformer. \
-            create_row_diagonal_offset_tensors_parallel(x)
+            create_row_diagonal_offset_tensors(x)
 
         # print("skewed images columns: " + str(skewed_images_columns))
         # print("skewed images rows: " + str(skewed_images_rows))
@@ -314,7 +381,7 @@ class ImageInputTransformer:
             # print("row_number: (original_image_columns + row_number: " +
             #      str(row_number) + ":" + str(original_image_columns + row_number))
             activation_columns = activations_as_tensor[:, :, row_number,
-                                 row_number: (original_image_columns + row_number)]
+                                                       row_number: (original_image_columns + row_number)]
             activation_columns = torch.unsqueeze(activation_columns, 2)
             # print("activations.size():" + str(activations.size()))
             # print("activations_unskewed.size():" + str(activations_unskewed.size()))

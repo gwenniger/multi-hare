@@ -103,8 +103,6 @@ class TensorChunking:
     def chunk_tensor_into_blocks_concatenate_along_batch_dimension_cat_once(self,
             tensor: torch.tensor):
 
-        tensor_split_on_height = torch.split(tensor, self.block_size.height, 2)
-
         # if Utils.use_cuda():
         #     device = tensor.get_device()
         #     with torch.cuda.device(device):
