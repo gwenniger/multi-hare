@@ -103,6 +103,10 @@ class TensorChunking:
     def chunk_tensor_into_blocks_concatenate_along_batch_dimension_cat_once(self,
             tensor: torch.tensor):
 
+        tensor_split_on_height = torch.split(tensor, self.block_size.height, 2)
+
+        # The old implementation, calls torch.cat many times
+        #
         # if Utils.use_cuda():
         #     device = tensor.get_device()
         #     with torch.cuda.device(device):
@@ -117,9 +121,6 @@ class TensorChunking:
         #     result = torch.zeros(0, tensor.size(1), self.block_size.height,
         #                          self.block_size.width)
 
-        tensor_split_on_height = torch.split(tensor, self.block_size.height, 2)
-
-        # The old implementation, calls torch.cat many times
         # for row_block in tensor_split_on_height:
         #     blocks = torch.split(row_block, self.block_size.width, 3)
         #     list_for_cat = list([])
@@ -134,7 +135,7 @@ class TensorChunking:
             blocks = torch.split(row_block, self.block_size.width, 3)
             list_for_cat.extend(blocks)
         result = torch.cat(list_for_cat, 0)
-        print("chunk_tensor_into_blocks_concatenate_along_batch_dimension - result.size(): " + str(result.size()))
+        # print("chunk_tensor_into_blocks_concatenate_along_batch_dimension - result.size(): " + str(result.size()))
 
         return result
 
@@ -258,8 +259,8 @@ class TensorChunking:
     def dechunk_block_tensor_concatenated_along_batch_dimension_breaks_gradient(self, tensor: torch.tensor):
         number_of_examples = int(tensor.size(0) / self.number_of_feature_blocks_per_example)
 
-        print(">>> dechunk_block_tensor_concatenated_along_batch_dimension: - tensor.grad_fn "
-              + str(tensor.grad_fn))
+        # print(">>> dechunk_block_tensor_concatenated_along_batch_dimension: - tensor.grad_fn "
+        #       + str(tensor.grad_fn))
 
         # print("tensor.size(): " + str(tensor.size()))
         channels = tensor.size(1)
@@ -300,8 +301,8 @@ class TensorChunking:
             width_span_begin:width_span_end] = \
                 tensor_grouped_by_block[block_index, :, :, :]
 
-        print(">>> dechunk_block_tensor_concatenated_along_batch_dimension: - result.grad_fn "
-              + str(result.grad_fn))
+        # print(">>> dechunk_block_tensor_concatenated_along_batch_dimension: - result.grad_fn "
+        #      + str(result.grad_fn))
 
         return result
 

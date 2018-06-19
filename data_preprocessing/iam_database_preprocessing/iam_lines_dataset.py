@@ -77,6 +77,9 @@ class IamLinesDataset(Dataset):
     def get_vocabulary_list(self):
         return self.string_to_index_mapping_table.get_vocabulary_list()
 
+    def get_blank_symbol(self):
+        return self.string_to_index_mapping_table.get_blank_symbol()
+
     @staticmethod
     def get_labels_with_probabilities_length_and_real_sequence_length(labels_padded,
                                                                       original_image_width: int,
@@ -197,6 +200,7 @@ class IamLinesDataset(Dataset):
 
     def __len__(self):
         return len(self.examples_line_information)
+        # return int(len(self.examples_line_information) / 20)  # Hack for faster training during development
 
     def __getitem__(self, idx):
         line_information = self.examples_line_information[idx]

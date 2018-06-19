@@ -55,12 +55,18 @@ def get_test_set():
     return test_set
 
 
+# We want labels to start from 1, so we increase the original label by 1
+# so that 0 can reserved for blanks
+def get_item_label_with_labels_starting_from_one(item_label):
+    return item_label + 1
+
+
 def get_item_tensors_and_labels_combined(train_set: list, start_index: int, sequence_length: int):
     print("get_item_tensors_and_labels_combined - start_index: " + str(start_index) +
           " sequence length: " + str(sequence_length))
     item_one = train_set[start_index]
     item_one_tensor = item_one[0]
-    item_one_label = item_one[1]
+    item_one_label = get_item_label_with_labels_starting_from_one(item_one[1])
 
     item_tensors_combined = item_one_tensor
     item_labels_combined = torch.IntTensor([item_one_label])
@@ -70,7 +76,8 @@ def get_item_tensors_and_labels_combined(train_set: list, start_index: int, sequ
         print("index:  " + str(index))
         next_item = train_set[index]
         next_item_tensor = next_item[0]
-        next_item_label = next_item[1]
+
+        next_item_label = get_item_label_with_labels_starting_from_one(next_item[1])
 
         item_tensors_combined = torch.cat((item_tensors_combined, next_item_tensor), 2)
         item_labels_combined = torch.cat((item_labels_combined,  torch.IntTensor([next_item_label])), 0)

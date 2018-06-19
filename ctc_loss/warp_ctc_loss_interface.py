@@ -91,8 +91,9 @@ class WarpCTCLossInterface:
     @staticmethod
     def create_probabilities_lengths_specification_tensor_different_lengths(labels_row_tensor,
                                                                             horizontal_reduction_factor: int,
-                                                                            probabilities_tensor_sequence_length: int
+                                                                            probabilities
                                                                             ):
+        probabilities_tensor_sequence_length = probabilities.size(1)
         number_of_examples = labels_row_tensor.size(0)
         sequence_length = WarpCTCLossInterface.get_real_probabilities_length(labels_row_tensor[0],
                                                                              horizontal_reduction_factor,
@@ -156,9 +157,9 @@ class WarpCTCLossInterface:
     @staticmethod
     def check_labels_row_tensor_contains_no_zeros(labels_row_tensor):
         number_of_zero_labels = util.tensor_utils.TensorUtils.number_of_zeros(labels_row_tensor)
-        print(
-            "WarpCTCLossInterface.check_labels_row_tensor_contains_no_zeros - number_of_zeros: "
-            + str(number_of_zero_labels))
+        #print(
+        #    "WarpCTCLossInterface.check_labels_row_tensor_contains_no_zeros - number_of_zeros: "
+        #    + str(number_of_zero_labels))
         # A sanity check to make sure the labels_row_tensor does not contain zeros,
         # which was an error in past usage
         if number_of_zero_labels != 0:
@@ -176,7 +177,6 @@ class WarpCTCLossInterface:
     def compute_ctc_loss(self, probabilities, labels_row_tensor, batch_size: int,
                          width_reduction_factor: int):
 
-        probabilities_tensor_sequence_length = probabilities.size(1)
         WarpCTCLossInterface.check_labels_row_tensor_contains_no_zeros(labels_row_tensor)
 
         labels = Variable(WarpCTCLossInterface.
@@ -191,7 +191,7 @@ class WarpCTCLossInterface:
         probabilities_sizes = \
             Variable(WarpCTCLossInterface.
                      create_probabilities_lengths_specification_tensor_different_lengths(
-                        labels_row_tensor, width_reduction_factor, probabilities_tensor_sequence_length))
+                        labels_row_tensor, width_reduction_factor, probabilities))
 
         # The ctc_loss interface expects the second dimension to be the batch size,
         # so the first and second dimension must be swapped

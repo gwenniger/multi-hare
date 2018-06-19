@@ -138,7 +138,7 @@ class ImageInputTransformer:
         # but this is not also very conclusive
         print("create_row_diagonal_offset_tensor_parallel_breaks_gradient: transformed_images.grad_fn: " +
               str(transformed_images.grad_fn))
-        print("transformed_images.size(): " + str(transformed_images.size()))
+        # print("transformed_images.size(): " + str(transformed_images.size()))
         return transformed_images
 
     @staticmethod
@@ -228,7 +228,7 @@ class ImageInputTransformer:
                                           number_of_channels,
                                           width, transformed_images_width, image_tensors[:, :, 0, :], device)
         transformed_images = transformed_images.unsqueeze(2)
-        print("transformed_images.size(): " + str(transformed_images.size()))
+        # print("transformed_images.size(): " + str(transformed_images.size()))
 
         for row_number in range(1, height):
             new_row = ImageInputTransformer. \
@@ -317,7 +317,7 @@ class ImageInputTransformer:
 
         #result = ImageInputTransformer.create_row_diagonal_offset_tensors_serial(image_tensors[:, :, :, :])
         result = ImageInputTransformer.create_row_diagonal_offset_tensors_parallel(image_tensors)
-        # Experimental lternative implementation using split instead of tensor slicing,
+        # Experimental alternative implementation using split instead of tensor slicing,
         # uses almost exactly the same time as the original implementation
         # result = ImageInputTransformer.create_row_diagonal_offset_tensors_parallel_using_split(image_tensors)
         #print("result: " + str(result))

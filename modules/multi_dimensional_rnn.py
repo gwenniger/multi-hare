@@ -229,8 +229,8 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         if activations_height != 1:
             # raise RuntimeError("Error: the height dimension of returned activations should be of size 1, but it " +
             #                   "was: " + str(activations.size(2)))
-            print("WARNING: activations height is " + str(activations_height) + " ( > 1) :\n" +
-                  "Converting to a height of 1 by summing over the rows")
+            # print("WARNING: activations height is " + str(activations_height) + " ( > 1) :\n" +
+            #      "Converting to a height of 1 by summing over the rows")
             activations = torch.sum(activations, dim=2)
             # activations = activations[:, :, 0, :] # Wrong and not really faster
 
@@ -268,9 +268,6 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         result = class_activations_resized
 
         # print(">>> MultiDimensionalRNNToSoftMaxNetwork.forward.result: " + str(result))
-
-        soft_max_activations_summed = torch.sum(result, dim=probabilities_sum_to_one_dimension)
-        # print(">>> MultiDimensionalRNNToSoftMaxNetwork.forward - soft_max_activations_summed: " + str(soft_max_activations_summed))
 
         return result
 
@@ -339,7 +336,7 @@ class MultiDimensionalRNNBase(torch.nn.Module):
         # print("activations_unskewed: " + str(activations_unskewed))
         # print("selection_tensor: " + str(selection_tensor))
 
-        # Using tor.index_select we can bring together the activations of the four
+        # Using torch.index_select we can bring together the activations of the four
         # different rotations, while avoiding use of a for loop, making the whole thing
         # hopefully faster
         selection_tensor = self.get_or_add_and_get_selection_tensor(x)

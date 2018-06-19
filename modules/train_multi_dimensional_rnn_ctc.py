@@ -20,6 +20,8 @@ from modules.size_two_dimensional import SizeTwoDimensional
 from ctc_loss.warp_ctc_loss_interface import WarpCTCLossInterface
 import ctcdecode
 import util.timing
+import data_preprocessing
+import util.tensor_utils
 
 
 def test_mdrnn_cell():
@@ -66,24 +68,35 @@ def print_number_of_parameters(model):
 
 # Note that if seq_len=0 then the result will always be the empty String
 def convert_to_string(tokens, vocab, seq_len):
-    print("convert_to_string - tokens: " + str(tokens))
-    print("convert_to_string - vocab: " + str(vocab))
-    print("convert_to_string - seq_len: " + str(seq_len))
+    # print("convert_to_string - tokens: " + str(tokens))
+    # print("convert_to_string - vocab: " + str(vocab))
+    # print("convert_to_string - seq_len: " + str(seq_len))
     result = ''.join([vocab[x] for x in tokens[0:seq_len]])
-    print("convert_to_string - result: " + str(result))
+    # print("convert_to_string - result: " + str(result))
     return result
 
 
-def convert_labels_tensor_to_string(labels: torch.Tensor):
+def convert_labels_tensor_to_string(labels: torch.Tensor, vocab_list: list, blank_symbol):
+
+    # Check that the first label of vocab_list is indeed the blank label,
+    # otherwise the results will be incorrect
+    if not vocab_list[0] == blank_symbol:
+        raise RuntimeError("Error: convert_labels_tensor_to_string - " +
+                           "requires the first label of vocab_list (" +
+                           str(vocab_list) + ") to be the blank symbol " +
+                           " but was: " + str(vocab_list[0]))
+
     labels_as_list = labels.data.tolist()
     result = ""
     for i in range(0, labels.size(0)):
-        result = result + str(labels_as_list[i])
+        index = labels_as_list[i]
+        # print("convert_labels_tensor_to_string - index: " + str(index))
+        result = result + str(vocab_list[index])
     return result
 
 
-def evaluate_mdrnn(test_loader, multi_dimensional_rnn, batch_size, device,
-                   vocab_list, horizontal_reduction_factor: int):
+def evaluate_mdrnn(test_loader, multi_dimensional_rnn, device,
+                   vocab_list: list, blank_symbol: str, horizontal_reduction_factor: int):
 
     correct = 0
     total = 0
@@ -109,44 +122,48 @@ def evaluate_mdrnn(test_loader, multi_dimensional_rnn, batch_size, device,
         print(">>> evaluate_mdrnn  - probabilities.size: " + str(probabilities.size()))
 
         beam_size = 20
-        print(">>> evaluate_mdrnn  - len(vocab_list: " + str(len(vocab_list)))
+        print(">>> evaluate_mdrnn  - len(vocab_list): " + str(len(vocab_list)))
         decoder = ctcdecode.CTCBeamDecoder(vocab_list, beam_width=beam_size,
-                                           blank_id=vocab_list.index('_'),
+                                           blank_id=vocab_list.index(blank_symbol),
                                            num_processes=16)
         label_sizes = WarpCTCLossInterface.\
             create_sequence_lengths_specification_tensor_different_lengths(labels)
-        # The sequence lengths are determined using the label_sizes, under the assumption
-        # that each label has a fixed number of output rows.
-        # TODO: Using pack_padded_sequence, it should be possible to pad the input
-        # with -1 rather than 0, since the padding is supposedly not processed when
-        # pack_padded_sequence is used. This would allow to directly determine the lengths
-        # from the image input, which is better, as it does not require a fixed relation
-        # between sequence length and number of rows (which may often not hold)
+
         sequence_lengths = WarpCTCLossInterface.create_probabilities_lengths_specification_tensor_different_lengths(
-            labels, horizontal_reduction_factor)
-        print(">>> evaluate_mdrnn  -  sequence lengths: " + str(sequence_lengths))
+            labels, horizontal_reduction_factor, probabilities)
+        # print(">>> evaluate_mdrnn  -  sequence lengths: " + str(sequence_lengths))
+        # print("probabilities.data.size(): " + str(probabilities.data.size()))
         beam_results, beam_scores, timesteps, out_seq_len = \
             decoder.decode(probabilities.data, sequence_lengths)
-        print(">>> evaluate_mdrnn  - beam_results: " + str(beam_results))
+
+        # print(">>> evaluate_mdrnn  - beam_results: " + str(beam_results))
 
         total += labels.size(0)
 
         for example_index in range(0, beam_results.size(0)):
             beam_results_sequence = beam_results[example_index][0]
-            print("beam_results_sequence: \"" + str(beam_results_sequence) + "\"")
+            # print("beam_results_sequence: \"" + str(beam_results_sequence) + "\"")
             output_string = convert_to_string(beam_results_sequence,
                                               vocab_list, out_seq_len[example_index][0])
             example_labels_with_padding = labels[example_index]
             # Extract the real example labels, removing the padding labels
-            example_labels = example_labels_with_padding[0:label_sizes[example_index]]
-            print(">>> evaluate_mdrnn  - output_string: " + output_string)
-            print(">>> evaluate_mdrnn  - example_labels: " + str(example_labels))
-            example_labels_string = convert_labels_tensor_to_string(example_labels)
-            print(">>> evaluate_mdrnn  - example_labels_string: " + example_labels_string)
+            reference_labels = example_labels_with_padding[0:label_sizes[example_index]]
 
-            if example_labels_string == output_string:
-                print("Yaaaaah, got one correct!!!")
+            # print(">>> evaluate_mdrnn  - reference_labels: " + str(reference_labels))
+            reference_labels_string = convert_labels_tensor_to_string(reference_labels, vocab_list, blank_symbol)
+
+            if reference_labels_string == output_string:
+                # print("Yaaaaah, got one correct!!!")
                 correct += 1
+                correct_string = "correct"
+            else:
+                correct_string = "wrong"
+
+            print(">>> evaluate_mdrnn  - output: \"" + output_string + "\" " +
+                  "\nreference: \"" + reference_labels_string + "\" --- "
+                  + correct_string)
+
+
 
         # correct += (predicted == labels).sum()
 
@@ -384,14 +401,14 @@ def train_mdrnn_no_ctc(train_loader, test_loader, input_channels: int, input_siz
                 running_loss = 0.0
                 num_gradient_corrections = 0
 
-            print("Time used for this batch: " + str(util.timing.time_since(time_start_batch)))
+        print("Time used for this batch: " + str(util.timing.time_since(time_start_batch)))
 
-            percent = (i + 1) / float(len(train_loader))
-            examples_processed = (i + 1) * batch_size
-            total_examples = len(train_loader.dataset)
-            print("Processed " + str(examples_processed) + " of " + str(total_examples) + " examples in this epoch")
-            print(">>> Total time used during this epoch: " +
-                  str(util.timing.time_since_and_expected_remaining_time(time_start, percent)))
+        percent = (i + 1) / float(len(train_loader))
+        examples_processed = (i + 1) * batch_size
+        total_examples = len(train_loader.dataset)
+        print("Processed " + str(examples_processed) + " of " + str(total_examples) + " examples in this epoch")
+        print(">>> Total time used during this epoch: " +
+        str(util.timing.time_since_and_expected_remaining_time(time_start, percent)))
 
     print('Finished Training')
 
@@ -404,7 +421,7 @@ def train_mdrnn_no_ctc(train_loader, test_loader, input_channels: int, input_siz
 
 def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: SizeTwoDimensional, hidden_states_size: int, batch_size,
                     compute_multi_directional: bool, use_dropout: bool,
-                    vocab_list: list):
+                    vocab_list: list, blank_symbol: str):
     import torch.optim as optim
 
     criterion = nn.CrossEntropyLoss()
@@ -478,18 +495,18 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
     mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
     # mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
     block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
-    #multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking.\
-    #    create_two_layer_pair_network(hidden_states_size, mdlstm_block_size,
-    #                                  block_strided_convolution_block_size)
+    multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking.\
+        create_two_layer_pair_network(hidden_states_size, mdlstm_block_size,
+                                      block_strided_convolution_block_size)
     #multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
     #    create_three_layer_pair_network(hidden_states_size, mdlstm_block_size,
     #                                 block_strided_convolution_block_size)
-    multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
-        create_three_layer_pair_network_linear_parameter_size_increase(input_channels, hidden_states_size,
-                                                                       mdlstm_block_size,
-                                                                       block_strided_convolution_block_size,
-                                                                       compute_multi_directional,
-                                                                       use_dropout)
+    #multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
+    #    create_three_layer_pair_network_linear_parameter_size_increase(input_channels, hidden_states_size,
+    #                                                                   mdlstm_block_size,
+    #                                                                   block_strided_convolution_block_size,
+    #                                                                   compute_multi_directional,
+    #                                                                   use_dropout)
 
     number_of_classes_excluding_blank = len(vocab_list) - 1
     # number_of_classes_excluding_blank = 10
@@ -559,7 +576,7 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
     # in the output from the real input width information in the warp_ctc_loss function
     width_reduction_factor = network.module.get_width_reduction_factor()
 
-    for epoch in range(4):  # loop over the dataset multiple times
+    for epoch in range(5):  # loop over the dataset multiple times
 
         running_loss = 0.0
         time_start = time.time()
@@ -570,9 +587,12 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
             # get the inputs
             inputs, labels = data
 
-            # Increase all labels by one, since that is the format
-            # expected by warp_ctc, which reserves the 0 label for blanks
-            # labels = create_labels_starting_from_one(labels)
+            # The format expected by warp_ctc, which reserves the 0 label for blanks
+            number_of_zeros = util.tensor_utils.TensorUtils.number_of_zeros(labels)
+            # Check that labels indeed start from 1 as required
+            if number_of_zeros != 0:
+                raise RuntimeError("Error: labels tensor contains zeros, which is " +
+                                   " not allowed, since 0 is reserved for blanks")
 
             if Utils.use_cuda():
                 inputs = inputs.to(device)
@@ -596,13 +616,13 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
 
             # forward + backward + optimize
             #outputs = multi_dimensional_rnn(Variable(inputs))  # For "Net" (Le Net)
-            print("train_multi_dimensional_rnn_ctc.train_mdrnn - labels.size(): " + str(labels.size()))
-            print("train_multi_dimensional_rnn_ctc.train_mdrnn - inputs.size(): " + str(inputs.size()))
+            # print("train_multi_dimensional_rnn_ctc.train_mdrnn - labels.size(): " + str(labels.size()))
+            # print("train_multi_dimensional_rnn_ctc.train_mdrnn - inputs.size(): " + str(inputs.size()))
             # print("train_multi_dimensional_rnn_ctc.train_mdrnn - inputs: " + str(inputs))
 
             time_start_network_forward = time.time()
             outputs = network(inputs)
-            print("Time used for network forward: " + str(util.timing.time_since(time_start_network_forward)))
+            # print("Time used for network forward: " + str(util.timing.time_since(time_start_network_forward)))
 
 
             # print(">>> outputs.size(): " + str(outputs.size()))
@@ -625,7 +645,7 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
                                                             number_of_examples,
                                                             width_reduction_factor)
 
-            print("Time used for ctc loss computation: " + str(util.timing.time_since(time_start_ctc_loss_computation)))
+            # print("Time used for ctc loss computation: " + str(util.timing.time_since(time_start_ctc_loss_computation)))
 
 
             # See: https://github.com/SeanNaren/deepspeech.pytorch/blob/master/train.py
@@ -641,12 +661,12 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
             else:
                 loss_value = loss.item()
 
-            print("loss: " + str(loss))
+            # print("loss: " + str(loss))
             #loss = criterion(outputs, labels)
 
             time_start_loss_backward = time.time()
             loss.backward()
-            print("Time used for loss backward: " + str(util.timing.time_since(time_start_loss_backward)))
+            # print("Time used for loss backward: " + str(util.timing.time_since(time_start_loss_backward)))
 
             # Perform gradient clipping
             made_gradient_norm_based_correction = clip_gradient(multi_dimensional_rnn)
@@ -663,33 +683,44 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
             #if i % 2000 == 1999:  # print every 2000 mini-batches
             # See: https://stackoverflow.com/questions/5598181/python-multiple-prints-on-the-same-line
             #print(str(i)+",", end="", flush=True)
-            if i % 100 == 99:  # print every 100 mini-batches
+            if i % 10 == 9:  # print every 10 mini-batches
                 end = time.time()
                 running_time = end - start
                 print('[%d, %5d] loss: %.3f' %
-                      (epoch + 1, i + 1, running_loss / 100) +
+                      (epoch + 1, i + 1, running_loss / 10) +
                       " Running time: " + str(running_time))
                 print("Number of gradient norm-based corrections: " + str(num_gradient_corrections))
                 running_loss = 0.0
                 num_gradient_corrections = 0
 
-            print("Time used for this batch: " + str(util.timing.time_since(time_start_batch)))
+                percent = (i + 1) / float(len(train_loader))
+                examples_processed = (i + 1) * batch_size
+                total_examples = len(train_loader.dataset)
+                print("Processed " + str(examples_processed) + " of " + str(total_examples) + " examples in this epoch")
+                print(">>> Time used in current epoch: " +
+                      str(util.timing.time_since_and_expected_remaining_time(time_start, percent)))
 
-            percent = (i + 1) / float(len(train_loader))
-            examples_processed = (i + 1) * batch_size
-            total_examples = len(train_loader.dataset)
-            print("Processed " + str(examples_processed) + " of " + str(total_examples) + " examples in this epoch")
-            print(">>> Total time used during this epoch: " +
-                  str(util.timing.time_since_and_expected_remaining_time(time_start, percent)))
+            # print("Time used for this batch: " + str(util.timing.time_since(time_start_batch)))
+
+
+
+
+        print("<evaluation epoch " + str(epoch) + " >")
+        # Run evaluation
+        # multi_dimensional_rnn.set_training(False) # Normal case
+        network.module.set_training(False)  # When using DataParallel
+        evaluate_mdrnn(test_loader, network, device, vocab_list, blank_symbol,
+                           width_reduction_factor)
+	
+        network.module.set_training(True)  # When using DataParallel
+        print("</evaluation epoch " + str(epoch) + " >")
+
+  	 
+
 
     print('Finished Training')
 
-    # Run evaluation
-    # multi_dimensional_rnn.set_training(False) # Normal case
-    network.module.set_training(False)  # When using DataParallel
-    evaluate_mdrnn(test_loader, network, batch_size, device, vocab_list,
-                   width_reduction_factor)
-
+   
 
 def mnist_recognition_fixed_length():
     batch_size = 128
@@ -732,7 +763,7 @@ def mnist_recognition_fixed_length():
 def mnist_recognition_variable_length():
     batch_size = 128
     min_num_digits = 1
-    max_num_digits = 30
+    max_num_digits = 3
     # In MNIST there are the digits 0-9, and we also add a symbol for blanks
     # This vocab_list will be used by the decoder
     vocab_list = list(['_', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'])
@@ -763,27 +794,33 @@ def mnist_recognition_variable_length():
 
     input_size = SizeTwoDimensional.create_size_two_dimensional(input_height, input_width)
     #with torch.autograd.profiler.profile(use_cuda=False) as prof:
+    blank_symbol = "_"
     train_mdrnn_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
-                    compute_multi_directional, use_dropout, vocab_list)
+                    compute_multi_directional, use_dropout, vocab_list, blank_symbol)
     #print(prof)
 
 
 def iam_recognition():
 
-        batch_size = 32
+        batch_size = 24
 
         lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
         iam_database_line_images_root_folder_path = "/datastore/data/iam-database/lines"
+
+        print("Loading IAM dataset...")
         iam_lines_dicionary = IamLinesDictionary.create_iam_dictionary(lines_file_path,
                                                                        iam_database_line_images_root_folder_path)
         iam_lines_dataset = IamLinesDataset.create_iam_lines_dataset(iam_lines_dicionary, "ok", None)
 
+
         # This vocab_list will be used by the decoder
         vocab_list = iam_lines_dataset.get_vocabulary_list()
+        blank_symbol = iam_lines_dataset.get_blank_symbol()
 
         test_examples_fraction = 0.20
         train_loader, test_loader = iam_lines_dataset.\
             get_random_train_set_test_set_data_loaders(batch_size, test_examples_fraction)
+        print("Loading IAM dataset: DONE")
 
         # test_mdrnn_cell()
         #test_mdrnn()
@@ -809,15 +846,15 @@ def iam_recognition():
         input_size = SizeTwoDimensional.create_size_two_dimensional(input_height, input_width)
         #with torch.autograd.profiler.profile(use_cuda=False) as prof:
         train_mdrnn_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
-                       compute_multi_directional, use_dropout, vocab_list)
+                       compute_multi_directional, use_dropout, vocab_list, blank_symbol)
         # train_mdrnn_no_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
         #                 compute_multi_directional, use_dropout, vocab_list)
 
 
 def main():
     # mnist_recognition_fixed_length()
-    # mnist_recognition_variable_length()
-    iam_recognition()
+    mnist_recognition_variable_length()
+    # iam_recognition()
     #cifar_ten_basic_recognition()
 
 
