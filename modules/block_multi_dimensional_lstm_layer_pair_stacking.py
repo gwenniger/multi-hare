@@ -316,6 +316,13 @@ class BlockMultiDimensionalLSTMLayerPairStacking(Module):
 
         return result
 
+    def get_height_reduction_factor(self):
+        result = 1
+        for layer_pair in self.block_multi_dimensional_lstm_layer_pairs:
+            result *= layer_pair.block_strided_convolution.get_height_reduction_factor()
+
+        return result
+
     def forward(self, x):
         network_input = x
         for layer_pair in self.block_multi_dimensional_lstm_layer_pairs:

@@ -161,7 +161,7 @@ class IamLinesDataset(Dataset):
             image_padded = image_padded.unsqueeze(0)
             # print("after padding: image_padded.size(): " + str(image_padded.size()))
 
-            image_padded = IamLinesDataset.convert_unsigned_int_image_tensor_to_float_image_tensor(image_padded)
+            # image_padded = IamLinesDataset.convert_unsigned_int_image_tensor_to_float_image_tensor(image_padded)
             # print("after padding and type conversion: image_padded: " + str(image_padded))
 
             digits_padding_required = max_labels_length - labels_length

@@ -68,3 +68,6 @@ class BlockStridedConvolution(Module):
     def get_width_reduction_factor(self):
         return self.block_size.width
 
+    def get_height_reduction_factor(self):
+        return self.block_size.height
+
