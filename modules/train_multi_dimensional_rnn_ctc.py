@@ -180,7 +180,7 @@ def evaluate_mdrnn(test_loader, multi_dimensional_rnn, device,
             float(100 * correct) / total))
 
 
-def clip_gradient(model):
+def clip_gradient_norm(model):
     made_gradient_norm_based_correction = False
 
     # What is a good max norm for clipping is an empirical question. But a norm
@@ -200,10 +200,9 @@ def clip_gradient(model):
     # make the model converge."
     # A max norm of 15 seems to make the learning go faster and yield almost no
     # clipping in the second epoch onwards, which seems ideal.
-    max_norm = 30
+    max_norm = 15
     # https://www.reddit.com/r/MachineLearning/comments/3n8g28/gradient_clipping_what_are_good_values_to_clip_at/
     # https://machinelearningmastery.com/exploding-gradients-in-neural-networks/
-    # grad_clip_value_ = 1
     # norm_type is the p-norm type, a value of 2 means the eucledian norm
     # The higher the number of the norm_type, the higher the influence of the
     # outliers on the total_norm. For norm_type = 1 (= "manhattan distance")
@@ -217,14 +216,21 @@ def clip_gradient(model):
 
     if total_norm > max_norm:
         made_gradient_norm_based_correction = True
-        # print("Made gradient norm based correction. total norm: " + str(total_norm))
+        print("Made gradient norm based correction. total norm: " + str(total_norm))
 
+
+    #
+    return made_gradient_norm_based_correction
+
+
+def clip_gradient_value(model):
     # Clipping the gradient value is an alternative to clipping the gradient norm,
     # and seems to be more effective
     # https://pytorch.org/docs/master/_modules/torch/nn/utils/clip_grad.html
-    # torch.nn.utils.clip_grad_value_(multi_dimensional_rnn.parameters(), grad_clip_value_)
-    #
-    return made_gradient_norm_based_correction
+    # https://www.reddit.com/r/MachineLearning/comments/3n8g28/gradient_clipping_what_are_good_values_to_clip_at/
+    # https://machinelearningmastery.com/exploding-gradients-in-neural-networks/
+    grad_clip_value_ = 100
+    torch.nn.utils.clip_grad_value_(model.parameters(), grad_clip_value_)
 
 
 # Method takes a tensor of labels starting from 0 and increases
@@ -297,6 +303,8 @@ def train_mdrnn_no_ctc(train_loader, test_loader, input_channels: int, input_siz
         network.to(device)
     else:
         raise RuntimeError("CUDA not available")
+
+    # https://discuss.pytorch.org/t/register-backward-hook-on-nn-sequential/472/6
 
     print_number_of_parameters(multi_dimensional_rnn)
 
@@ -392,9 +400,14 @@ def train_mdrnn_no_ctc(train_loader, test_loader, input_channels: int, input_siz
             # print("Finished...")
 
             # Perform gradient clipping
-            made_gradient_norm_based_correction = clip_gradient(multi_dimensional_rnn)
-            if made_gradient_norm_based_correction:
-                num_gradient_corrections += 1
+            # made_gradient_norm_based_correction = clip_gradient_norm(multi_dimensional_rnn)
+
+            # https://stackoverflow.com/questions/44796793/
+            # difference-between-tf-clip-by-value-and-tf-clip-by-global-norm-for-rnns-and-how
+            # With clip by value, loss is actually increasing...
+            # clip_gradient_value(multi_dimensional_rnn)
+            # if made_gradient_norm_based_correction:
+            #    num_gradient_corrections += 1
 
             optimizer.step()
 
@@ -406,7 +419,7 @@ def train_mdrnn_no_ctc(train_loader, test_loader, input_channels: int, input_siz
                 print('[%d, %5d] loss: %.3f' %
                       (epoch + 1, i + 1, running_loss / 100) +
                       " Running time: " + str(running_time))
-                print("Number of gradient norm-based corrections: " + str(num_gradient_corrections))
+                # print("Number of gradient norm-based corrections: " + str(num_gradient_corrections))
                 running_loss = 0.0
                 num_gradient_corrections = 0
 
@@ -436,6 +449,21 @@ def get_data_height(train_loader):
     data_height = first_data_element.size(1)
     print(">>> data_height: " + str(data_height))
     return data_height
+
+
+def printgradnorm(self, grad_input, grad_output):
+    print('Inside ' + self.__class__.__name__ + ' backward')
+    print('Inside class:' + self.__class__.__name__)
+    print('')
+    print('grad_input: ', type(grad_input))
+    print('grad_input[0]: ', type(grad_input[0]))
+    print('grad_output: ', type(grad_output))
+    print('grad_output[0]: ', type(grad_output[0]))
+    print('')
+    print('grad_input size:', grad_input[0].size())
+    print('grad_output size:', grad_output[0].size())
+    print('grad_input norm:', grad_input[0].norm())
+    print('grad_output norm: ', grad_output[0].norm())
 
 
 def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: SizeTwoDimensional, hidden_states_size: int, batch_size,
@@ -515,28 +543,35 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
     mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
     # mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
     block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
+    clamp_gradients = True
     # multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking.\
     #     create_two_layer_pair_network(hidden_states_size, mdlstm_block_size,
-    #                                   block_strided_convolution_block_size)
+    #                                   block_strided_convolution_block_size,
+    #                                   clamp_gradients)
     #multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
     #    create_three_layer_pair_network(hidden_states_size, mdlstm_block_size,
     #                                 block_strided_convolution_block_size)
+
     multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
        create_three_layer_pair_network_linear_parameter_size_increase(input_channels, hidden_states_size,
                                                                       mdlstm_block_size,
                                                                       block_strided_convolution_block_size,
                                                                       compute_multi_directional,
+                                                                      clamp_gradients,
                                                                       use_dropout)
+
+    # See: https://pytorch.org/tutorials/beginner/former_torchies/nn_tutorial.html
+    multi_dimensional_rnn.register_backward_hook(printgradnorm)
 
     number_of_classes_excluding_blank = len(vocab_list) - 1
 
     data_height = get_data_height(train_loader)
     network = NetworkToSoftMaxNetwork.create_network_to_soft_max_network(multi_dimensional_rnn,
                                                                          input_size, number_of_classes_excluding_blank,
-                                                                         data_height)
+                                                                         data_height, clamp_gradients)
 
-
-
+    # See: https://pytorch.org/tutorials/beginner/former_torchies/nn_tutorial.html
+    # network.register_backward_hook(printgradnorm)
 
 
     #multi_dimensional_rnn = Net()
@@ -568,7 +603,7 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
 
 
     # Adding some weight decay seems to do magic, see: http://pytorch.org/docs/master/optim.html
-    # optimizer = optim.SGD(network.parameters(), lr=0.001, momentum=0.9, weight_decay=1e-5)
+    # optimizer = optim.SGD(network.parameters(), lr=0.0001, momentum=0.9, weight_decay=1e-5)
 
     # Faster learning
     # optimizer = optim.SGD(multi_dimensional_rnn.parameters(), lr=0.01, momentum=0.9)
@@ -577,7 +612,10 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
     # https://github.com/SeanNaren/deepspeech.pytorch/blob/master/train.py
     ### Reducing the learning rate seems to reduce the infinite loss problem
     ### https://github.com/baidu-research/warp-ctc/issues/51
-    #optimizer = optim.SGD(network.parameters(), lr=0.00001, momentum=0.9, weight_decay=1e-5,
+
+    optimizer = optim.SGD(network.parameters(), lr=0.0001, momentum=0.9, weight_decay=1e-5,
+                          nesterov=True)
+    #optimizer = optim.SGD(network.parameters(), lr=0.0001, momentum=0.9, weight_decay=1e-5,
     #                      nesterov=True)
     #optimizer = optim.SGD(network.parameters(), lr=0.000005, momentum=0.9, weight_decay=1e-5,
     #                      nesterov=True)
@@ -590,7 +628,8 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
     # But the largest learning rate that still works also seems on things like
     # the relative length of the output sequence
     # optimizer = optim.Adam(network.parameters(), lr=0.00001, weight_decay=1e-5)
-    optimizer = optim.Adam(network.parameters(), lr=0.0001, weight_decay=1e-5)
+    # optimizer = optim.Adam(network.parameters(), lr=0.0001, weight_decay=1e-5)
+    # optimizer = optim.Adam(network.parameters(), lr=0.00001, weight_decay=1e-5)
 #    optimizer = optim.Adam(network.parameters(), lr=0.000001, weight_decay=1e-5)
 
     start = time.time()
@@ -703,9 +742,9 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
             # print("Time used for loss backward: " + str(util.timing.time_since(time_start_loss_backward)))
 
             # Perform gradient clipping
-            made_gradient_norm_based_correction = clip_gradient(multi_dimensional_rnn)
-            if made_gradient_norm_based_correction:
-                num_gradient_corrections += 1
+            #made_gradient_norm_based_correction = clip_gradient_norm(multi_dimensional_rnn)
+            #if made_gradient_norm_based_correction:
+            #    num_gradient_corrections += 1
 
             #if not (loss_sum == inf or loss_sum == -inf):
             optimizer.step()
@@ -725,7 +764,7 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
                       " Running time: " + str(running_time))
                 print("Number of gradient norm-based corrections: " + str(num_gradient_corrections))
                 running_loss = 0.0
-                num_gradient_corrections = 0
+                # num_gradient_corrections = 0
 
                 percent = (i + 1) / float(len(train_loader))
                 examples_processed = (i + 1) * batch_size
@@ -823,13 +862,14 @@ def mnist_recognition_variable_length():
     #with torch.autograd.profiler.profile(use_cuda=False) as prof:
     blank_symbol = "_"
     train_mdrnn_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
-                    compute_multi_directional, use_dropout, vocab_list, blank_symbol)
+                    compute_multi_directional, use_dropout, vocab_list, blank_symbol,
+                    False)
     #print(prof)
 
 
 def iam_recognition():
 
-        batch_size = 24
+        batch_size = 16
 
         lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
         iam_database_line_images_root_folder_path = "/datastore/data/iam-database/lines"

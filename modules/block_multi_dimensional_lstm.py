@@ -19,11 +19,14 @@ class BlockMultiDimensionalLSTM(Module):
     def create_block_multi_dimensional_lstm(input_channels: int, hidden_states_size: int,
                                             block_size: SizeTwoDimensional,
                                             compute_multi_directional: bool,
+                                            clamp_gradients: bool,
                                             use_dropout: bool,
                                             nonlinearity="tanh"):
         multi_dimensional_lstm = MultiDimensionalLSTM.\
             create_multi_dimensional_lstm_fast(input_channels, hidden_states_size,
-                                               compute_multi_directional, use_dropout,
+                                               compute_multi_directional,
+                                               clamp_gradients,
+                                               use_dropout,
                                                nonlinearity)
 
         return BlockMultiDimensionalLSTM(multi_dimensional_lstm, block_size)

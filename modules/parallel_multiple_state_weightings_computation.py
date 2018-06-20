@@ -2,13 +2,16 @@ import torch.nn as nn
 import torch.nn.functional as F
 from modules.multi_dimensional_rnn import StateUpdateBlock
 from torch.nn.modules.module import Module
+import torch
+from modules.inside_model_gradient_clipping import InsideModelGradientClamping
 
 
 class ParallelMultipleStateWeightingsComputation(Module):
     def __init__(self, hidden_states_size: int,
-                 number_of_paired_input_weightings,
-                 output_states_size,
-                 parallel_convolution,
+                 number_of_paired_input_weightings: int,
+                 output_states_size: int,
+                 parallel_convolution: nn.Conv1d,
+                 clamp_gradients: bool,
                  use_dropout: bool,
                  training: bool):
         super(ParallelMultipleStateWeightingsComputation, self).__init__()
@@ -16,22 +19,28 @@ class ParallelMultipleStateWeightingsComputation(Module):
         self.number_of_paired_input_weightings = number_of_paired_input_weightings
         self.output_states_size = output_states_size
         self.parallel_convolution = parallel_convolution
+        self.clamp_gradients = clamp_gradients,
         self.use_dropout = use_dropout
         self.training = training
 
     @staticmethod
     def create_parallel_multiple_state_weighting_computation(hidden_states_size: int,
                                                              number_of_paired_input_weightings: int,
+                                                             clamp_gradients: bool,
                                                              use_dropout: bool):
         output_states_size = hidden_states_size * number_of_paired_input_weightings * 2
 
+        # parallel_convolution = nn.Conv1d(hidden_states_size, output_states_size, 1)
+
         parallel_convolution = nn.Conv1d(hidden_states_size, output_states_size, 1)
+
         # Xavier weight initialization
-        # torch.nn.init.xavier_uniform(parallel_convolution.weight)
+        torch.nn.init.xavier_uniform_(parallel_convolution.weight)
 
         return ParallelMultipleStateWeightingsComputation(hidden_states_size, number_of_paired_input_weightings,
 
-                                                          output_states_size, parallel_convolution, use_dropout,
+                                                          output_states_size, parallel_convolution, clamp_gradients,
+                                                          use_dropout,
                                                           True)
 
     # How to do dropout in pytorch:
@@ -46,6 +55,12 @@ class ParallelMultipleStateWeightingsComputation(Module):
                 result = F.dropout(self.parallel_convolution(previous_state_column),   p=0.2, training=self.training)
                 return result
         result = self.parallel_convolution(previous_state_column)
+
+        if self.clamp_gradients:
+            # print("ParallelMultipleStateWeightingsComputation - register gradient clamping...")
+            # Create a 1d convolution with clamping of the gradient
+            result = InsideModelGradientClamping.register_gradient_clamping(result)
+
         return result
 
     def get_result_range_start_index(self, result_element_index):

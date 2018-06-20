@@ -9,12 +9,19 @@ class MultiDimensionalLSTMParametersOneDirectionBase(Module):
     # https://github.com/pytorch/pytorch/issues/750
     FORGET_GATE_BIAS_INIT = 1
 
-    def __init__(self, hidden_states_size, input_channels, use_dropout):
+    def __init__(self, hidden_states_size,
+                 input_channels: int, use_dropout: bool):
         super(MultiDimensionalLSTMParametersOneDirectionBase, self).__init__()
         self.input_channels = input_channels
         self.hidden_states_size = hidden_states_size
         self.use_dropout = use_dropout
 
+        # TODO: In fact the input convolutions can also be parallelized as
+        # a single convolution using a form of parallel_multiple_state_weightings_convolution
+        # However, the computational gains of this are smaller, since these convolutions are only
+        # computed once over the entire input image, rather than multiple times
+        # for the different columns of the image
+        #
         # Input convolutions
         self.input_input_convolution = nn.Conv2d(self.input_channels,
                                                  self.hidden_states_size, 1)
@@ -24,7 +31,6 @@ class MultiDimensionalLSTMParametersOneDirectionBase(Module):
                                                            self.hidden_states_size, 1)
         self.forget_gate_two_input_convolution = nn.Conv2d(self.input_channels,
                                                            self.hidden_states_size, 1)
-
         self.output_gate_input_convolution = nn.Conv2d(self.input_channels,
                                                        self.hidden_states_size, 1)
 
@@ -145,7 +151,8 @@ class MultiDimensionalLSTMParametersOneDirection(MultiDimensionalLSTMParametersO
         self.previous_memory_state_column = None
 
     @staticmethod
-    def create_multi_dimensional_lstm_parameters_one_direction(hidden_states_size, input_channels, use_dropout: bool):
+    def create_multi_dimensional_lstm_parameters_one_direction(hidden_states_size, input_channels,
+                                                               use_dropout: bool):
         return MultiDimensionalLSTMParametersOneDirection(hidden_states_size, input_channels, use_dropout)
 
     def prepare_computation_next_column_functions(self, previous_hidden_state_column,
@@ -259,18 +266,19 @@ class MultiDimensionalLSTMParametersOneDirection(MultiDimensionalLSTMParametersO
 # a single convolution with N times as many outputs
 # https://discuss.pytorch.org/t/is-there-a-way-to-parallelize-independent-sequential-steps/3360
 class MultiDimensionalLSTMParametersOneDirectionFast(MultiDimensionalLSTMParametersOneDirectionBase):
-    def __init__(self, hidden_states_size, input_channels, use_dropout: bool):
+    def __init__(self, hidden_states_size, input_channels, clamp_gradients: bool,
+                 use_dropout: bool):
         super(MultiDimensionalLSTMParametersOneDirectionFast, self).__init__(hidden_states_size, input_channels,
                                                                              use_dropout)
 
         # There are five paired input weightings, in this case, pairs of previous hidden state
         # inputs, namely for: 1) the input, 2) the input gate, 3) forget gate one,
         # 4) forget gate two, 5) the output gate
-        self.parallel_hidden_state_column_computation = ParallelMultipleStateWeightingsComputation.create_parallel_multiple_state_weighting_computation(
-            hidden_states_size, 5, use_dropout)
+        self.parallel_hidden_state_column_computation = ParallelMultipleStateWeightingsComputation.\
+            create_parallel_multiple_state_weighting_computation(hidden_states_size, 5, clamp_gradients, use_dropout)
 
-        self.parallel_memory_state_column_computation = ParallelMultipleStateWeightingsComputation.create_parallel_multiple_state_weighting_computation(
-            hidden_states_size, 2, use_dropout)
+        self.parallel_memory_state_column_computation = ParallelMultipleStateWeightingsComputation.\
+            create_parallel_multiple_state_weighting_computation(hidden_states_size, 2, clamp_gradients, use_dropout)
 
         self.node_hidden_state_columns = None
         self.node_memory_state_columns = None
@@ -278,8 +286,10 @@ class MultiDimensionalLSTMParametersOneDirectionFast(MultiDimensionalLSTMParamet
 
     @staticmethod
     def create_multi_dimensional_lstm_parameters_one_direction_fast(hidden_states_size, input_channels,
+                                                                    clamp_gradients: bool,
                                                                     use_dropout: bool):
-        return MultiDimensionalLSTMParametersOneDirectionFast(hidden_states_size, input_channels, use_dropout)
+        return MultiDimensionalLSTMParametersOneDirectionFast(hidden_states_size, input_channels,
+                                                              clamp_gradients, use_dropout)
 
     def prepare_computation_next_column_functions(self, previous_hidden_state_column,
                                                   previous_memory_state_column):
@@ -381,21 +391,29 @@ class MultiDimensionalLSTMParametersCreator:
     @abstractmethod
     def create_multi_dimensional_lstm_parameters_one_direction(self,
                                                                hidden_states_size, input_channels,
-                                                               use_dropout: bool):
+                                                               use_dropout: bool,
+                                                               clamp_gradients: bool):
         raise RuntimeError("not implemented")
 
 
 class MultiDimensionalLSTMParametersCreatorFast(MultiDimensionalLSTMParametersCreator):
 
     def create_multi_dimensional_lstm_parameters_one_direction(self,
-                                                               hidden_states_size, input_channels, use_dropout: bool):
+                                                               hidden_states_size, input_channels,
+                                                               clamp_gradients: bool,
+                                                               use_dropout: bool,
+                                                               ):
         return MultiDimensionalLSTMParametersOneDirectionFast.\
-            create_multi_dimensional_lstm_parameters_one_direction_fast(hidden_states_size, input_channels, use_dropout)
+            create_multi_dimensional_lstm_parameters_one_direction_fast(hidden_states_size, input_channels,
+                                                                        clamp_gradients, use_dropout)
 
 
 class MultiDimensionalLSTMParametersCreatorSlow(MultiDimensionalLSTMParametersCreator):
 
     def create_multi_dimensional_lstm_parameters_one_direction(self, hidden_states_size, input_channels,
+                                                               clamp_gradients: bool,
                                                                use_dropout: bool):
+        # TODO: clamp_gradient is not implemented for the slow version
         return MultiDimensionalLSTMParametersOneDirection.\
-            create_multi_dimensional_lstm_parameters_one_direction(hidden_states_size, input_channels, use_dropout)
+            create_multi_dimensional_lstm_parameters_one_direction(hidden_states_size, input_channels,
+                                                                   use_dropout)

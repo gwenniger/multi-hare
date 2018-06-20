@@ -3,17 +3,19 @@ from torch.nn.modules.module import Module
 import torch.nn as nn
 import torch.nn.functional as F
 from util.tensor_chunking import TensorChunking
-
+from modules.inside_model_gradient_clipping import InsideModelGradientClamping
 
 class BlockStridedConvolution(Module):
 
     def __init__(self, input_channels: int, output_channels: int, block_size: SizeTwoDimensional,
+                 clamp_gradients: bool,
                  nonlinearity="tanh"):
         super(BlockStridedConvolution, self).__init__()
         self.input_channels = input_channels
         self.output_channels = output_channels
         self.block_size = block_size
         self.nonlinearity = nonlinearity
+        self.clamp_gradients = clamp_gradients
         # What types of convolutions are there:
         # https://github.com/vdumoulin/conv_arithmetic/blob/master/README.md
         # https://towardsdatascience.com/types-of-convolutions-in-deep-learning-717013397f4d
@@ -26,8 +28,10 @@ class BlockStridedConvolution(Module):
 
     @staticmethod
     def create_block_strided_convolution(input_channels: int, output_channels: int, block_size: SizeTwoDimensional,
+                                         clamp_gradients: bool,
                  nonlinearity="tanh"):
-        return BlockStridedConvolution(input_channels, output_channels, block_size, nonlinearity)
+        return BlockStridedConvolution(input_channels, output_channels, block_size,
+                                       clamp_gradients, nonlinearity)
 
     def get_activation_function(self):
         if self.nonlinearity == "tanh":
@@ -61,8 +65,17 @@ class BlockStridedConvolution(Module):
 
     def forward(self, x):
         convolution_output = self.convolution(x)
+        if self.clamp_gradients:
+            convolution_output = InsideModelGradientClamping.register_gradient_clamping(convolution_output)
         # print("convolution output: " + str(convolution_output))
         result = self.get_activation_function()(convolution_output)
+
+        # Tanh and sigmoid have a derivative that is not higher than 1,
+        # so they should not give large gradients in the backward pass
+        # if self.clamp_gradients:
+            # print("BlockStridedConvolution.forward - clamp gradients")
+        #result = InsideModelGradientClamping.register_gradient_clamping(result)
+
         return result
 
     def get_width_reduction_factor(self):

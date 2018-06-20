@@ -505,6 +505,7 @@ class MultiDimensionalRNNFast(MultiDimensionalRNNAbstract):
     def __init__(self, input_channels: int, hidden_states_size, compute_multi_directional: bool,
                  use_dropout: bool,
                  training: bool,
+                 clamp_gradients: bool,
                  nonlinearity="tanh"):
         super(MultiDimensionalRNNFast, self).__init__(input_channels, hidden_states_size,
                                                       compute_multi_directional,
@@ -514,7 +515,7 @@ class MultiDimensionalRNNFast(MultiDimensionalRNNAbstract):
         self.parallel_multiple_state_weighting_computation = \
             ParallelMultipleStateWeightingsComputation.\
             create_parallel_multiple_state_weighting_computation(self.hidden_states_size, 2,
-                                                                 use_dropout)
+                                                                 clamp_gradients, use_dropout)
 
         # This is necessary to make sure things are stored on the same gpu, otherwise
         # pytorch doesn't realizes these convolutions are part of this module
@@ -524,9 +525,11 @@ class MultiDimensionalRNNFast(MultiDimensionalRNNAbstract):
     @staticmethod
     def create_multi_dimensional_rnn_fast(hidden_states_size: int,
                                           compute_multi_directional: bool, use_dropout: bool,
+                                          clamp_gradients:bool,
                                           nonlinearity="tanh"):
         return MultiDimensionalRNNFast(hidden_states_size,
                                        compute_multi_directional, use_dropout, True,
+                                       clamp_gradients,
                                        nonlinearity)
 
     # This method compute the state update for the two input dimension and

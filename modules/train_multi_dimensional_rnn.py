@@ -205,7 +205,7 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
     multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking.\
         create_two_layer_pair_network(hidden_states_size, mdlstm_block_size,
-                                      block_strided_convolution_block_size)
+                                      block_strided_convolution_block_size, False)
 
     network = MultiDimensionalRNNToSingleClassNetwork.\
         create_multi_dimensional_rnn_to_single_class_network(multi_dimensional_rnn, input_size)
@@ -275,18 +275,18 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
             #outputs = multi_dimensional_rnn(Variable(inputs))  # For "Net" (Le Net)
             time_start_network_forward = time.time()
             outputs = network(inputs)
-            print("Time used for network forward: " + str(util.timing.time_since(time_start_network_forward)))
+            # print("Time used for network forward: " + str(util.timing.time_since(time_start_network_forward)))
             # print("outputs: " + str(outputs))
             # print("outputs.size(): " + str(outputs.size()))
             #print("labels: " + str(labels))
 
             time_start_loss_computation = time.time()
             loss = criterion(outputs, labels)
-            print("Time used for loss computation: " + str(util.timing.time_since(time_start_loss_computation)))
+            # print("Time used for loss computation: " + str(util.timing.time_since(time_start_loss_computation)))
 
             time_start_loss_backward = time.time()
             loss.backward()
-            print("Time used for loss backward: " + str(util.timing.time_since(time_start_loss_backward)))
+            # print("Time used for loss backward: " + str(util.timing.time_since(time_start_loss_backward)))
 
             # Perform gradient clipping
             made_gradient_norm_based_correction = clip_gradient(multi_dimensional_rnn)

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from modules.size_two_dimensional import SizeTwoDimensional
 from abc import abstractmethod
-
+from modules.inside_model_gradient_clipping import InsideModelGradientClamping
 
 class ActivationsResizer:
 
@@ -96,9 +96,11 @@ class KeepAllActivationsResizer(ActivationsResizer):
 class NetworkToSoftMaxNetwork(torch.nn.Module):
     def __init__(self, network, input_size: SizeTwoDimensional,
                  number_of_classes_excluding_blank: int,
-                 activations_resizer: ActivationsResizer
+                 activations_resizer: ActivationsResizer,
+                 clamp_gradients: bool
                  ):
         super(NetworkToSoftMaxNetwork, self).__init__()
+        self.clamp_gradients = clamp_gradients
         self.network = network
         self.activations_resizer = activations_resizer
         self.input_size = input_size
@@ -108,9 +110,17 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         print(">>> number_of_output_channels: " + str(self.number_of_output_channels))
 
         self.fc3 = nn.Linear(self.number_of_output_channels, self.get_number_of_classes_including_blank())
+
+
+
+        # It is not clear actually whether "xavier_normal" or "xavier_uniform" initialization
+        # is to be preferred
+        # https://datascience.stackexchange.com/questions/13061/
+        # when-to-use-he-or-glorot-normal-initialization-over-uniform-init-and-what-are
+
         # Initialize the linear output layer with Xavier uniform  weights
-        torch.nn.init.xavier_normal_(self.fc3.weight)
-        #torch.nn.init.xavier_uniform_(self.fc3.weight)
+        # torch.nn.init.xavier_normal_(self.fc3.weight)
+        torch.nn.init.xavier_uniform_(self.fc3.weight)
         # print("self.fc3 : " + str(self.fc3))
         # print("self.fc3.weight: " + str(self.fc3.weight))
         # print("self.fc3.bias: " + str(self.fc3.bias))
@@ -118,11 +128,13 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
     @staticmethod
     def create_network_to_soft_max_network(network, input_size: SizeTwoDimensional,
                                            number_of_classes_excluding_blank: int,
-                                           data_height: int):
+                                           data_height: int, clamp_gradients: bool):
         activations_resizer = KeepAllActivationsResizer(network, data_height)
         # activations_resizer = SumActivationsResizer(network)
         return NetworkToSoftMaxNetwork(network, input_size, number_of_classes_excluding_blank,
-                                       activations_resizer)
+                                       activations_resizer,
+                                       clamp_gradients
+                                       )
 
     def get_number_of_classes_including_blank(self):
         return self.number_of_classes_excluding_blank + 1
@@ -149,6 +161,12 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
 
         # print("activations_resized_one_dimensional: " + str(activations_resized_one_dimensional))
         class_activations = self.fc3(activations_resized_one_dimensional)
+
+        if self.clamp_gradients:
+            # print("NetworkToSoftMaxNetwork - register gradient clamping...")
+            class_activations = InsideModelGradientClamping.register_gradient_clamping(class_activations)
+
+
         # print("class_activations: " + str(class_activations))
         class_activations_resized = class_activations.view(batch_size, -1,
                                                              self.get_number_of_classes_including_blank())
