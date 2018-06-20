@@ -3,8 +3,8 @@ import torch
 
 class InsideModelGradientClamping:
     #    CLAMPING_BOUND = 0.001
-    #    CLAMPING_BOUND = 0.1
-    CLAMPING_BOUND = 0.01
+    CLAMPING_BOUND = 0.1
+    #CLAMPING_BOUND = 0.01
     # CLAMPING_BOUND = 1
 
     # This method registers a gradient clamping hook for the gradient of the
