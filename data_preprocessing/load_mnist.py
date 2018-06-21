@@ -62,8 +62,8 @@ def get_item_label_with_labels_starting_from_one(item_label):
 
 
 def get_item_tensors_and_labels_combined(train_set: list, start_index: int, sequence_length: int):
-    print("get_item_tensors_and_labels_combined - start_index: " + str(start_index) +
-          " sequence length: " + str(sequence_length))
+    # print("get_item_tensors_and_labels_combined - start_index: " + str(start_index) +
+    #      " sequence length: " + str(sequence_length))
     item_one = train_set[start_index]
     item_one_tensor = item_one[0]
     item_one_label = get_item_label_with_labels_starting_from_one(item_one[1])
@@ -73,7 +73,7 @@ def get_item_tensors_and_labels_combined(train_set: list, start_index: int, sequ
 
     for j in range(start_index + 1, start_index + sequence_length):
         index = j
-        print("index:  " + str(index))
+        # print("index:  " + str(index))
         next_item = train_set[index]
         next_item_tensor = next_item[0]
 
@@ -82,8 +82,8 @@ def get_item_tensors_and_labels_combined(train_set: list, start_index: int, sequ
         item_tensors_combined = torch.cat((item_tensors_combined, next_item_tensor), 2)
         item_labels_combined = torch.cat((item_labels_combined,  torch.IntTensor([next_item_label])), 0)
 
-    print("item_tensors_combined.size(): " + str(item_tensors_combined.size()))
-    print("item_labels_combined: " + str(item_labels_combined))
+    # print("item_tensors_combined.size(): " + str(item_tensors_combined.size()))
+    # print("item_labels_combined: " + str(item_labels_combined))
     return item_tensors_combined, item_labels_combined
 
 
@@ -150,8 +150,8 @@ def get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_dig
 
         item_tensors_combined, item_labels_combined = get_item_tensors_and_labels_combined(
             data_set, i, sequence_length)
-        print("item_tensors_combined.size(): " + str(item_tensors_combined.size()))
-        print("item_labels_combined.size(): " + str(item_labels_combined.size()))
+        # print("item_tensors_combined.size(): " + str(item_tensors_combined.size()))
+        # print("item_labels_combined.size(): " + str(item_labels_combined.size()))
 
         # https://pytorch.org/docs/master/nn.html#torch.nn.functional.pad
         digits_padding_required = max_num_digits - sequence_length
@@ -168,15 +168,22 @@ def get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_dig
         item_labels_combined_padded = \
             get_item_labels_with_probabilities_length_and_real_sequence_length(item_labels_combined_padded,
                                                                                 sequence_length)
-        print("item_tensors_combined_padded.size(): " + str(item_tensors_combined_padded.size()))
-        print("item_labels_combined_padded.size(): " + str(item_labels_combined_padded.size()))
-        print("item_labels_combined_padded: " + str(item_labels_combined_padded))
+        # print("item_tensors_combined_padded.size(): " + str(item_tensors_combined_padded.size()))
+        # print("item_labels_combined_padded.size(): " + str(item_labels_combined_padded.size()))
+        # print("item_labels_combined_padded: " + str(item_labels_combined_padded))
 
         train_set_pairs.append(tuple((item_tensors_combined_padded, item_labels_combined_padded)))
+
+        percentage_complete = (i*100) / len(data_set)
+        if (percentage_complete % 10) == 0:
+            print("load_mnist.get_multi_digit_loader_random_length - completed " +
+                  str(percentage_complete) + "%")
 
         #util.image_visualization.imshow(torchvision.utils.make_grid(item_tensors_combined))
         #plt.show()
         i += sequence_length
+
+
 
     train_loader = torch.utils.data.DataLoader(
         dataset=train_set_pairs,

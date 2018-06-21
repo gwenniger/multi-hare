@@ -216,11 +216,9 @@ def clip_gradient_norm(model):
 
     if total_norm > max_norm:
         made_gradient_norm_based_correction = True
-        print("Made gradient norm based correction. total norm: " + str(total_norm))
+        # print("Made gradient norm based correction. total norm: " + str(total_norm))
 
-
-    #
-    return made_gradient_norm_based_correction
+    return made_gradient_norm_based_correction, total_norm
 
 
 def clip_gradient_value(model):
@@ -635,6 +633,7 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
     start = time.time()
 
     num_gradient_corrections = 0
+    gradient_norms_sum = 0
 
     #ctc_loss = warpctc_pytorch.CTCLoss()
     warp_ctc_loss_interface = WarpCTCLossInterface.create_warp_ctc_loss_interface()
@@ -742,9 +741,10 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
             # print("Time used for loss backward: " + str(util.timing.time_since(time_start_loss_backward)))
 
             # Perform gradient clipping
-            made_gradient_norm_based_correction = clip_gradient_norm(multi_dimensional_rnn)
+            made_gradient_norm_based_correction, total_norm = clip_gradient_norm(multi_dimensional_rnn)
             if made_gradient_norm_based_correction:
                 num_gradient_corrections += 1
+            gradient_norms_sum += total_norm
 
             #if not (loss_sum == inf or loss_sum == -inf):
             optimizer.step()
@@ -762,9 +762,12 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
                 print('[%d, %5d] loss: %.3f' %
                       (epoch + 1, i + 1, running_loss / 10) +
                       " Running time: " + str(running_time))
+                average_norm = gradient_norms_sum / 10
                 print("Number of gradient norm-based corrections: " + str(num_gradient_corrections))
+                print("Average gradient total norm: " + str(average_norm))
                 running_loss = 0.0
-                # num_gradient_corrections = 0
+                num_gradient_corrections = 0
+                gradient_norms_sum = 0
 
                 percent = (i + 1) / float(len(train_loader))
                 examples_processed = (i + 1) * batch_size
