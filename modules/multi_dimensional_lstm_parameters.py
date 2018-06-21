@@ -38,7 +38,22 @@ class MultiDimensionalLSTMParametersOneDirectionBase(Module):
         self.output_gate_memory_state_convolution = nn.Conv1d(self.hidden_states_size,
                                                               self.hidden_states_size, 1)
 
+        # Initialize the input and memory state convolutions with the
+        # Xavier Glorot scheme
+        self.initialize_input_and_memory_state_convolutions_xavier_glorot()
+
         # TODO: Add dropout to the remaining layers
+
+    def initialize_input_and_memory_state_convolutions_xavier_glorot(self):
+        # Xavier Glorot weight initialization
+        # http://proceedings.mlr.press/v9/glorot10a/glorot10a.pdf
+        nn.init.xavier_uniform_(self.input_input_convolution.weight)
+        nn.init.xavier_uniform_(self.input_gate_input_convolution.weight)
+        nn.init.xavier_uniform_(self.forget_gate_one_input_convolution.weight)
+        nn.init.xavier_uniform_(self.forget_gate_two_input_convolution.weight)
+        nn.init.xavier_uniform_(self.output_gate_input_convolution.weight)
+        nn.init.xavier_uniform_(self.output_gate_memory_state_convolution.weight)
+
 
     def set_bias_forget_gates_image_input(self):
         self.forget_gate_one_input_convolution.bias.data.fill_(

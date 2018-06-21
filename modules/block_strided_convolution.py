@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from util.tensor_chunking import TensorChunking
 from modules.inside_model_gradient_clipping import InsideModelGradientClamping
 
+
 class BlockStridedConvolution(Module):
 
     def __init__(self, input_channels: int, output_channels: int, block_size: SizeTwoDimensional,
@@ -25,6 +26,10 @@ class BlockStridedConvolution(Module):
                                      (block_size.height, block_size.width),
                                      stride=(block_size.height, block_size.width),
                                      bias=True)
+
+        # Initialize the convolution with the
+        # Xavier Glorot scheme
+        nn.init.xavier_uniform_(self.convolution.weight)
 
     @staticmethod
     def create_block_strided_convolution(input_channels: int, output_channels: int, block_size: SizeTwoDimensional,

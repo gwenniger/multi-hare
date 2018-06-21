@@ -454,14 +454,14 @@ def get_data_height(train_loader):
 def printgradnorm(self, grad_input, grad_output):
     print('Inside ' + self.__class__.__name__ + ' backward')
     print('Inside class:' + self.__class__.__name__)
-    print('')
-    print('grad_input: ', type(grad_input))
-    print('grad_input[0]: ', type(grad_input[0]))
-    print('grad_output: ', type(grad_output))
-    print('grad_output[0]: ', type(grad_output[0]))
-    print('')
-    print('grad_input size:', grad_input[0].size())
-    print('grad_output size:', grad_output[0].size())
+    # print('')
+    # print('grad_input: ', type(grad_input))
+    # print('grad_input[0]: ', type(grad_input[0]))
+    # print('grad_output: ', type(grad_output))
+    # print('grad_output[0]: ', type(grad_output[0]))
+    # print('')
+    # print('grad_input size:', grad_input[0].size())
+    # print('grad_output size:', grad_output[0].size())
     print('grad_input norm:', grad_input[0].norm())
     print('grad_output norm: ', grad_output[0].norm())
 
@@ -543,25 +543,25 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
     mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
     # mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
     block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
-    clamp_gradients = True
-    # multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking.\
-    #     create_two_layer_pair_network(hidden_states_size, mdlstm_block_size,
-    #                                   block_strided_convolution_block_size,
-    #                                   clamp_gradients)
+    clamp_gradients = False
+    multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking.\
+        create_two_layer_pair_network(hidden_states_size, mdlstm_block_size,
+                                      block_strided_convolution_block_size,
+                                      clamp_gradients)
     #multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
     #    create_three_layer_pair_network(hidden_states_size, mdlstm_block_size,
     #                                 block_strided_convolution_block_size)
 
-    multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
-       create_three_layer_pair_network_linear_parameter_size_increase(input_channels, hidden_states_size,
-                                                                      mdlstm_block_size,
-                                                                      block_strided_convolution_block_size,
-                                                                      compute_multi_directional,
-                                                                      clamp_gradients,
-                                                                      use_dropout)
+    # multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
+    #    create_three_layer_pair_network_linear_parameter_size_increase(input_channels, hidden_states_size,
+    #                                                                   mdlstm_block_size,
+    #                                                                   block_strided_convolution_block_size,
+    #                                                                   compute_multi_directional,
+    #                                                                   clamp_gradients,
+    #                                                                   use_dropout)
 
     # See: https://pytorch.org/tutorials/beginner/former_torchies/nn_tutorial.html
-    multi_dimensional_rnn.register_backward_hook(printgradnorm)
+    # multi_dimensional_rnn.register_backward_hook(printgradnorm)
 
     number_of_classes_excluding_blank = len(vocab_list) - 1
 
@@ -742,9 +742,9 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
             # print("Time used for loss backward: " + str(util.timing.time_since(time_start_loss_backward)))
 
             # Perform gradient clipping
-            #made_gradient_norm_based_correction = clip_gradient_norm(multi_dimensional_rnn)
-            #if made_gradient_norm_based_correction:
-            #    num_gradient_corrections += 1
+            made_gradient_norm_based_correction = clip_gradient_norm(multi_dimensional_rnn)
+            if made_gradient_norm_based_correction:
+                num_gradient_corrections += 1
 
             #if not (loss_sum == inf or loss_sum == -inf):
             optimizer.step()
@@ -813,7 +813,6 @@ def mnist_recognition_fixed_length():
     # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
     use_dropout = False
 
-    # TODO: Add gradient clipping? This might also make training more stable?
     # Interesting link with tips on how to fix training:
     # https://blog.slavv.com/37-reasons-why-your-neural-network-is-not-working-4020854bd607
     # https://discuss.pytorch.org/t/about-torch-nn-utils-clip-grad-norm/13873
@@ -848,7 +847,7 @@ def mnist_recognition_variable_length():
     # Possibly a batch size of 128 leads to more instability in training?
     #batch_size = 128
 
-    compute_multi_directional = True
+    compute_multi_directional = False
     # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
     use_dropout = False
 
@@ -922,8 +921,8 @@ def iam_recognition():
 
 def main():
     # mnist_recognition_fixed_length()
-    # mnist_recognition_variable_length()
-    iam_recognition()
+    mnist_recognition_variable_length()
+    # iam_recognition()
     #cifar_ten_basic_recognition()
 
 

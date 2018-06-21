@@ -113,10 +113,16 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
 
 
 
-        # It is not clear actually whether "xavier_normal" or "xavier_uniform" initialization
+        # It is not totally clear actually whether "xavier_normal" or "xavier_uniform" initialization
         # is to be preferred
         # https://datascience.stackexchange.com/questions/13061/
         # when-to-use-he-or-glorot-normal-initialization-over-uniform-init-and-what-are
+        #
+        # However, the paper "Handwriting Recognition with Large Multidimensional
+        # Long Short Term Memory Recurrent Neural Networks" gives better results
+        # with using Xavier Glorot uniform initialization throughout, so we
+        # go with that as well
+        #  See: https://ieeexplore.ieee.org/document/7814068/
 
         # Initialize the linear output layer with Xavier uniform  weights
         # torch.nn.init.xavier_normal_(self.fc3.weight)
