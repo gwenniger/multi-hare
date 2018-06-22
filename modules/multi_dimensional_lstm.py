@@ -171,6 +171,9 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         forget_gate_one_input_matrix = mdlstm_parameters.get_forget_gate_one_input_matrix()
         forget_gate_two_input_matrix = mdlstm_parameters.get_forget_gate_two_input_matrix()
         output_gate_input_matrix = mdlstm_parameters.get_output_gate_input_matrix()
+        # Cleanup the temporarily stored results, so that they won't be held in
+        # memory unnecessarily
+        mdlstm_parameters.cleanup_input_convolution_results()
 
         # if self.clamp_gradients:
         #     # print("MultiDimensionalLSTM.compute_multi_dimensional_lstm_one_direction - register gradient clamping...")

@@ -42,6 +42,10 @@ class MultiDimensionalLSTMParametersOneDirectionBase(Module):
     def prepare_input_convolutions(self, skewed_images_variable):
         raise RuntimeError("not implemented")
 
+    @abstractmethod
+    def cleanup_input_convolution_results(self):
+        raise RuntimeError("not implemented")
+
     # Needs to be implemented in the subclasses
     @abstractmethod
     def prepare_computation_next_column_functions(self, previous_hidden_state_column,
@@ -204,6 +208,9 @@ class MultiDimensionalLSTMParametersOneDirection(MultiDimensionalLSTMParametersO
 
     def prepare_input_convolutions(self, skewed_images_variable):
         self.skewed_images_variable = skewed_images_variable
+
+    def cleanup_input_convolution_results(self):
+        return
 
     def prepare_computation_next_column_functions(self, previous_hidden_state_column,
                                                   previous_memory_state_column):
@@ -381,6 +388,11 @@ class MultiDimensionalLSTMParametersOneDirectionFast(MultiDimensionalLSTMParamet
     def prepare_input_convolutions(self, skewed_images_variable):
         self.input_matrices = self.parallel_multiple_input_convolutions_computation.\
             compute_result_and_split_into_output_elements(skewed_images_variable)
+
+    def cleanup_input_convolution_results(self):
+        # Reset the value to None, so that the memory can be cleared,
+        # if there are no other users of these results
+        self.input_matrices = None
 
     def prepare_computation_next_column_functions(self, previous_hidden_state_column,
                                                   previous_memory_state_column):
