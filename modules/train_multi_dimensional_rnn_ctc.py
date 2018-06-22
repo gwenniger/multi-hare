@@ -24,6 +24,7 @@ import util.timing
 import data_preprocessing
 import util.tensor_utils
 import sys
+import numpy as np
 
 
 def test_mdrnn_cell():
@@ -117,60 +118,65 @@ def evaluate_mdrnn(test_loader, multi_dimensional_rnn, device,
         if image_input_is_unsigned_int:
             inputs = IamLinesDataset.convert_unsigned_int_image_tensor_to_float_image_tensor(inputs)
 
-        #outputs = multi_dimensional_rnn(Variable(inputs))  # For "Net" (Le Net)
-        outputs = multi_dimensional_rnn(inputs)
+        # https://github.com/pytorch/pytorch/issues/235
+        # Running the evaluation without computing gradients is the recommended way
+        # since this saves time, and more importantly, memory
+        with torch.no_grad():
 
-        probabilities_sum_to_one_dimension = 2
-        # Outputs is the output of the linear layer which is the input to warp_ctc
-        # But to get probabilities for the decoder, the softmax function needs to
-        # be applied to the outputs
-        probabilities = torch.nn.functional.\
-            softmax(outputs, probabilities_sum_to_one_dimension)
+            #outputs = multi_dimensional_rnn(Variable(inputs))  # For "Net" (Le Net)
+            outputs = multi_dimensional_rnn(inputs)
 
-        print(">>> evaluate_mdrnn  - outputs.size: " + str(outputs.size()))
-        print(">>> evaluate_mdrnn  - probabilities.size: " + str(probabilities.size()))
+            probabilities_sum_to_one_dimension = 2
+            # Outputs is the output of the linear layer which is the input to warp_ctc
+            # But to get probabilities for the decoder, the softmax function needs to
+            # be applied to the outputs
+            probabilities = torch.nn.functional.\
+                softmax(outputs, probabilities_sum_to_one_dimension)
 
-        beam_size = 20
-        print(">>> evaluate_mdrnn  - len(vocab_list): " + str(len(vocab_list)))
-        decoder = ctcdecode.CTCBeamDecoder(vocab_list, beam_width=beam_size,
-                                           blank_id=vocab_list.index(blank_symbol),
-                                           num_processes=16)
-        label_sizes = WarpCTCLossInterface.\
-            create_sequence_lengths_specification_tensor_different_lengths(labels)
+            print(">>> evaluate_mdrnn  - outputs.size: " + str(outputs.size()))
+            print(">>> evaluate_mdrnn  - probabilities.size: " + str(probabilities.size()))
 
-        sequence_lengths = WarpCTCLossInterface.create_probabilities_lengths_specification_tensor_different_lengths(
-            labels, horizontal_reduction_factor, probabilities)
-        # print(">>> evaluate_mdrnn  -  sequence lengths: " + str(sequence_lengths))
-        # print("probabilities.data.size(): " + str(probabilities.data.size()))
-        beam_results, beam_scores, timesteps, out_seq_len = \
-            decoder.decode(probabilities.data, sequence_lengths)
+            beam_size = 20
+            print(">>> evaluate_mdrnn  - len(vocab_list): " + str(len(vocab_list)))
+            decoder = ctcdecode.CTCBeamDecoder(vocab_list, beam_width=beam_size,
+                                               blank_id=vocab_list.index(blank_symbol),
+                                               num_processes=16)
+            label_sizes = WarpCTCLossInterface.\
+                create_sequence_lengths_specification_tensor_different_lengths(labels)
 
-        # print(">>> evaluate_mdrnn  - beam_results: " + str(beam_results))
+            sequence_lengths = WarpCTCLossInterface.create_probabilities_lengths_specification_tensor_different_lengths(
+                labels, horizontal_reduction_factor, probabilities)
+            # print(">>> evaluate_mdrnn  -  sequence lengths: " + str(sequence_lengths))
+            # print("probabilities.data.size(): " + str(probabilities.data.size()))
+            beam_results, beam_scores, timesteps, out_seq_len = \
+                decoder.decode(probabilities.data, sequence_lengths)
 
-        total += labels.size(0)
+            # print(">>> evaluate_mdrnn  - beam_results: " + str(beam_results))
 
-        for example_index in range(0, beam_results.size(0)):
-            beam_results_sequence = beam_results[example_index][0]
-            # print("beam_results_sequence: \"" + str(beam_results_sequence) + "\"")
-            output_string = convert_to_string(beam_results_sequence,
-                                              vocab_list, out_seq_len[example_index][0])
-            example_labels_with_padding = labels[example_index]
-            # Extract the real example labels, removing the padding labels
-            reference_labels = example_labels_with_padding[0:label_sizes[example_index]]
+            total += labels.size(0)
 
-            # print(">>> evaluate_mdrnn  - reference_labels: " + str(reference_labels))
-            reference_labels_string = convert_labels_tensor_to_string(reference_labels, vocab_list, blank_symbol)
+            for example_index in range(0, beam_results.size(0)):
+                beam_results_sequence = beam_results[example_index][0]
+                # print("beam_results_sequence: \"" + str(beam_results_sequence) + "\"")
+                output_string = convert_to_string(beam_results_sequence,
+                                                  vocab_list, out_seq_len[example_index][0])
+                example_labels_with_padding = labels[example_index]
+                # Extract the real example labels, removing the padding labels
+                reference_labels = example_labels_with_padding[0:label_sizes[example_index]]
 
-            if reference_labels_string == output_string:
-                # print("Yaaaaah, got one correct!!!")
-                correct += 1
-                correct_string = "correct"
-            else:
-                correct_string = "wrong"
+                # print(">>> evaluate_mdrnn  - reference_labels: " + str(reference_labels))
+                reference_labels_string = convert_labels_tensor_to_string(reference_labels, vocab_list, blank_symbol)
 
-            print(">>> evaluate_mdrnn  - output: \"" + output_string + "\" " +
-                  "\nreference: \"" + reference_labels_string + "\" --- "
-                  + correct_string)
+                if reference_labels_string == output_string:
+                    # print("Yaaaaah, got one correct!!!")
+                    correct += 1
+                    correct_string = "correct"
+                else:
+                    correct_string = "wrong"
+
+                print(">>> evaluate_mdrnn  - output: \"" + output_string + "\" " +
+                      "\nreference: \"" + reference_labels_string + "\" --- "
+                      + correct_string)
 
 
 
@@ -200,7 +206,7 @@ def clip_gradient_norm(model):
     # make the model converge."
     # A max norm of 15 seems to make the learning go faster and yield almost no
     # clipping in the second epoch onwards, which seems ideal.
-    max_norm = 15
+    max_norm = 10
     # https://www.reddit.com/r/MachineLearning/comments/3n8g28/gradient_clipping_what_are_good_values_to_clip_at/
     # https://machinelearningmastery.com/exploding-gradients-in-neural-networks/
     # norm_type is the p-norm type, a value of 2 means the eucledian norm
@@ -542,21 +548,21 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
     # mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
     block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
     clamp_gradients = False
-    multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking.\
-        create_two_layer_pair_network(hidden_states_size, mdlstm_block_size,
-                                      block_strided_convolution_block_size,
-                                      clamp_gradients)
+    # multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking.\
+    #     create_two_layer_pair_network(hidden_states_size, mdlstm_block_size,
+    #                                   block_strided_convolution_block_size,
+    #                                   clamp_gradients)
     #multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
     #    create_three_layer_pair_network(hidden_states_size, mdlstm_block_size,
     #                                 block_strided_convolution_block_size)
 
-    # multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
-    #    create_three_layer_pair_network_linear_parameter_size_increase(input_channels, hidden_states_size,
-    #                                                                   mdlstm_block_size,
-    #                                                                   block_strided_convolution_block_size,
-    #                                                                   compute_multi_directional,
-    #                                                                   clamp_gradients,
-    #                                                                   use_dropout)
+    multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
+       create_three_layer_pair_network_linear_parameter_size_increase(input_channels, hidden_states_size,
+                                                                      mdlstm_block_size,
+                                                                      block_strided_convolution_block_size,
+                                                                      compute_multi_directional,
+                                                                      clamp_gradients,
+                                                                      use_dropout)
 
     # See: https://pytorch.org/tutorials/beginner/former_torchies/nn_tutorial.html
     # multi_dimensional_rnn.register_backward_hook(printgradnorm)
@@ -611,8 +617,14 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
     ### Reducing the learning rate seems to reduce the infinite loss problem
     ### https://github.com/baidu-research/warp-ctc/issues/51
 
-    optimizer = optim.SGD(network.parameters(), lr=0.0001, momentum=0.9, weight_decay=1e-5,
-                          nesterov=True)
+    # https://www.quora.com/
+    # How-can-one-escape-from-a-plateau-in-Deep-Learning-by-using-the-momentum-+-RMSProp-method-hyper-parameters
+    # Increase weight decay to  1e-4
+    #optimizer = optim.SGD(network.parameters(), lr=0.0001, momentum=0.9, weight_decay=1e-4,
+    #                      nesterov=True)
+
+    #optimizer = optim.SGD(network.parameters(), lr=0.0001, momentum=0.9, weight_decay=1e-5,
+    #                      nesterov=True)
     #optimizer = optim.SGD(network.parameters(), lr=0.0001, momentum=0.9, weight_decay=1e-5,
     #                      nesterov=True)
     #optimizer = optim.SGD(network.parameters(), lr=0.000005, momentum=0.9, weight_decay=1e-5,
@@ -626,7 +638,7 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
     # But the largest learning rate that still works also seems on things like
     # the relative length of the output sequence
     # optimizer = optim.Adam(network.parameters(), lr=0.00001, weight_decay=1e-5)
-    # optimizer = optim.Adam(network.parameters(), lr=0.0001, weight_decay=1e-5)
+    optimizer = optim.Adam(network.parameters(), lr=0.0001)
     # optimizer = optim.Adam(network.parameters(), lr=0.00001, weight_decay=1e-5)
 #    optimizer = optim.Adam(network.parameters(), lr=0.000001, weight_decay=1e-5)
 
@@ -641,6 +653,7 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
     # in the output from the real input width information in the warp_ctc_loss function
     width_reduction_factor = network.module.get_width_reduction_factor()
 
+    iteration = 1
     for epoch in range(20):  # loop over the dataset multiple times
 
         running_loss = 0.0
@@ -779,6 +792,9 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
 
             # print("Time used for this batch: " + str(util.timing.time_since(time_start_batch)))
 
+            # Update the iteration / minibatch number
+            iteration += 1
+
         print("<evaluation epoch " + str(epoch) + " >")
         # Run evaluation
         # multi_dimensional_rnn.set_training(False) # Normal case
@@ -871,7 +887,7 @@ def mnist_recognition_variable_length():
 
 def iam_recognition():
 
-        batch_size = 16
+        batch_size = 32
 
         lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
         iam_database_line_images_root_folder_path = "/datastore/data/iam-database/lines"
@@ -924,8 +940,8 @@ def iam_recognition():
 
 def main():
     # mnist_recognition_fixed_length()
-    mnist_recognition_variable_length()
-    # iam_recognition()
+    # mnist_recognition_variable_length()
+    iam_recognition()
     #cifar_ten_basic_recognition()
 
 
