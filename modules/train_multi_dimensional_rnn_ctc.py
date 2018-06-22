@@ -653,7 +653,11 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
     # But the largest learning rate that still works also seems on things like
     # the relative length of the output sequence
     # optimizer = optim.Adam(network.parameters(), lr=0.00001, weight_decay=1e-5)
-    optimizer = optim.Adam(network.parameters(), lr=0.0001)
+    #optimizer = optim.Adam(network.parameters(), lr=0.0001)
+
+    # Initial value used by "Handwriting Recognition with Large Multimodal
+    # Long-Short Term Memory Recurrent Neural Networks"
+    optimizer = optim.Adam(network.parameters(), lr=0.0005)
     # optimizer = optim.Adam(network.parameters(), lr=0.00001, weight_decay=1e-5)
 #    optimizer = optim.Adam(network.parameters(), lr=0.000001, weight_decay=1e-5)
 

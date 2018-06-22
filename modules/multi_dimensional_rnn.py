@@ -315,6 +315,8 @@ class MultiDimensionalRNNBase(torch.nn.Module):
 
     @staticmethod
     def compute_states_plus_input(input_matrix, column_number, state_columns_combined):
+        # print("compute_states_plus_input - input_matrix.size(): " + str(input_matrix.size()))
+
         input_column = input_matrix[:, :, :, column_number]
         # print("input_column.size(): " + str(input_column.size()))
         # print("state_columns_combined.size(): " + str(state_columns_combined.size()))

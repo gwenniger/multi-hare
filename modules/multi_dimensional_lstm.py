@@ -162,14 +162,15 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         # print("mdlstm_parameters.input_input_convolution.bias: "
         # + str(mdlstm_parameters.input_input_convolution.bias))
 
+        mdlstm_parameters.prepare_input_convolutions(skewed_images_variable)
 
         # Compute the different input convolutions
-        input_input_matrix = mdlstm_parameters.input_input_convolution(skewed_images_variable)
+        input_input_matrix = mdlstm_parameters.get_input_input_matrix()
         # print("input_input_matrix.size(): " + str(input_input_matrix.size()))
-        input_gate_input_matrix = mdlstm_parameters.input_gate_input_convolution(skewed_images_variable)
-        forget_gate_one_input_matrix = mdlstm_parameters.forget_gate_one_input_convolution(skewed_images_variable)
-        forget_gate_two_input_matrix = mdlstm_parameters.forget_gate_two_input_convolution(skewed_images_variable)
-        output_gate_input_matrix = mdlstm_parameters.output_gate_input_convolution(skewed_images_variable)
+        input_gate_input_matrix = mdlstm_parameters.get_input_gate_input_matrix()
+        forget_gate_one_input_matrix = mdlstm_parameters.get_forget_gate_one_input_matrix()
+        forget_gate_two_input_matrix = mdlstm_parameters.get_forget_gate_two_input_matrix()
+        output_gate_input_matrix = mdlstm_parameters.get_output_gate_input_matrix()
 
         # if self.clamp_gradients:
         #     # print("MultiDimensionalLSTM.compute_multi_dimensional_lstm_one_direction - register gradient clamping...")

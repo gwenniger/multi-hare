@@ -1,5 +1,6 @@
 from modules.state_update_block import StateUpdateBlock
 from modules.parallel_multiple_state_weightings_computation import ParallelMultipleStateWeightingsComputation
+from modules.parallel_multiple_input_convolutions_computation import ParallelMultipleInputConvolutionsComputation
 from abc import abstractmethod
 import torch.nn as nn
 from torch.nn.modules.module import Module
@@ -23,37 +24,11 @@ class MultiDimensionalLSTMParametersOneDirectionBase(Module):
         # for the different columns of the image
         #
         # Input convolutions
-        self.input_input_convolution = nn.Conv2d(self.input_channels,
-                                                 self.hidden_states_size, 1)
-        self.input_gate_input_convolution = nn.Conv2d(self.input_channels,
-                                                      self.hidden_states_size, 1)
-        self.forget_gate_one_input_convolution = nn.Conv2d(self.input_channels,
-                                                           self.hidden_states_size, 1)
-        self.forget_gate_two_input_convolution = nn.Conv2d(self.input_channels,
-                                                           self.hidden_states_size, 1)
-        self.output_gate_input_convolution = nn.Conv2d(self.input_channels,
-                                                       self.hidden_states_size, 1)
 
         # Memory state convolutions
         self.output_gate_memory_state_convolution = nn.Conv1d(self.hidden_states_size,
                                                               self.hidden_states_size, 1)
-
-        # Initialize the input and memory state convolutions with the
-        # Xavier Glorot scheme
-        self.initialize_input_and_memory_state_convolutions_xavier_glorot()
-
-        # TODO: Add dropout to the remaining layers
-
-    def initialize_input_and_memory_state_convolutions_xavier_glorot(self):
-        # Xavier Glorot weight initialization
-        # http://proceedings.mlr.press/v9/glorot10a/glorot10a.pdf
-        nn.init.xavier_uniform_(self.input_input_convolution.weight)
-        nn.init.xavier_uniform_(self.input_gate_input_convolution.weight)
-        nn.init.xavier_uniform_(self.forget_gate_one_input_convolution.weight)
-        nn.init.xavier_uniform_(self.forget_gate_two_input_convolution.weight)
-        nn.init.xavier_uniform_(self.output_gate_input_convolution.weight)
         nn.init.xavier_uniform_(self.output_gate_memory_state_convolution.weight)
-
 
     def set_bias_forget_gates_image_input(self):
         self.forget_gate_one_input_convolution.bias.data.fill_(
@@ -63,11 +38,47 @@ class MultiDimensionalLSTMParametersOneDirectionBase(Module):
             MultiDimensionalLSTMParametersOneDirectionBase.FORGET_GATE_BIAS_INIT
         )
 
+    @abstractmethod
+    def prepare_input_convolutions(self, skewed_images_variable):
+        raise RuntimeError("not implemented")
+
     # Needs to be implemented in the subclasses
     @abstractmethod
     def prepare_computation_next_column_functions(self, previous_hidden_state_column,
                                                   previous_memory_state_column):
         raise RuntimeError("not implemented")
+
+    @abstractmethod
+    def get_input_input_matrix(self):
+        raise RuntimeError("not implemented")
+
+    @abstractmethod
+    def get_input_gate_input_matrix(self):
+        raise RuntimeError("not implemented")
+
+    @abstractmethod
+    def get_forget_gate_one_input_matrix(self):
+        raise RuntimeError("not implemented")
+
+    @abstractmethod
+    def get_forget_gate_two_input_matrix(self):
+        raise RuntimeError("not implemented")
+
+    @abstractmethod
+    def get_output_gate_input_matrix(self):
+        raise RuntimeError("not implemented")
+
+
+
+    # input_input_matrix = mdlstm_parameters.input_input_convolution(skewed_images_variable)
+    # # print("input_input_matrix.size(): " + str(input_input_matrix.size()))
+    # input_gate_input_matrix = mdlstm_parameters.input_gate_input_convolution(skewed_images_variable)
+    # forget_gate_one_input_matrix = mdlstm_parameters.forget_gate_one_input_convolution(skewed_images_variable)
+    # forget_gate_two_input_matrix = mdlstm_parameters.forget_gate_two_input_convolution(skewed_images_variable)
+    # output_gate_input_matrix = mdlstm_parameters.output_gate_input_convolution(skewed_images_variable)
+
+
+
 
     # Needs to be implemented in the subclasses
     @abstractmethod
@@ -124,14 +135,9 @@ class MultiDimensionalLSTMParametersOneDirectionBase(Module):
     def set_training(self, training):
         raise RuntimeError("not implemented")
 
+    @abstractmethod
     def get_all_input_convolutions_as_list(self):
-        result = list([])
-        result.append(self.input_input_convolution)
-        result.append(self.input_gate_input_convolution)
-        result.append(self.forget_gate_one_input_convolution)
-        result.append(self.forget_gate_two_input_convolution)
-        result.append(self.output_gate_input_convolution)
-        return result
+        raise RuntimeError("not implemented")
 
     # This class extends Module so as to make sure that the parameters
     # are properly copied (to the right cuda device) when using nn.DataParallel(model)
@@ -161,19 +167,68 @@ class MultiDimensionalLSTMParametersOneDirection(MultiDimensionalLSTMParametersO
                                                                   self.hidden_states_size, 1)
         self.forget_gate_two_memory_state_convolution = nn.Conv1d(self.hidden_states_size,
                                                                   self.hidden_states_size, 1)
-
+        self.skewed_images_variable = None
         self.previous_hidden_state_column = None
         self.previous_memory_state_column = None
+
+        self.input_input_convolution = nn.Conv2d(self.input_channels,
+                                                 self.hidden_states_size, 1)
+        self.input_gate_input_convolution = nn.Conv2d(self.input_channels,
+                                                      self.hidden_states_size, 1)
+        self.forget_gate_one_input_convolution = nn.Conv2d(self.input_channels,
+                                                           self.hidden_states_size, 1)
+        self.forget_gate_two_input_convolution = nn.Conv2d(self.input_channels,
+                                                           self.hidden_states_size, 1)
+        self.output_gate_input_convolution = nn.Conv2d(self.input_channels,
+                                                       self.hidden_states_size, 1)
+
+        # Initialize the input and memory state convolutions with the
+        # Xavier Glorot scheme
+        self.initialize_input_convolutions_xavier_glorot()
+
+        # TODO: Add dropout to the remaining layers
+
+    def initialize_input_convolutions_xavier_glorot(self):
+        # Xavier Glorot weight initialization
+        # http://proceedings.mlr.press/v9/glorot10a/glorot10a.pdf
+        nn.init.xavier_uniform_(self.input_input_convolution.weight)
+        nn.init.xavier_uniform_(self.input_gate_input_convolution.weight)
+        nn.init.xavier_uniform_(self.forget_gate_one_input_convolution.weight)
+        nn.init.xavier_uniform_(self.forget_gate_two_input_convolution.weight)
+        nn.init.xavier_uniform_(self.output_gate_input_convolution.weight)
 
     @staticmethod
     def create_multi_dimensional_lstm_parameters_one_direction(hidden_states_size, input_channels,
                                                                use_dropout: bool):
         return MultiDimensionalLSTMParametersOneDirection(hidden_states_size, input_channels, use_dropout)
 
+    def prepare_input_convolutions(self, skewed_images_variable):
+        self.skewed_images_variable = skewed_images_variable
+
     def prepare_computation_next_column_functions(self, previous_hidden_state_column,
                                                   previous_memory_state_column):
         self.previous_hidden_state_column = previous_hidden_state_column
         self.previous_memory_state_column = previous_memory_state_column
+
+    def get_input_input_matrix(self):
+        input_input_matrix = self.input_input_convolution(self.skewed_images_variable)
+        return input_input_matrix
+
+    def get_input_gate_input_matrix(self):
+        input_gate_input_matrix = self.input_gate_input_convolution(self.skewed_images_variable)
+        return input_gate_input_matrix
+
+    def get_forget_gate_one_input_matrix(self):
+        forget_gate_one_input_matrix = self.forget_gate_one_input_convolution(self.skewed_images_variable)
+        return forget_gate_one_input_matrix
+
+    def get_forget_gate_two_input_matrix(self):
+        forget_gate_two_input_matrix = self.forget_gate_two_input_convolution(self.skewed_images_variable)
+        return forget_gate_two_input_matrix
+
+    def get_output_gate_input_matrix(self):
+        output_gate_input_matrix = self.output_gate_input_convolution(self.skewed_images_variable)
+        return output_gate_input_matrix
 
     def get_input_hidden_state_column(self):
         input_hidden_state_column = self.input_hidden_state_update_block. \
@@ -272,6 +327,15 @@ class MultiDimensionalLSTMParametersOneDirection(MultiDimensionalLSTMParametersO
         # TODO: implement this
         return
 
+    def get_all_input_convolutions_as_list(self):
+        result = list([])
+        result.append(self.input_input_convolution)
+        result.append(self.input_gate_input_convolution)
+        result.append(self.forget_gate_one_input_convolution)
+        result.append(self.forget_gate_two_input_convolution)
+        result.append(self.output_gate_input_convolution)
+        return result
+
     def forward(self, x):
         raise NotImplementedError
 
@@ -286,6 +350,13 @@ class MultiDimensionalLSTMParametersOneDirectionFast(MultiDimensionalLSTMParamet
         super(MultiDimensionalLSTMParametersOneDirectionFast, self).__init__(hidden_states_size, input_channels,
                                                                              use_dropout)
 
+        self.parallel_multiple_input_convolutions_computation = ParallelMultipleInputConvolutionsComputation.\
+            create_parallel_multiple_input_convolutions_computation(self.input_channels,
+                                                                    self.hidden_states_size,
+                                                                    5,
+                                                                    clamp_gradients,
+                                                                    use_dropout)
+
         # There are five paired input weightings, in this case, pairs of previous hidden state
         # inputs, namely for: 1) the input, 2) the input gate, 3) forget gate one,
         # 4) forget gate two, 5) the output gate
@@ -295,6 +366,7 @@ class MultiDimensionalLSTMParametersOneDirectionFast(MultiDimensionalLSTMParamet
         self.parallel_memory_state_column_computation = ParallelMultipleStateWeightingsComputation.\
             create_parallel_multiple_state_weighting_computation(hidden_states_size, 2, clamp_gradients, use_dropout)
 
+        self.input_matrices = None
         self.node_hidden_state_columns = None
         self.node_memory_state_columns = None
         self.previous_memory_state_column = None
@@ -305,6 +377,10 @@ class MultiDimensionalLSTMParametersOneDirectionFast(MultiDimensionalLSTMParamet
                                                                     use_dropout: bool):
         return MultiDimensionalLSTMParametersOneDirectionFast(hidden_states_size, input_channels,
                                                               clamp_gradients, use_dropout)
+
+    def prepare_input_convolutions(self, skewed_images_variable):
+        self.input_matrices = self.parallel_multiple_input_convolutions_computation.\
+            compute_result_and_split_into_output_elements(skewed_images_variable)
 
     def prepare_computation_next_column_functions(self, previous_hidden_state_column,
                                                   previous_memory_state_column):
@@ -318,6 +394,21 @@ class MultiDimensionalLSTMParametersOneDirectionFast(MultiDimensionalLSTMParamet
         self.node_memory_state_columns = self.\
             parallel_memory_state_column_computation.\
             compute_result_and_split_into_pairs_with_second_pair_element_shifted(previous_memory_state_column)
+
+    def get_input_input_matrix(self):
+        return self.input_matrices[0]
+
+    def get_input_gate_input_matrix(self):
+        return self.input_matrices[1]
+
+    def get_forget_gate_one_input_matrix(self):
+        return self.input_matrices[2]
+
+    def get_forget_gate_two_input_matrix(self):
+        return self.input_matrices[3]
+
+    def get_output_gate_input_matrix(self):
+        return self.input_matrices[4]
 
     def get_input_hidden_state_column(self):
         return self.node_hidden_state_columns[0]
@@ -395,6 +486,11 @@ class MultiDimensionalLSTMParametersOneDirectionFast(MultiDimensionalLSTMParamet
     def set_training(self, training):
         self.parallel_hidden_state_column_computation.set_training(training)
         self.parallel_memory_state_column_computation.set_training(training)
+
+    def get_all_input_convolutions_as_list(self):
+        result = list([])
+        result.append(self.parallel_multiple_input_convolutions_computation.parallel_convolution)
+        return result
 
     def forward(self, x):
         raise NotImplementedError

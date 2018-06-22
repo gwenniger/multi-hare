@@ -6,6 +6,18 @@ import torch
 from modules.inside_model_gradient_clipping import InsideModelGradientClamping
 
 
+# This class optimizes the computation of multiple states computed
+# using 1D convolutions that are computed from the same input, by
+# computing them as a single convolution with more outputs, and then
+# splitting the results.
+# The states are computed as pairs, whereby the result of the second
+# element of the pair needs to be shifted by one position.
+# This is for the purpose of querying one original and one shifted element
+# in MDLSTM computation: by shifting the result of the input convolution
+# for the second hidden/memory state, all the other computations become
+# simpler, since now the shifting has already been done so the same element
+# from the original and shifted output can be combined, rather than explicitly
+# shifting the querying index for getting the shifted result.
 class ParallelMultipleStateWeightingsComputation(Module):
     def __init__(self, hidden_states_size: int,
                  number_of_paired_input_weightings: int,
@@ -74,6 +86,10 @@ class ParallelMultipleStateWeightingsComputation(Module):
 
         convolution_result = self.compute_convolution_result(previous_state_column)
         # print("convolution result: " + str(convolution_result))
+
+        # print(">>> parallel_multiple_state_weightings_computation."
+        #      + " compute_result_and_split_into_output_elements - convolution_result.size(): " +
+        #      str(convolution_result.size()))
 
         for i in range(0, self.number_of_paired_input_weightings):
             range_begin = self.get_result_range_start_index(i * 2)
