@@ -131,6 +131,9 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         # print("self.fc3.weight: " + str(self.fc3.weight))
         # print("self.fc3.bias: " + str(self.fc3.bias))
 
+        print("NetworkToSoftMaxNetwork - clamp_gradients: " + str(clamp_gradients))
+
+
     @staticmethod
     def create_network_to_soft_max_network(network, input_size: SizeTwoDimensional,
                                            number_of_classes_excluding_blank: int,

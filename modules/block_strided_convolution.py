@@ -31,6 +31,8 @@ class BlockStridedConvolution(Module):
         # Xavier Glorot scheme
         nn.init.xavier_uniform_(self.convolution.weight)
 
+        print("BlockStridedConvolution - clamp_gradients: " + str(clamp_gradients))
+
     @staticmethod
     def create_block_strided_convolution(input_channels: int, output_channels: int, block_size: SizeTwoDimensional,
                                          clamp_gradients: bool,

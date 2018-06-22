@@ -116,6 +116,7 @@ def evaluate_mdrnn(test_loader, multi_dimensional_rnn, device,
         # be converted to floats (after moving to GPU, i.e. directly on GPU
         # which is faster)
         if image_input_is_unsigned_int:
+            check_inputs_is_right_type(inputs)
             inputs = IamLinesDataset.convert_unsigned_int_image_tensor_to_float_image_tensor(inputs)
 
         # https://github.com/pytorch/pytorch/issues/235
@@ -470,6 +471,20 @@ def printgradnorm(self, grad_input, grad_output):
     print('grad_output norm: ', grad_output[0].norm())
 
 
+# Check that the inputs are of ByteTensor (uint8) type
+# Reading the data and preserving it in this type is sort of tricky, so it is
+# best to check that the inputs is indeed of the expected type
+def check_inputs_is_right_type(inputs):
+    if Utils.use_cuda():
+        expected_type_instance = torch.cuda.ByteTensor()
+    else:
+        expected_type_instance = torch.ByteTensor()
+
+    if inputs.type() != expected_type_instance.type():
+        raise RuntimeError("Error: expected a " + str(expected_type_instance.type()) + " type image tensor" +
+                           " but got : " + str(inputs.type()))
+
+
 def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: SizeTwoDimensional, hidden_states_size: int, batch_size,
                     compute_multi_directional: bool, use_dropout: bool,
                     vocab_list: list, blank_symbol: str,
@@ -679,6 +694,7 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
             # be converted to floats (after moving to GPU, i.e. directly on GPU
             # which is faster)
             if image_input_is_unsigned_int:
+                check_inputs_is_right_type(inputs)
                 inputs = IamLinesDataset.convert_unsigned_int_image_tensor_to_float_image_tensor(inputs)
 
             # Set requires_grad(True) directly and only for the input

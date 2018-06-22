@@ -7,21 +7,28 @@ import torch
 import numpy
 import os
 import sys
+import util.image_visualization
 
 
 class IamLinesDataset(Dataset):
     EXAMPLE_TYPES_OK = "ok"
     EXAMPLE_TYPES_ERROR = "error"
     EXAMPLE_TYPES_ALL = "all"
+    UINT8_WHITE_VALUE = 255
+
 
     def __init__(self, iam_lines_dictionary: IamLinesDictionary,
                  examples_line_information: list,
                  string_to_index_mapping_table: StringToIndexMappingTable,
+                 height_required_per_network_output_row: int,
+                 width_required_per_network_output_column: int,
                  transform=None):
         self.iam_lines_dictionary = iam_lines_dictionary
         self.examples_line_information = examples_line_information
         self.string_to_index_mapping_table = string_to_index_mapping_table
         self.transform = transform
+        self.height_required_per_network_output_row = height_required_per_network_output_row
+        self.width_required_per_network_output_column = width_required_per_network_output_column
 
     @staticmethod
     def get_examples_line_information(iam_lines_dictionary: IamLinesDictionary, example_types: str):
@@ -55,8 +62,13 @@ class IamLinesDataset(Dataset):
         examples_line_information = IamLinesDataset.get_examples_line_information(iam_lines_dictionary, example_types)
         string_to_index_mapping_table = IamLinesDataset.create_string_to_index_mapping_table(examples_line_information)
 
+        # TODO : compute these from an input parameter
+        height_required_per_network_output_row = 64
+        width_required_per_network_output_column = 8
+
         print("string_to_index_mapping_table: " + str(string_to_index_mapping_table))
         return IamLinesDataset(iam_lines_dictionary, examples_line_information, string_to_index_mapping_table,
+                               height_required_per_network_output_row, width_required_per_network_output_column,
                                transformation)
 
     def split_random_train_set_and_test_set(self, test_examples_fraction):
@@ -68,9 +80,9 @@ class IamLinesDataset(Dataset):
         examples_line_information_test = \
             [self.examples_line_information[i] for i in random_permutation[last_train_index:]]
         train_set = IamLinesDataset(self.iam_lines_dictionary, examples_line_information_train,
-                        self.string_to_index_mapping_table, self.transform)
+                        self.string_to_index_mapping_table, 64, 8, self.transform)
         test_set = IamLinesDataset(self.iam_lines_dictionary, examples_line_information_test,
-                                    self.string_to_index_mapping_table, self.transform)
+                                    self.string_to_index_mapping_table, 64, 8, self.transform)
 
         return train_set, test_set
 
@@ -97,6 +109,10 @@ class IamLinesDataset(Dataset):
         result = torch.div(result, 255)
         return result
 
+    @staticmethod
+    def compute_max_adjusted_by_scale_reduction_factor(max_value, scale_reduction_factor):
+        return int((max_value + (max_value % scale_reduction_factor)) / scale_reduction_factor)
+
     def get_data_loader_with_appropriate_padding(self, data_set, max_image_height,
                                                  max_image_width, max_labels_length,
                                                  batch_size: int):
@@ -112,13 +128,26 @@ class IamLinesDataset(Dataset):
         # FIXME: This is a quick and dirty hack to get the sizes right
         # Implement for general block sizes
 
-        max_image_height = int(max_image_height / scale_reduction_factor)
-        max_image_width = int(max_image_width / scale_reduction_factor)
-        max_image_height = max_image_height + (64 - (max_image_height % 64))
-        max_image_width = max_image_width + (8 - (max_image_width % 8))
+        max_image_height = IamLinesDataset.compute_max_adjusted_by_scale_reduction_factor(max_image_height,
+                                                                                          scale_reduction_factor)
+        max_image_width = IamLinesDataset.compute_max_adjusted_by_scale_reduction_factor(max_image_width,
+                                                                                         scale_reduction_factor)
+        max_image_height = max_image_height + (self.height_required_per_network_output_row
+                                               - (max_image_height % self.height_required_per_network_output_row))
+        # Width that is strictly required to fit the max occurring width and also
+        # be a multiple of self.width_required_per_network_output_row
+        max_image_width = max_image_width + (self.width_required_per_network_output_column
+                                             - (max_image_width % self.width_required_per_network_output_column))
+
+        sample_index = 0
+        last_percentage_complete = 0
 
         for sample in data_set:
             image_original = sample["image"]
+            image_original_dtype = image_original.dtype
+
+            # print("image_original: " + str(image_original))
+            # print("image_original.dtype: " + str(image_original.dtype))
 
             image_height_original, image_width_original = image_original.shape
 
@@ -127,8 +156,19 @@ class IamLinesDataset(Dataset):
             rescale = Rescale(tuple([image_height, image_width]))
 
             # Rescale works on ndarrays, not on pytorch tensors
+            # print("before: sample[\"image\"].dtype: " + str(sample["image"].dtype))
             sample = rescale(sample)
+            image_rescaled = sample["image"]
+            # print("image_rescaled.dtype: " + str(image_rescaled.dtype))
+
+            # Sanity check that the image dtype remained the same
+            if image_original_dtype != image_rescaled.dtype:
+                raise RuntimeError("Error: the image dtype changed")
+
             sample_pytorch = to_tensor(sample)
+
+           # print("sample_pytorch: " + str(sample_pytorch))
+
             image = sample_pytorch["image"]
             # print(">>> image size: " + str(image.size()))
 
@@ -145,21 +185,34 @@ class IamLinesDataset(Dataset):
 
             columns_padding_required = max_image_width - image_width
             rows_padding_required = max_image_height - image_height
+            rows_padding_required_top = int(rows_padding_required / 2)
+            # Make sure no row gets lost through integer division
+            rows_padding_required_bottom = rows_padding_required - rows_padding_required_top
+
             # print("columns_padding_required: " + str(columns_padding_required))
             # print("rows_padding_required: " + str(rows_padding_required))
 
             # See: https://pytorch.org/docs/stable/_modules/torch/nn/functional.html
             # pad last dimension (width) by 0, columns_padding_required
             # and one-but-last dimension (height) by 0, rows_padding_required
-            p2d = (0, columns_padding_required, rows_padding_required, 0)
+            # p2d = (0, columns_padding_required, rows_padding_required, 0)
+            p2d = (0, columns_padding_required,
+                   rows_padding_required_top,
+                   rows_padding_required_bottom)
+            # We want to pad with the value for white, which is 255 for uint8
             image_padded = torch.nn.functional. \
-                pad(image, p2d, "constant", 0)
+                pad(image, p2d, "constant", IamLinesDataset.UINT8_WHITE_VALUE)
+
+            # Show padded image: for debugging
+            # print("image: " + str(image))
+            # util.image_visualization.imshow_tensor_2d(image_padded)
 
             # Add additional bogus channel dimension, since a channel dimension is expected by downstream
             # users of this method
             # print("before: image_padded.size(): " + str(image_padded.size()))
             image_padded = image_padded.unsqueeze(0)
             # print("after padding: image_padded.size(): " + str(image_padded.size()))
+            # print("after padding: image_padded: " + str(image_padded))
 
             # image_padded = IamLinesDataset.convert_unsigned_int_image_tensor_to_float_image_tensor(image_padded)
             # print("after padding and type conversion: image_padded: " + str(image_padded))
@@ -173,6 +226,17 @@ class IamLinesDataset(Dataset):
                                                                               labels_length)
 
             train_set_pairs.append(tuple((image_padded, labels_padded)))
+
+            percentage_complete = int((float(sample_index) / len(data_set)) * 100)
+
+            # Print every 10% if not already printed
+            if ((percentage_complete % 10) == 0) and (percentage_complete != last_percentage_complete):
+                print("iam_lines_dataset.get_data_loader_with_appropriate_padding - completed " +
+                      str(percentage_complete) + "%")
+                # print(" sample index: " + str(sample_index) + " len(data_set):" +
+                #      str(len(data_set)))
+                last_percentage_complete = percentage_complete
+            sample_index += 1
 
         train_loader = torch.utils.data.DataLoader(
             dataset=train_set_pairs,
@@ -191,16 +255,19 @@ class IamLinesDataset(Dataset):
 
         train_set, test_set = self.split_random_train_set_and_test_set(test_examples_fraction)
 
+        print("Prepare IAM data train loader...")
         train_loader = self.get_data_loader_with_appropriate_padding(train_set, max_image_height, max_image_width,
                                                                      max_labels_length, batch_size)
+
+        print("Prepare IAM data test loader...")
         test_loader = self.get_data_loader_with_appropriate_padding(test_set, max_image_height, max_image_width,
                                                                     max_labels_length, batch_size)
 
         return train_loader, test_loader
 
     def __len__(self):
-        return len(self.examples_line_information)
-        # return int(len(self.examples_line_information) / 20)  # Hack for faster training during development
+        # return len(self.examples_line_information)
+        return int(len(self.examples_line_information) / 20)  # Hack for faster training during development
 
     def __getitem__(self, idx):
         line_information = self.examples_line_information[idx]
@@ -222,7 +289,7 @@ class IamLinesDataset(Dataset):
         # print("image_file_path: " + str(image_file_path))
 
         image = io.imread(image_file_path)
-
+        # print(">>> get_image - image.dtype: " + str(image.dtype))
         return image
 
     def get_labels(self, index):
@@ -310,6 +377,8 @@ class Rescale(object):
     def __call__(self, sample):
         image, labels = sample['image'], sample['labels']
 
+        image_type_original = image.dtype
+
         h, w = image.shape[:2]
         if isinstance(self.output_size, int):
             if h > w:
@@ -322,9 +391,26 @@ class Rescale(object):
         new_h, new_w = int(new_h), int(new_w)
 
         # img = transform.resize(image, (new_h, new_w))
-        img = transform.resize(image, (new_h, new_w), mode="constant", anti_aliasing=True)
 
-        return {'image': img, 'labels': labels}
+        # print("rescale - image.dtype: " + str(image.dtype))
+
+        # The option "preserve_range=True is crucial for preserving
+        # ints, and not converting to floats
+        # See: http://scikit-image.org/docs/dev/api/skimage.transform.html#skimage.transform.resize
+        image_result = transform.resize(image, (new_h, new_w),
+                               mode="constant", anti_aliasing=True,
+                               preserve_range=True)
+
+        # print("rescale - img_result.dtype: " + str(image_result.dtype))
+
+        # Still need to convert back to the original type, since
+        # transform has no option to preserve type. "unsafe" option is
+        # needed to allow casting floats to ints
+        # See: https://docs.scipy.org/doc/numpy-1.14.0/reference/generated/numpy.ndarray.astype.html
+        image_result_converted_back = image_result.\
+            astype(image_type_original, casting="unsafe")
+
+        return {'image': image_result_converted_back, 'labels': labels}
 
 
 class ToTensor(object):
@@ -337,6 +423,10 @@ class ToTensor(object):
         # numpy image: H x W x C
         # torch image: C X H X W
         # image = image.transpose((2, 0, 1))
+
+        # print("ToTensor.call - image.dtype: " + str(image.dtype))
+        # Appearantly the right torch tensor type is determined automatically
+        # https://github.com/pytorch/pytorch/issues/541
         torch_image = torch.from_numpy(image)
         # print("torch_image.size(): " + str(torch_image.size()))
         # FIXME: labels must be an np.ndarray
@@ -366,9 +456,35 @@ def test_iam_lines_dataset():
     # for i in range(0, torch_tensors['image'].view(-1).size(0)):
     #    print("torch_tensor['image'][" + str(i) + "]: " + str(torch_tensors['image'].view(-1)[i]))
 
+    iam_lines_dataset.get_random_train_set_test_set_data_loaders(16, 0.5)
+
+
+def test_iam_words_dataset():
+    words_file_path = "/datastore/data/iam-database/ascii/words.txt"
+    iam_database_word_images_root_folder_path = "/datastore/data/iam-database/words"
+    iam_words_dicionary = IamLinesDictionary.create_iam_dictionary(words_file_path,
+                                                                   iam_database_word_images_root_folder_path)
+    iam_lines_dataset = IamLinesDataset.create_iam_lines_dataset(iam_words_dicionary, "ok", None)
+    sample = iam_lines_dataset[0]
+    print("iam_words_dataset[0]: " + str(sample))
+    print("(iam_words_dataset[0])[image]: " + str(sample["image"]))
+    to_tensor = ToTensor()
+    sample_image = sample["image"]
+    print("sample_image: " + str(sample_image))
+    torch_tensors = to_tensor(sample)
+    print("torch_tensor['image'].size(): " + str(torch_tensors['image'].size()))
+    print("torch_tensor['labels'].size(): " + str(torch_tensors['labels'].size()))
+
+    print("torch_tensor['image']: " + str(torch_tensors['image']))
+    print("torch_tensor['labels']: " + str(torch_tensors['labels']))
+
+    # for i in range(0, torch_tensors['image'].view(-1).size(0)):
+    #    print("torch_tensor['image'][" + str(i) + "]: " + str(torch_tensors['image'].view(-1)[i]))
+
 
 def main():
     test_iam_lines_dataset()
+    # test_iam_words_dataset()
 
 
 if __name__ == "__main__":
