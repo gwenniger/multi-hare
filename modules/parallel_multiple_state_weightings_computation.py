@@ -19,7 +19,7 @@ class ParallelMultipleStateWeightingsComputation(Module):
         self.number_of_paired_input_weightings = number_of_paired_input_weightings
         self.output_states_size = output_states_size
         self.parallel_convolution = parallel_convolution
-        self.clamp_gradients = clamp_gradients,
+        self.clamp_gradients = clamp_gradients
         self.use_dropout = use_dropout
         self.training = training
 
