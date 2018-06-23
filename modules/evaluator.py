@@ -4,7 +4,7 @@ from ctc_loss.warp_ctc_loss_interface import WarpCTCLossInterface
 from modules.trainer import Trainer
 import ctcdecode
 from data_preprocessing.iam_database_preprocessing.iam_lines_dataset import IamLinesDataset
-
+from modules.validation_stats import ValidationStats
 
 class Evaluator:
 
@@ -123,8 +123,8 @@ class Evaluator:
             # correct += (predicted == labels).sum()
 
         total_examples = len(test_loader.dataset)
-        accuracy = float(100 * correct) / total
+        validation_stats = ValidationStats(total_examples, correct)
         # https://stackoverflow.com/questions/3395138/using-multiple-arguments-for-string-formatting-in-python-e-g-s-s
-        print("Accuracy of the network on the {} test inputs: {:.2f} %% accuracy".format(total_examples, accuracy))
-
-        return accuracy
+        print("Accuracy of the network on the {} test inputs: {:.2f} %% accuracy".format(total_examples,
+                                                                                         validation_stats.accuracy()))
+        return validation_stats

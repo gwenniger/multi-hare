@@ -4,7 +4,7 @@ import torch
 class GradientClipping:
 
     @staticmethod
-    def clip_gradient_norm(model):
+    def clip_gradient_norm(parameters, max_norm):
         made_gradient_norm_based_correction = False
 
         # What is a good max norm for clipping is an empirical question. But a norm
@@ -24,7 +24,7 @@ class GradientClipping:
         # make the model converge."
         # A max norm of 15 seems to make the learning go faster and yield almost no
         # clipping in the second epoch onwards, which seems ideal.
-        max_norm = 10
+        # max_norm = 10  <===
         # https://www.reddit.com/r/MachineLearning/comments/3n8g28/gradient_clipping_what_are_good_values_to_clip_at/
         # https://machinelearningmastery.com/exploding-gradients-in-neural-networks/
         # norm_type is the p-norm type, a value of 2 means the eucledian norm
@@ -35,7 +35,7 @@ class GradientClipping:
 
         # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
         # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191/9
-        total_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm,
+        total_norm = torch.nn.utils.clip_grad_norm_(parameters, max_norm,
                                                     norm_type)
 
         if total_norm > max_norm:

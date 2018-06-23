@@ -9,6 +9,8 @@ from data_preprocessing.iam_database_preprocessing.iam_lines_dataset import IamL
 import sys
 from modules.gradient_clipping import GradientClipping
 import torch.nn
+from modules.validation_stats import ValidationStats
+from modules.optim import Optim
 
 
 class ModelProperties:
@@ -20,7 +22,7 @@ class ModelProperties:
 
 class Trainer:
 
-    def __init__(self, model, optimizer,
+    def __init__(self, model, optimizer: Optim,
                  warp_ctc_loss_interface,
                  model_properties: ModelProperties):
         self.model = model
@@ -153,15 +155,13 @@ class Trainer:
             loss.backward()
             # print("Time used for loss backward: " + str(util.timing.time_since(time_start_loss_backward)))
 
-            # Perform gradient clipping
-            made_gradient_norm_based_correction, total_norm = \
-                GradientClipping.clip_gradient_norm(self.model)
+            # Perform step including gradient clipping
+            made_gradient_norm_based_correction, total_norm = self.optimizer.step()
+
             if made_gradient_norm_based_correction:
                 num_gradient_corrections += 1
             gradient_norms_sum += total_norm
 
-            # if not (loss_sum == inf or loss_sum == -inf):
-            self.optimizer.step()
 
             # print statistics
             # print("loss.data: " + str(loss.data))
@@ -174,7 +174,7 @@ class Trainer:
                 end = time.time()
                 running_time = end - start
                 print('[%d, %5d] loss: %.3f' %
-                      (epoch + 1, i + 1, running_loss / 10) +
+                      (epoch, i + 1, running_loss / 10) +
                       " Running time: " + str(running_time))
                 average_norm = gradient_norms_sum / 10
                 print("Number of gradient norm-based corrections: " + str(num_gradient_corrections))
@@ -191,7 +191,7 @@ class Trainer:
                       str(util.timing.time_since_and_expected_remaining_time(time_start, percent)))
                 sys.stdout.flush()
 
-    def drop_checkpoint(self, opt, epoch, valid_stats):
+    def drop_checkpoint(self, opt, epoch, valid_stats:ValidationStats):
         """ Save a resumable checkpoint.
 
         Args:
@@ -202,20 +202,22 @@ class Trainer:
         real_model = (self.model.module
                       if isinstance(self.model, torch.nn.DataParallel)
                       else self.model)
-        real_generator = (real_model.generator.module
-                          if isinstance(real_model.generator, torch.nn.DataParallel)
-                          else real_model.generator)
-
+        # real_generator = (real_model.generator.module
+        #                   if isinstance(real_model.generator, torch.nn.DataParallel)
+        #                   else real_model.generator)
+        #
         model_state_dict = real_model.state_dict()
-        model_state_dict = {k: v for k, v in model_state_dict.items()
-                            if 'generator' not in k}
-        generator_state_dict = real_generator.state_dict()
+
+        # Not sure what the generator is for and if it is really needed
+        #model_state_dict = {k: v for k, v in model_state_dict.items()
+        #                    if 'generator' not in k}
+        #generator_state_dict = real_generator.state_dict()
         checkpoint = {
             'model': model_state_dict,
-            'generator': generator_state_dict,
+            #'generator': generator_state_dict,
             'opt': opt,
             'epoch': epoch,
-            'optim': self.optim,
+            'optim': self.optimizer,
         }
         torch.save(checkpoint,
                    '%s_acc_%.2f_e%d.pt'

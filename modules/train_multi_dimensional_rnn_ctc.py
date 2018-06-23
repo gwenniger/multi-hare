@@ -1,3 +1,4 @@
+import argparse
 import torch
 import torch.nn
 import torch.nn as nn
@@ -6,11 +7,6 @@ from modules.multi_dimensional_rnn import MDRNNCell
 from modules.network_to_softmax_network import NetworkToSoftMaxNetwork
 from modules.multi_dimensional_rnn import MultiDimensionalRNNBase
 from modules.multi_dimensional_rnn import MultiDimensionalRNN
-from modules.multi_dimensional_rnn import MultiDimensionalRNNToSingleClassNetwork
-from modules.multi_dimensional_rnn import MultiDimensionalRNNFast
-from modules.multi_dimensional_lstm import MultiDimensionalLSTM
-from modules.block_multi_dimensional_lstm import BlockMultiDimensionalLSTM
-from modules.block_multi_dimensional_lstm_layer_pair import BlockMultiDimensionalLSTMLayerPair
 from modules.block_multi_dimensional_lstm_layer_pair_stacking import BlockMultiDimensionalLSTMLayerPairStacking
 import data_preprocessing.load_mnist
 import data_preprocessing.load_cifar_ten
@@ -22,12 +18,25 @@ from ctc_loss.warp_ctc_loss_interface import WarpCTCLossInterface
 import util.timing
 import data_preprocessing
 import util.tensor_utils
-import sys
-import numpy as np
 import torch.optim as optim
 from modules.trainer import ModelProperties
 from modules.trainer import Trainer
 from modules.evaluator import Evaluator
+from modules.optim import Optim
+import os
+import opts
+
+parser = argparse.ArgumentParser(
+    description='train.py',
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+
+# config/opts.py
+opts.add_md_help_argument(parser)
+opts.model_opts(parser)
+opts.train_opts(parser)
+opt = parser.parse_args()
+
 
 
 def test_mdrnn_cell():
@@ -301,9 +310,10 @@ def printgradnorm(self, grad_input, grad_output):
     print('grad_output norm: ', grad_output[0].norm())
 
 
-def create_model(data_height: int, input_channels: int, input_size: SizeTwoDimensional, hidden_states_size: int,
+def create_model(checkpoint, data_height: int, input_channels: int, input_size: SizeTwoDimensional, hidden_states_size: int,
                  compute_multi_directional: bool, use_dropout: bool, vocab_list,
                  clamp_gradients: bool, data_set_name: str):
+
     # multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(input_channels,
     #                                                                                 hidden_states_size,
     #                                                                                 compute_multi_directional,
@@ -380,10 +390,111 @@ def create_model(data_height: int, input_channels: int, input_size: SizeTwoDimen
                                                                          input_size, number_of_classes_excluding_blank,
                                                                          data_height, clamp_gradients)
 
+    if checkpoint is not None:
+        network.load_state_dict(checkpoint["model"])
+
     return network
 
 
-def create_optimizer(network):
+# Debugging method for showing the optimizer state
+def show_optimizer_state(optim):
+    print("optim.optimizer.state_dict()['state'] keys: ")
+    for key in optim.optimizer.state_dict()['state'].keys():
+        print("optim.optimizer.state_dict()['state'] key: " + str(key))
+
+    print("optim.optimizer.state_dict()['param_groups'] elements: ")
+    for element in optim.optimizer.state_dict()['param_groups']:
+        print("optim.optimizer.state_dict()['param_groups'] element: " + str(
+            element))
+
+
+def build_optim(model, checkpoint):
+    saved_optimizer_state_dict = None
+
+    if opt.train_from:
+        print('Loading optimizer from checkpoint.')
+        optim = checkpoint['optim']
+
+        # We need to save a copy of optim.optimizer.state_dict() for setting
+        # the, optimizer state later on in Stage 2 in this method, since
+        # the method optim.set_parameters(model.parameters()) will overwrite
+        # optim.optimizer, and with ith the values stored in
+        # optim.optimizer.state_dict()
+        saved_optimizer_state_dict = optim.optimizer.state_dict()
+    else:
+        print('Making optimizer for training.')
+        optim = Optim(
+            opt.optim, opt.learning_rate, opt.max_grad_norm,
+            lr_decay=opt.learning_rate_decay,
+            start_decay_at=opt.start_decay_at,
+            beta1=opt.adam_beta1,
+            beta2=opt.adam_beta2,
+            adagrad_accum=opt.adagrad_accumulator_init,
+            decay_method=opt.decay_method)
+
+    # Stage 1:
+    # Essentially optim.set_parameters (re-)creates and optimizer using
+    # model.paramters() as parameters that will be stored in the
+    # optim.optimizer.param_groups field of the torch optimizer class.
+    # Importantly, this method does not yet load the optimizer state, as
+    # essentially it builds a new optimizer with empty optimizer state and
+    # parameters from the model.
+    optim.set_parameters(model.named_parameters())
+    #optim.set_parameters(model.parameters())
+    print(
+        "Stage 1: Keys after executing optim.set_parameters" +
+        "(model.parameters())")
+    show_optimizer_state(optim)
+
+    if opt.train_from:
+        # Stage 2: In this stage, which is only performed when loading an
+        # optimizer from a checkpoint, we load the saved_optimizer_state_dict
+        # into the re-created optimizer, to set the optim.optimizer.state
+        # field, which was previously empty. For this, we use the optimizer
+        # state saved in the "saved_optimizer_state_dict" variable for
+        # this purpose.
+        # See also: https://github.com/pytorch/pytorch/issues/2830
+        optim.optimizer.load_state_dict(saved_optimizer_state_dict)
+        # Convert back the state values to cuda type if applicable
+        if Utils.use_cuda():
+            for state in optim.optimizer.state.values():
+                for k, v in state.items():
+                    if torch.is_tensor(v):
+                        state[k] = v.cuda()
+
+        print(
+            "Stage 2: Keys after executing  optim.optimizer.load_state_dict" +
+            "(saved_optimizer_state_dict)")
+        show_optimizer_state(optim)
+
+        # We want to make sure that indeed we have a non-empty optimizer state
+        # when we loaded an existing model. This should be at least the case
+        # for Adam, which saves "exp_avg" and "exp_avg_sq" state
+        # (Exponential moving average of gradient and squared gradient values)
+        if (optim.method == 'adam') and (len(optim.optimizer.state) < 1):
+            raise RuntimeError(
+                "Error: loaded Adam optimizer from existing model" +
+                " but optimizer state is empty")
+
+        # We don't want to get the_decay_at from the model
+        # but rather from the configuration parameters. Otherwise
+        # we can never change this parameter for an existing model!
+    print("Info: before setting -  optim.start_decay_at: "
+          + str(optim.start_decay_at))
+    optim.start_decay_at = opt.start_decay_at
+    print("Info: after optim.start_decay_at: " + str(optim.start_decay_at))
+    # Same for learning rate decay
+    optim.lr_decay = opt.learning_rate_decay
+    print("Info: Learning rate related values at the end of build_optim:")
+    print("optim.lr: " + str(optim.lr))
+    print("optim.lr_decay: " + str(optim.lr_decay))
+    print("optim.start_decay: " + str(optim.start_decay))
+    print("optim.betas: " + str(optim.betas))
+
+    return optim
+
+
+def create_optimizer(network, checkpoint):
     # optimizer = optim.SGD(multi_dimensional_rnn.parameters(), lr=0.001, momentum=0.9)
 
     # Adding some weight decay seems to do magic, see: http://pytorch.org/docs/master/optim.html
@@ -421,15 +532,23 @@ def create_optimizer(network):
 
     # Initial value used by "Handwriting Recognition with Large Multimodal
     # Long-Short Term Memory Recurrent Neural Networks"
-    optimizer = optim.Adam(network.parameters(), lr=0.0005)
+    #optimizer = optim.Adam(network.parameters(), lr=0.0005)
     # optimizer = optim.Adam(network.parameters(), lr=0.00001, weight_decay=1e-5)
 
+    optimizer = build_optim(network, checkpoint)
 
     # optimizer = optim.Adam(network.parameters(), lr=0.000001, weight_decay=1e-5)
     return optimizer
 
 
-def train_mdrnn_ctc(train_loader, validation_loader, test_loader, input_channels: int, input_size: SizeTwoDimensional, hidden_states_size: int, batch_size,
+def check_save_model_path():
+    save_model_path = os.path.abspath(opt.save_model)
+    model_dirname = os.path.dirname(save_model_path)
+    if not os.path.exists(model_dirname):
+        os.makedirs(model_dirname)
+
+
+def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels: int, input_size: SizeTwoDimensional, hidden_states_size: int, batch_size,
                     compute_multi_directional: bool, use_dropout: bool,
                     vocab_list: list, blank_symbol: str,
                     image_input_is_unsigned_int: bool,
@@ -448,9 +567,11 @@ def train_mdrnn_ctc(train_loader, validation_loader, test_loader, input_channels
 
     data_height = get_data_height(train_loader)
     clamp_gradients = False
-    network = create_model(data_height, input_channels, input_size, hidden_states_size,
+    network = create_model(checkpoint, data_height, input_channels, input_size, hidden_states_size,
                            compute_multi_directional, use_dropout, vocab_list,
                            clamp_gradients, data_set_name)
+
+    check_save_model_path()
 
     # See: https://pytorch.org/tutorials/beginner/former_torchies/nn_tutorial.html
     # network.register_backward_hook(printgradnorm)
@@ -477,7 +598,7 @@ def train_mdrnn_ctc(train_loader, validation_loader, test_loader, input_channels
 
     print_number_of_parameters(network)
 
-    optimizer = create_optimizer(network)
+    optimizer = create_optimizer(network, checkpoint)
 
     start = time.time()
 
@@ -491,7 +612,15 @@ def train_mdrnn_ctc(train_loader, validation_loader, test_loader, input_channels
     trainer = Trainer(network, optimizer, warp_ctc_loss_interface, model_properties)
 
     iteration = 1
-    for epoch in range(2):  # loop over the dataset multiple times
+
+    # I don't like reassigning attributes of opt: it's not clear.
+    if checkpoint is not None:
+        start_epoch = checkpoint['epoch'] + 1
+    else:
+        start_epoch = 1
+
+    for epoch in range(start_epoch, opt.epochs + 1):  # loop over the dataset multiple times
+        print(">>> Training, starting epoch " + str(epoch) + "...")
 
         # print("Time used for this batch: " + str(util.timing.time_since(time_start_batch)))
 
@@ -504,10 +633,12 @@ def train_mdrnn_ctc(train_loader, validation_loader, test_loader, input_channels
         # Run evaluation
         # multi_dimensional_rnn.set_training(False) # Normal case
         network.module.set_training(False)  # When using DataParallel
-        Evaluator.evaluate_mdrnn(validation_loader, network, device, vocab_list, blank_symbol,
+        validation_stats = Evaluator.evaluate_mdrnn(validation_loader, network, device, vocab_list, blank_symbol,
                                  width_reduction_factor, image_input_is_unsigned_int)
         network.module.set_training(True)  # When using DataParallel
         print("</validation evaluation epoch " + str(epoch) + " >")
+
+        trainer.drop_checkpoint(opt, epoch, validation_stats)
 
     print('Finished Training')
 
@@ -560,7 +691,7 @@ def mnist_recognition_fixed_length():
     #print(prof)
 
 
-def mnist_recognition_variable_length():
+def mnist_recognition_variable_length(model_opt, checkpoint):
     batch_size = 128
     min_num_digits = 1
     max_num_digits = 3
@@ -596,18 +727,20 @@ def mnist_recognition_variable_length():
     #with torch.autograd.profiler.profile(use_cuda=False) as prof:
     blank_symbol = "_"
     image_input_is_unsigned_int = False
-    train_mdrnn_ctc(train_loader, test_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
+    train_mdrnn_ctc(model_opt, checkpoint, train_loader, test_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
                     compute_multi_directional, use_dropout, vocab_list, blank_symbol,
                     image_input_is_unsigned_int, "MNIST")
     #print(prof)
 
 
-def iam_recognition():
+def iam_recognition(model_opt, checkpoint):
 
         batch_size = 20
 
-        lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
-        iam_database_line_images_root_folder_path = "/datastore/data/iam-database/lines"
+        #lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
+        lines_file_path = model_opt.iam_database_lines_file_path
+        # iam_database_line_images_root_folder_path = "/datastore/data/iam-database/lines"
+        iam_database_line_images_root_folder_path = model_opt.iam_database_line_images_root_folder_path
 
         print("Loading IAM dataset...")
         iam_lines_dicionary = IamLinesDictionary.create_iam_dictionary(lines_file_path,
@@ -635,7 +768,8 @@ def iam_recognition():
         input_width = 16
         input_channels = 1
         # hidden_states_size = 32
-        hidden_states_size = 8  # Start with a lower initial hidden states size since there are more layers
+        # hidden_states_size = 8  # Start with a lower initial hidden states size since there are more layers
+        hidden_states_size = model_opt.first_layer_hidden_states_size
         # https://stackoverflow.com/questions/45027234/strange-loss-curve-while-training-lstm-with-keras
         # Possibly a batch size of 128 leads to more instability in training?
         #batch_size = 128
@@ -653,7 +787,7 @@ def iam_recognition():
         input_size = SizeTwoDimensional.create_size_two_dimensional(input_height, input_width)
         #with torch.autograd.profiler.profile(use_cuda=False) as prof:
         image_input_is_unsigned_int = True
-        train_mdrnn_ctc(train_loader, validation_loader, test_loader, input_channels, input_size, hidden_states_size,
+        train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels, input_size, hidden_states_size,
                         batch_size, compute_multi_directional, use_dropout, vocab_list, blank_symbol,
                         image_input_is_unsigned_int, "IAM")
         # train_mdrnn_no_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
@@ -661,9 +795,22 @@ def iam_recognition():
 
 
 def main():
+    # Load checkpoint if we resume from a previous training.
+    if opt.train_from:
+        print('Loading checkpoint from %s' % opt.train_from)
+        checkpoint = torch.load(opt.train_from,
+                                map_location=lambda storage, loc: storage)
+        model_opt = checkpoint['opt']
+
+    else:
+        checkpoint = None
+        model_opt = opt
+
+
+
     # mnist_recognition_fixed_length()
-    mnist_recognition_variable_length()
-    # iam_recognition()
+    # mnist_recognition_variable_length(model_opt, checkpoint,)
+    iam_recognition(model_opt, checkpoint)
     #cifar_ten_basic_recognition()
 
 
