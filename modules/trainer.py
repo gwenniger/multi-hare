@@ -190,3 +190,33 @@ class Trainer:
                 print(">>> Time used in current epoch: " +
                       str(util.timing.time_since_and_expected_remaining_time(time_start, percent)))
                 sys.stdout.flush()
+
+    def drop_checkpoint(self, opt, epoch, valid_stats):
+        """ Save a resumable checkpoint.
+
+        Args:
+            opt (dict): option object
+            epoch (int): epoch number
+            valid_stats : statistics of last validation run
+        """
+        real_model = (self.model.module
+                      if isinstance(self.model, torch.nn.DataParallel)
+                      else self.model)
+        real_generator = (real_model.generator.module
+                          if isinstance(real_model.generator, torch.nn.DataParallel)
+                          else real_model.generator)
+
+        model_state_dict = real_model.state_dict()
+        model_state_dict = {k: v for k, v in model_state_dict.items()
+                            if 'generator' not in k}
+        generator_state_dict = real_generator.state_dict()
+        checkpoint = {
+            'model': model_state_dict,
+            'generator': generator_state_dict,
+            'opt': opt,
+            'epoch': epoch,
+            'optim': self.optim,
+        }
+        torch.save(checkpoint,
+                   '%s_acc_%.2f_e%d.pt'
+                   % (opt.save_model, valid_stats.accuracy(), epoch))

@@ -19,7 +19,6 @@ from data_preprocessing.iam_database_preprocessing.iam_lines_dictionary import I
 from util.utils import Utils
 from modules.size_two_dimensional import SizeTwoDimensional
 from ctc_loss.warp_ctc_loss_interface import WarpCTCLossInterface
-import ctcdecode
 import util.timing
 import data_preprocessing
 import util.tensor_utils
@@ -28,6 +27,8 @@ import numpy as np
 import torch.optim as optim
 from modules.trainer import ModelProperties
 from modules.trainer import Trainer
+from modules.evaluator import Evaluator
+
 
 def test_mdrnn_cell():
     print("Testing the MultDimensionalRNN Cell... ")
@@ -69,127 +70,6 @@ def print_number_of_parameters(model):
         total_parameters += parameters
         i += 1
     print("total parameters: " + str(total_parameters))
-
-
-# Note that if seq_len=0 then the result will always be the empty String
-def convert_to_string(tokens, vocab, seq_len):
-    # print("convert_to_string - tokens: " + str(tokens))
-    # print("convert_to_string - vocab: " + str(vocab))
-    # print("convert_to_string - seq_len: " + str(seq_len))
-    result = ''.join([vocab[x] for x in tokens[0:seq_len]])
-    # print("convert_to_string - result: " + str(result))
-    return result
-
-
-def convert_labels_tensor_to_string(labels: torch.Tensor, vocab_list: list, blank_symbol):
-
-    # Check that the first label of vocab_list is indeed the blank label,
-    # otherwise the results will be incorrect
-    if not vocab_list[0] == blank_symbol:
-        raise RuntimeError("Error: convert_labels_tensor_to_string - " +
-                           "requires the first label of vocab_list (" +
-                           str(vocab_list) + ") to be the blank symbol " +
-                           " but was: " + str(vocab_list[0]))
-
-    labels_as_list = labels.data.tolist()
-    result = ""
-    for i in range(0, labels.size(0)):
-        index = labels_as_list[i]
-        # print("convert_labels_tensor_to_string - index: " + str(index))
-        result = result + str(vocab_list[index])
-    return result
-
-
-def evaluate_mdrnn(test_loader, multi_dimensional_rnn, device,
-                   vocab_list: list, blank_symbol: str, horizontal_reduction_factor: int,
-                   image_input_is_unsigned_int: bool):
-
-    correct = 0
-    total = 0
-
-    for data in test_loader:
-        inputs, labels = data
-
-        if MultiDimensionalRNNBase.use_cuda():
-            labels = labels.to(device)
-            inputs = inputs.to(device)
-
-        # If the image input comes in the form of unsigned ints, they need to
-        # be converted to floats (after moving to GPU, i.e. directly on GPU
-        # which is faster)
-        if image_input_is_unsigned_int:
-            Trainer.check_inputs_is_right_type(inputs)
-            inputs = IamLinesDataset.convert_unsigned_int_image_tensor_to_float_image_tensor(inputs)
-
-        # https://github.com/pytorch/pytorch/issues/235
-        # Running the evaluation without computing gradients is the recommended way
-        # since this saves time, and more importantly, memory
-        with torch.no_grad():
-
-            #outputs = multi_dimensional_rnn(Variable(inputs))  # For "Net" (Le Net)
-            outputs = multi_dimensional_rnn(inputs)
-
-            probabilities_sum_to_one_dimension = 2
-            # Outputs is the output of the linear layer which is the input to warp_ctc
-            # But to get probabilities for the decoder, the softmax function needs to
-            # be applied to the outputs
-            probabilities = torch.nn.functional.\
-                softmax(outputs, probabilities_sum_to_one_dimension)
-
-            print(">>> evaluate_mdrnn  - outputs.size: " + str(outputs.size()))
-            print(">>> evaluate_mdrnn  - probabilities.size: " + str(probabilities.size()))
-
-            beam_size = 20
-            print(">>> evaluate_mdrnn  - len(vocab_list): " + str(len(vocab_list)))
-            decoder = ctcdecode.CTCBeamDecoder(vocab_list, beam_width=beam_size,
-                                               blank_id=vocab_list.index(blank_symbol),
-                                               num_processes=16)
-            label_sizes = WarpCTCLossInterface.\
-                create_sequence_lengths_specification_tensor_different_lengths(labels)
-
-            sequence_lengths = WarpCTCLossInterface.create_probabilities_lengths_specification_tensor_different_lengths(
-                labels, horizontal_reduction_factor, probabilities)
-            # print(">>> evaluate_mdrnn  -  sequence lengths: " + str(sequence_lengths))
-            # print("probabilities.data.size(): " + str(probabilities.data.size()))
-            beam_results, beam_scores, timesteps, out_seq_len = \
-                decoder.decode(probabilities.data, sequence_lengths)
-
-            # print(">>> evaluate_mdrnn  - beam_results: " + str(beam_results))
-
-            total += labels.size(0)
-
-            for example_index in range(0, beam_results.size(0)):
-                beam_results_sequence = beam_results[example_index][0]
-                # print("beam_results_sequence: \"" + str(beam_results_sequence) + "\"")
-                output_string = convert_to_string(beam_results_sequence,
-                                                  vocab_list, out_seq_len[example_index][0])
-                example_labels_with_padding = labels[example_index]
-                # Extract the real example labels, removing the padding labels
-                reference_labels = example_labels_with_padding[0:label_sizes[example_index]]
-
-                # print(">>> evaluate_mdrnn  - reference_labels: " + str(reference_labels))
-                reference_labels_string = convert_labels_tensor_to_string(reference_labels, vocab_list, blank_symbol)
-
-                if reference_labels_string == output_string:
-                    # print("Yaaaaah, got one correct!!!")
-                    correct += 1
-                    correct_string = "correct"
-                else:
-                    correct_string = "wrong"
-
-                print(">>> evaluate_mdrnn  - output: \"" + output_string + "\" " +
-                      "\nreference: \"" + reference_labels_string + "\" --- "
-                      + correct_string)
-
-
-
-        # correct += (predicted == labels).sum()
-
-    print('Accuracy of the network on the 10000 test inputs: %d %%' % (
-            float(100 * correct) / total))
-
-
-
 
 # Method takes a tensor of labels starting from 0 and increases
 # all elements by one to get a tensor of labels starting form 1
@@ -423,7 +303,7 @@ def printgradnorm(self, grad_input, grad_output):
 
 def create_model(data_height: int, input_channels: int, input_size: SizeTwoDimensional, hidden_states_size: int,
                  compute_multi_directional: bool, use_dropout: bool, vocab_list,
-                 clamp_gradients: bool):
+                 clamp_gradients: bool, data_set_name: str):
     # multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(input_channels,
     #                                                                                 hidden_states_size,
     #                                                                                 compute_multi_directional,
@@ -470,21 +350,26 @@ def create_model(data_height: int, input_channels: int, input_size: SizeTwoDimen
     mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
     # mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
     block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
-    # multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking.\
-    #     create_two_layer_pair_network(hidden_states_size, mdlstm_block_size,
-    #                                   block_strided_convolution_block_size,
-    #                                   clamp_gradients)
+
+    if data_set_name == "MNIST":
+        multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking.\
+            create_two_layer_pair_network(hidden_states_size, mdlstm_block_size,
+                                      block_strided_convolution_block_size,
+                                       clamp_gradients)
     # multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
     #    create_three_layer_pair_network(hidden_states_size, mdlstm_block_size,
     #                                 block_strided_convolution_block_size)
 
-    multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
-        create_three_layer_pair_network_linear_parameter_size_increase(input_channels, hidden_states_size,
-                                                                       mdlstm_block_size,
-                                                                       block_strided_convolution_block_size,
-                                                                       compute_multi_directional,
-                                                                       clamp_gradients,
-                                                                       use_dropout)
+    elif data_set_name == "IAM":
+        multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
+            create_three_layer_pair_network_linear_parameter_size_increase(input_channels, hidden_states_size,
+                                                                           mdlstm_block_size,
+                                                                           block_strided_convolution_block_size,
+                                                                           compute_multi_directional,
+                                                                           clamp_gradients,
+                                                                           use_dropout)
+    else:
+        raise RuntimeError("Error: unrecognized dataset name")
 
     # See: https://pytorch.org/tutorials/beginner/former_torchies/nn_tutorial.html
     # multi_dimensional_rnn.register_backward_hook(printgradnorm)
@@ -544,10 +429,11 @@ def create_optimizer(network):
     return optimizer
 
 
-def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: SizeTwoDimensional, hidden_states_size: int, batch_size,
+def train_mdrnn_ctc(train_loader, validation_loader, test_loader, input_channels: int, input_size: SizeTwoDimensional, hidden_states_size: int, batch_size,
                     compute_multi_directional: bool, use_dropout: bool,
                     vocab_list: list, blank_symbol: str,
-                    image_input_is_unsigned_int: bool):
+                    image_input_is_unsigned_int: bool,
+                    data_set_name):
 
     # http://pytorch.org/docs/master/notes/cuda.html
     device = torch.device("cuda:0")
@@ -564,7 +450,7 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
     clamp_gradients = False
     network = create_model(data_height, input_channels, input_size, hidden_states_size,
                            compute_multi_directional, use_dropout, vocab_list,
-                           clamp_gradients)
+                           clamp_gradients, data_set_name)
 
     # See: https://pytorch.org/tutorials/beginner/former_torchies/nn_tutorial.html
     # network.register_backward_hook(printgradnorm)
@@ -605,7 +491,7 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
     trainer = Trainer(network, optimizer, warp_ctc_loss_interface, model_properties)
 
     iteration = 1
-    for epoch in range(20):  # loop over the dataset multiple times
+    for epoch in range(2):  # loop over the dataset multiple times
 
         # print("Time used for this batch: " + str(util.timing.time_since(time_start_batch)))
 
@@ -614,17 +500,27 @@ def train_mdrnn_ctc(train_loader, test_loader, input_channels: int, input_size: 
         # Update the iteration / minibatch number
         iteration += 1
 
-        print("<evaluation epoch " + str(epoch) + " >")
+        print("<validation evaluation epoch " + str(epoch) + " >")
         # Run evaluation
         # multi_dimensional_rnn.set_training(False) # Normal case
         network.module.set_training(False)  # When using DataParallel
-        evaluate_mdrnn(test_loader, network, device, vocab_list, blank_symbol,
-                       width_reduction_factor, image_input_is_unsigned_int)
+        Evaluator.evaluate_mdrnn(validation_loader, network, device, vocab_list, blank_symbol,
+                                 width_reduction_factor, image_input_is_unsigned_int)
         network.module.set_training(True)  # When using DataParallel
-        print("</evaluation epoch " + str(epoch) + " >")
-
+        print("</validation evaluation epoch " + str(epoch) + " >")
 
     print('Finished Training')
+
+    print('Evaluation on test set...')
+
+    print("<test evaluation epoch " + str(epoch) + " >")
+    # Run evaluation
+    # multi_dimensional_rnn.set_training(False) # Normal case
+    network.module.set_training(False)  # When using DataParallel
+    Evaluator.evaluate_mdrnn(test_loader, network, device, vocab_list, blank_symbol,
+                             width_reduction_factor, image_input_is_unsigned_int)
+    network.module.set_training(True)  # When using DataParallel
+    print("</test evaluation epoch " + str(epoch) + " >")
 
 
 def mnist_recognition_fixed_length():
@@ -660,7 +556,7 @@ def mnist_recognition_fixed_length():
     input_size = SizeTwoDimensional.create_size_two_dimensional(input_height, input_width)
     #with torch.autograd.profiler.profile(use_cuda=False) as prof:
     train_mdrnn_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
-                    compute_multi_directional, use_dropout, vocab_list)
+                    compute_multi_directional, use_dropout, vocab_list, "MNIST_FIXED_LENGTH")
     #print(prof)
 
 
@@ -699,9 +595,10 @@ def mnist_recognition_variable_length():
     input_size = SizeTwoDimensional.create_size_two_dimensional(input_height, input_width)
     #with torch.autograd.profiler.profile(use_cuda=False) as prof:
     blank_symbol = "_"
-    train_mdrnn_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
+    image_input_is_unsigned_int = False
+    train_mdrnn_ctc(train_loader, test_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
                     compute_multi_directional, use_dropout, vocab_list, blank_symbol,
-                    False)
+                    image_input_is_unsigned_int, "MNIST")
     #print(prof)
 
 
@@ -722,9 +619,14 @@ def iam_recognition():
         vocab_list = iam_lines_dataset.get_vocabulary_list()
         blank_symbol = iam_lines_dataset.get_blank_symbol()
 
+        train_examples_fraction = 0.70
+        validation_examples_fraction = 0.10
         test_examples_fraction = 0.20
-        train_loader, test_loader = iam_lines_dataset.\
-            get_random_train_set_test_set_data_loaders(batch_size, test_examples_fraction)
+
+        train_loader, validation_loader, test_loader = iam_lines_dataset.\
+            get_random_train_set_validation_set_test_set_data_loaders(batch_size, train_examples_fraction,
+                                                                      validation_examples_fraction,
+                                                                      test_examples_fraction)
         print("Loading IAM dataset: DONE")
 
         # test_mdrnn_cell()
@@ -751,17 +653,17 @@ def iam_recognition():
         input_size = SizeTwoDimensional.create_size_two_dimensional(input_height, input_width)
         #with torch.autograd.profiler.profile(use_cuda=False) as prof:
         image_input_is_unsigned_int = True
-        train_mdrnn_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
-                        compute_multi_directional, use_dropout, vocab_list, blank_symbol,
-                        image_input_is_unsigned_int)
+        train_mdrnn_ctc(train_loader, validation_loader, test_loader, input_channels, input_size, hidden_states_size,
+                        batch_size, compute_multi_directional, use_dropout, vocab_list, blank_symbol,
+                        image_input_is_unsigned_int, "IAM")
         # train_mdrnn_no_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
         #                 compute_multi_directional, use_dropout, vocab_list)
 
 
 def main():
     # mnist_recognition_fixed_length()
-    # mnist_recognition_variable_length()
-    iam_recognition()
+    mnist_recognition_variable_length()
+    # iam_recognition()
     #cifar_ten_basic_recognition()
 
 

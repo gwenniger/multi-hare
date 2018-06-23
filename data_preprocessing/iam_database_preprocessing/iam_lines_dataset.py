@@ -71,20 +71,30 @@ class IamLinesDataset(Dataset):
                                height_required_per_network_output_row, width_required_per_network_output_column,
                                transformation)
 
-    def split_random_train_set_and_test_set(self, test_examples_fraction):
+    def split_random_train_set_validation_set_and_test_set(self,
+                                                           train_examples_fraction,
+                                                           validation_examples_fraction,
+                                                           test_examples_fraction):
         random_permutation = numpy.random.permutation(self.__len__())
-        last_train_index = int(self.__len__() * (1 - test_examples_fraction) - 1)
+        last_train_index = int(self.__len__() * train_examples_fraction - 1)
+        last_validation_index = int(self.__len__() * (train_examples_fraction
+                                                      + validation_examples_fraction) - 1)
+
         # print("last_train_index: " + str(last_train_index))
         examples_line_information_train = \
             [self.examples_line_information[i] for i in random_permutation[0:last_train_index]]
+        examples_line_information_validation = \
+            [self.examples_line_information[i] for i in random_permutation[last_train_index:last_validation_index]]
         examples_line_information_test = \
-            [self.examples_line_information[i] for i in random_permutation[last_train_index:]]
+            [self.examples_line_information[i] for i in random_permutation[last_validation_index:]]
         train_set = IamLinesDataset(self.iam_lines_dictionary, examples_line_information_train,
-                        self.string_to_index_mapping_table, 64, 8, self.transform)
-        test_set = IamLinesDataset(self.iam_lines_dictionary, examples_line_information_test,
                                     self.string_to_index_mapping_table, 64, 8, self.transform)
+        validation_set = IamLinesDataset(self.iam_lines_dictionary, examples_line_information_validation,
+                                         self.string_to_index_mapping_table, 64, 8, self.transform)
+        test_set = IamLinesDataset(self.iam_lines_dictionary, examples_line_information_test,
+                                   self.string_to_index_mapping_table, 64, 8, self.transform)
 
-        return train_set, test_set
+        return train_set, validation_set, test_set
 
     def get_vocabulary_list(self):
         return self.string_to_index_mapping_table.get_vocabulary_list()
@@ -244,8 +254,28 @@ class IamLinesDataset(Dataset):
             shuffle=True)
         return train_loader
 
-    def get_random_train_set_test_set_data_loaders(self, batch_size: int,
-                                                   test_examples_fraction: float):
+
+    @staticmethod
+    def check_fractions_add_up_to_one(fractions: list):
+        total_fractions = 0
+        for fraction in fractions:
+            total_fractions += fraction
+
+        # Check that the specified fractions add up to one
+        if not total_fractions == 1:
+            raise RuntimeError("Error: fractions" + str(fractions) +
+                               " must sum up to one")
+
+    def get_random_train_set_validation_set_test_set_data_loaders(self, batch_size: int,
+                                                                  train_examples_fraction: float,
+                                                                  validation_examples_fraction: float,
+                                                                  test_examples_fraction: float):
+
+        IamLinesDataset.check_fractions_add_up_to_one(list([train_examples_fraction,
+                                                           validation_examples_fraction,
+                                                           test_examples_fraction]))
+
+
 
         max_image_height, max_image_width = self.get_max_image_dimension()
         # print("max image height: " + str(max_image_height))
@@ -253,21 +283,29 @@ class IamLinesDataset(Dataset):
         max_labels_length = self.get_max_labels_length()
         # print("max labels length: " + str(max_labels_length))
 
-        train_set, test_set = self.split_random_train_set_and_test_set(test_examples_fraction)
+        train_set, validation_set, test_set = self.\
+            split_random_train_set_validation_set_and_test_set(train_examples_fraction,
+                                                               validation_examples_fraction,
+                                                               test_examples_fraction)
 
         print("Prepare IAM data train loader...")
         train_loader = self.get_data_loader_with_appropriate_padding(train_set, max_image_height, max_image_width,
                                                                      max_labels_length, batch_size)
 
+        print("Prepare IAM data validation loader...")
+        validation_loader = self.get_data_loader_with_appropriate_padding(validation_set, max_image_height,
+                                                                          max_image_width,
+                                                                          max_labels_length, batch_size)
+
         print("Prepare IAM data test loader...")
         test_loader = self.get_data_loader_with_appropriate_padding(test_set, max_image_height, max_image_width,
                                                                     max_labels_length, batch_size)
 
-        return train_loader, test_loader
+        return train_loader, validation_loader, test_loader
 
     def __len__(self):
-        #return len(self.examples_line_information)
-        return int(len(self.examples_line_information) / 20)  # Hack for faster training during development
+        return len(self.examples_line_information)
+        # return int(len(self.examples_line_information) / 20)  # Hack for faster training during development
 
     def __getitem__(self, idx):
         line_information = self.examples_line_information[idx]
@@ -456,7 +494,7 @@ def test_iam_lines_dataset():
     # for i in range(0, torch_tensors['image'].view(-1).size(0)):
     #    print("torch_tensor['image'][" + str(i) + "]: " + str(torch_tensors['image'].view(-1)[i]))
 
-    iam_lines_dataset.get_random_train_set_test_set_data_loaders(16, 0.5)
+    iam_lines_dataset.get_random_train_set_validation_set_test_set_data_loaders(16, 0.5)
 
 
 def test_iam_words_dataset():
