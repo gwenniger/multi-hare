@@ -266,8 +266,8 @@ class IamLinesDataset(Dataset):
         return train_loader, test_loader
 
     def __len__(self):
-        return len(self.examples_line_information)
-        # return int(len(self.examples_line_information) / 20)  # Hack for faster training during development
+        #return len(self.examples_line_information)
+        return int(len(self.examples_line_information) / 20)  # Hack for faster training during development
 
     def __getitem__(self, idx):
         line_information = self.examples_line_information[idx]
