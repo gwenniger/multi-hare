@@ -10,12 +10,12 @@ import sys
 import util.image_visualization
 from data_preprocessing.iam_database_preprocessing.data_permutation import DataPermutation
 
+
 class IamLinesDataset(Dataset):
     EXAMPLE_TYPES_OK = "ok"
     EXAMPLE_TYPES_ERROR = "error"
     EXAMPLE_TYPES_ALL = "all"
     UINT8_WHITE_VALUE = 255
-
 
     def __init__(self, iam_lines_dictionary: IamLinesDictionary,
                  examples_line_information: list,
@@ -129,6 +129,33 @@ class IamLinesDataset(Dataset):
     def compute_max_adjusted_by_scale_reduction_factor(max_value, scale_reduction_factor):
         return int((max_value + (max_value % scale_reduction_factor)) / scale_reduction_factor)
 
+    # Find the smallest scale reduction factor larger than min_scaling_factor, that makes
+    # the rescaled max_image_height fit in a multiple of self.height_required_per_network_output_row
+    def get_scale_reduction_factor_that_minimizes_horizontal_padding(self, max_image_height, min_scaling_factor):
+        height_after_min_scaling = max_image_height / min_scaling_factor
+        actual_number_of_rows = float(height_after_min_scaling) / self.height_required_per_network_output_row
+        print("actual number of rows: " + str(actual_number_of_rows))
+        closest_number_of_rows = int(height_after_min_scaling / self.height_required_per_network_output_row)
+        print("closest number of rows: " + str(closest_number_of_rows))
+        second_scale_reduction_required = 1 / (closest_number_of_rows / actual_number_of_rows)
+        print("second scale reduction required: " + str(second_scale_reduction_required))
+        result = min_scaling_factor * second_scale_reduction_required
+
+        print("number of rows for max height:" + str((float(max_image_height) /
+                                                     self.height_required_per_network_output_row) / result))
+
+        return result
+
+    @staticmethod
+    def get_additional_amount_required_to_make_multiple_of_value(value, value_to_be_multiple_of: int):
+        additional_amount_required = \
+            value_to_be_multiple_of - (value % value_to_be_multiple_of)
+        additional_amount_required = \
+            additional_amount_required % value_to_be_multiple_of
+        print("get_additional_amount_required_to_make_multiple_of_value(" +
+              str(value) + "," + str(value_to_be_multiple_of) + "): " + str(additional_amount_required))
+        return additional_amount_required
+
     def get_data_loader_with_appropriate_padding(self, data_set, max_image_height,
                                                  max_image_width, max_labels_length,
                                                  batch_size: int):
@@ -137,7 +164,13 @@ class IamLinesDataset(Dataset):
         train_set_pairs = list([])
 
         # Rescale the image
-        scale_reduction_factor = 2
+        # scale_reduction_factor = 2
+
+        # Find a scaling factor > 2 that makes the highest image fit in a multiple of
+        # self.height_required_per_network_output_row
+        scale_reduction_factor = self.get_scale_reduction_factor_that_minimizes_horizontal_padding(max_image_height, 2)
+        print("Found scale_reduction_factor > 2 optimal for minimizing vertical padding: " +
+              str(scale_reduction_factor))
 
         # Not only must images be padded to be all the same size, they
         # must also be of a size that is a multiple of block_size squared
@@ -146,14 +179,31 @@ class IamLinesDataset(Dataset):
 
         max_image_height = IamLinesDataset.compute_max_adjusted_by_scale_reduction_factor(max_image_height,
                                                                                           scale_reduction_factor)
+
+        # Sanity check: after the special rescaling the max_image_height should fit
+        # exactly in a multiple of self.height_required_per_network_output_row
+        if (max_image_height % self.height_required_per_network_output_row) > 0:
+            raise RuntimeError("Error: the max_image_height " + str(max_image_height) +
+                               " after rescaling should be an exact multiple of " +
+                               str(self.height_required_per_network_output_row) +
+                               "but it is not")
+
         max_image_width = IamLinesDataset.compute_max_adjusted_by_scale_reduction_factor(max_image_width,
                                                                                          scale_reduction_factor)
-        max_image_height = max_image_height + (self.height_required_per_network_output_row
-                                               - (max_image_height % self.height_required_per_network_output_row))
+        max_image_height = \
+            max_image_height + IamLinesDataset.get_additional_amount_required_to_make_multiple_of_value(
+                max_image_height, self.height_required_per_network_output_row)
+
         # Width that is strictly required to fit the max occurring width and also
         # be a multiple of self.width_required_per_network_output_row
-        max_image_width = max_image_width + (self.width_required_per_network_output_column
-                                             - (max_image_width % self.width_required_per_network_output_column))
+
+        max_image_width = max_image_width + IamLinesDataset.get_additional_amount_required_to_make_multiple_of_value(
+                max_image_width, self.width_required_per_network_output_column)
+
+        print("After scaling and addition to fit into multiple of the " +
+              "height/width consumed per output row/column by the network : " +
+              "\nmax_image_height: " + str(max_image_height) +
+              "\nmax_image_width: " + str(max_image_width))
 
         sample_index = 0
         last_percentage_complete = 0
@@ -192,9 +242,6 @@ class IamLinesDataset(Dataset):
             labels = sample_pytorch["labels"]
             labels_length = labels.size(0)
 
-
-
-
             # print("image_height: " + str(image_height))
             # print("image_width: " + str(image_width))
             # print("labels_length: " + str(labels_length))
@@ -221,7 +268,13 @@ class IamLinesDataset(Dataset):
 
             # Show padded image: for debugging
             # print("image: " + str(image))
-            # util.image_visualization.imshow_tensor_2d(image_padded)
+
+            # Show padded images with the least padding, to see if the
+            # padding is really necessary
+            visualization_cutoff = 0.90 * max_image_height
+            if image_height > visualization_cutoff:
+                util.image_visualization.imshow_tensor_2d(image_padded)
+
 
             # Add additional bogus channel dimension, since a channel dimension is expected by downstream
             # users of this method
