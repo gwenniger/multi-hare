@@ -54,6 +54,12 @@ def train_opts(parser):
                        help="Path to the IAM database (ascii) lines file",
                        required=True)
 
+    group.add_argument('-iam_database_data_type',
+                       type=str,
+                       help="The data type to train and test for: words or lines",
+                       choices=["words", "lines"],
+                       required=True)
+
     group.add_argument('-data_permutation_file_path', type=str,
                        help="""Path to the data permutation file for saving or 
                             loading from. This is used to keep the data order

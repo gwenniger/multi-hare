@@ -10,8 +10,8 @@ from modules.multi_dimensional_rnn import MultiDimensionalRNN
 from modules.block_multi_dimensional_lstm_layer_pair_stacking import BlockMultiDimensionalLSTMLayerPairStacking
 import data_preprocessing.load_mnist
 import data_preprocessing.load_cifar_ten
-from data_preprocessing.iam_database_preprocessing.iam_lines_dataset import IamLinesDataset
-from data_preprocessing.iam_database_preprocessing.iam_lines_dictionary import IamLinesDictionary
+from data_preprocessing.iam_database_preprocessing.iam_dataset import IamLinesDataset
+from data_preprocessing.iam_database_preprocessing.iam_examples_dictionary import IamExamplesDictionary
 from util.utils import Utils
 from modules.size_two_dimensional import SizeTwoDimensional
 from ctc_loss.warp_ctc_loss_interface import WarpCTCLossInterface
@@ -733,9 +733,12 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     #print(prof)
 
 
-def iam_recognition(model_opt, checkpoint):
+def iam_line_recognition(model_opt, checkpoint):
 
-        batch_size = 20
+        # With the improved padding, the height of the images is 128,
+        # and memory usage is less, so batch_size 30 instead of 20 is possible,
+        # but it is only slightly faster (GPU usage appears to be already maxed out)
+        batch_size = 30
 
         #lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
         lines_file_path = model_opt.iam_database_lines_file_path
@@ -743,18 +746,17 @@ def iam_recognition(model_opt, checkpoint):
         iam_database_line_images_root_folder_path = model_opt.iam_database_line_images_root_folder_path
 
         print("Loading IAM dataset...")
-        iam_lines_dicionary = IamLinesDictionary.create_iam_dictionary(lines_file_path,
-                                                                       iam_database_line_images_root_folder_path)
-        iam_lines_dataset = IamLinesDataset.create_iam_lines_dataset(iam_lines_dicionary, "ok", None)
-
+        iam_lines_dicionary = IamExamplesDictionary.\
+            create_iam_lines_dictionary(lines_file_path, iam_database_line_images_root_folder_path, True)
+        iam_lines_dataset = IamLinesDataset.create_iam_dataset(iam_lines_dicionary, "ok", None)
 
         # This vocab_list will be used by the decoder
         vocab_list = iam_lines_dataset.get_vocabulary_list()
         blank_symbol = iam_lines_dataset.get_blank_symbol()
 
-        train_examples_fraction = 0.70
+        train_examples_fraction = 0.80
         validation_examples_fraction = 0.10
-        test_examples_fraction = 0.20
+        test_examples_fraction = 0.10
 
         permutation_save_or_load_file_path = opt.data_permutation_file_path
 
@@ -797,6 +799,73 @@ def iam_recognition(model_opt, checkpoint):
         #                 compute_multi_directional, use_dropout, vocab_list)
 
 
+def iam_word_recognition(model_opt, checkpoint):
+    # With the improved padding, the height of the images is 128,
+    # and memory usage is less, so batch_size 30 instead of 20 is possible,
+    # but it is only slightly faster (GPU usage appears to be already maxed out)
+    batch_size = 96
+
+    # lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
+    lines_file_path = model_opt.iam_database_lines_file_path
+    # iam_database_line_images_root_folder_path = "/datastore/data/iam-database/lines"
+    iam_database_line_images_root_folder_path = model_opt.iam_database_line_images_root_folder_path
+
+    print("Loading IAM dataset...")
+    iam_words_dicionary = IamExamplesDictionary.\
+        create_iam_words_dictionary(lines_file_path, iam_database_line_images_root_folder_path,
+                                    False)
+    iam_words_dataset = IamLinesDataset.create_iam_dataset(iam_words_dicionary, "ok", None)
+
+    # This vocab_list will be used by the decoder
+    vocab_list = iam_words_dataset.get_vocabulary_list()
+    blank_symbol = iam_words_dataset.get_blank_symbol()
+
+    train_examples_fraction = 0.80
+    validation_examples_fraction = 0.10
+    test_examples_fraction = 0.10
+
+    permutation_save_or_load_file_path = opt.data_permutation_file_path
+
+    train_loader, validation_loader, test_loader = iam_words_dataset. \
+        get_random_train_set_validation_set_test_set_data_loaders(batch_size, train_examples_fraction,
+                                                                  validation_examples_fraction,
+                                                                  test_examples_fraction,
+                                                                  permutation_save_or_load_file_path)
+    print("Loading IAM dataset: DONE")
+
+    # test_mdrnn_cell()
+    # test_mdrnn()
+    input_height = 16
+    input_width = 16
+    input_channels = 1
+    # hidden_states_size = 32
+    # hidden_states_size = 8  # Start with a lower initial hidden states size since there are more layers
+    hidden_states_size = model_opt.first_layer_hidden_states_size
+    # https://stackoverflow.com/questions/45027234/strange-loss-curve-while-training-lstm-with-keras
+    # Possibly a batch size of 128 leads to more instability in training?
+    # batch_size = 128
+
+    compute_multi_directional = False
+    # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
+    use_dropout = False
+
+    # TODO: Add gradient clipping? This might also make training more stable?
+    # Interesting link with tips on how to fix training:
+    # https://blog.slavv.com/37-reasons-why-your-neural-network-is-not-working-4020854bd607
+    # https://discuss.pytorch.org/t/about-torch-nn-utils-clip-grad-norm/13873
+    # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191
+
+    input_size = SizeTwoDimensional.create_size_two_dimensional(input_height, input_width)
+    # with torch.autograd.profiler.profile(use_cuda=False) as prof:
+    image_input_is_unsigned_int = True
+    train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels, input_size,
+                    hidden_states_size,
+                    batch_size, compute_multi_directional, use_dropout, vocab_list, blank_symbol,
+                    image_input_is_unsigned_int, "IAM")
+    # train_mdrnn_no_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
+    #                 compute_multi_directional, use_dropout, vocab_list)
+
+
 def main():
     # Load checkpoint if we resume from a previous training.
     if opt.train_from:
@@ -809,11 +878,15 @@ def main():
         checkpoint = None
         model_opt = opt
 
-
-
     # mnist_recognition_fixed_length()
     # mnist_recognition_variable_length(model_opt, checkpoint,)
-    iam_recognition(model_opt, checkpoint)
+
+    if opt.iam_database_data_type == "lines":
+        iam_line_recognition(model_opt, checkpoint)
+    elif opt.iam_database_data_type == "words":
+        iam_word_recognition(model_opt, checkpoint)
+    else:
+        raise RuntimeError("Unrecognized data type")
     #cifar_ten_basic_recognition()
 
 

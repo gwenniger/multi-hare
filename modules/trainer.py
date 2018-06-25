@@ -5,7 +5,7 @@ from util.utils import Utils
 from modules.size_two_dimensional import SizeTwoDimensional
 import util.timing
 import util.tensor_utils
-from data_preprocessing.iam_database_preprocessing.iam_lines_dataset import IamLinesDataset
+from data_preprocessing.iam_database_preprocessing.iam_dataset import IamLinesDataset
 import sys
 from modules.gradient_clipping import GradientClipping
 import torch.nn

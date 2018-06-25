@@ -1,11 +1,12 @@
 from torch.utils.data import Dataset, DataLoader
-from data_preprocessing.iam_database_preprocessing.iam_lines_dictionary import IamLinesDictionary
-from data_preprocessing.iam_database_preprocessing.iam_lines_dictionary import IamLineInformation
+from data_preprocessing.iam_database_preprocessing.iam_examples_dictionary import IamExamplesDictionary
+from data_preprocessing.iam_database_preprocessing.iam_examples_dictionary import IamLineInformation
 from data_preprocessing.iam_database_preprocessing.string_to_index_mapping_table import StringToIndexMappingTable
 from skimage import io, transform
 import torch
 import numpy
 import os
+import matplotlib.pyplot as plt
 import sys
 import util.image_visualization
 from data_preprocessing.iam_database_preprocessing.data_permutation import DataPermutation
@@ -17,7 +18,7 @@ class IamLinesDataset(Dataset):
     EXAMPLE_TYPES_ALL = "all"
     UINT8_WHITE_VALUE = 255
 
-    def __init__(self, iam_lines_dictionary: IamLinesDictionary,
+    def __init__(self, iam_lines_dictionary: IamExamplesDictionary,
                  examples_line_information: list,
                  string_to_index_mapping_table: StringToIndexMappingTable,
                  height_required_per_network_output_row: int,
@@ -31,7 +32,7 @@ class IamLinesDataset(Dataset):
         self.width_required_per_network_output_column = width_required_per_network_output_column
 
     @staticmethod
-    def get_examples_line_information(iam_lines_dictionary: IamLinesDictionary, example_types: str):
+    def get_examples_line_information(iam_lines_dictionary: IamExamplesDictionary, example_types: str):
         if example_types == IamLinesDataset.EXAMPLE_TYPES_OK:
             examples_key_value_enumeration = iam_lines_dictionary.get_ok_examples()
         elif example_types == IamLinesDataset.EXAMPLE_TYPES_ERROR:
@@ -57,8 +58,8 @@ class IamLinesDataset(Dataset):
         return string_to_index_mapping_table
 
     @staticmethod
-    def create_iam_lines_dataset(iam_lines_dictionary: IamLinesDictionary,
-                                 example_types: str = EXAMPLE_TYPES_OK, transformation=None):
+    def create_iam_dataset(iam_lines_dictionary: IamExamplesDictionary,
+                           example_types: str = EXAMPLE_TYPES_OK, transformation=None):
         examples_line_information = IamLinesDataset.get_examples_line_information(iam_lines_dictionary, example_types)
         string_to_index_mapping_table = IamLinesDataset.create_string_to_index_mapping_table(examples_line_information)
 
@@ -70,8 +71,6 @@ class IamLinesDataset(Dataset):
         return IamLinesDataset(iam_lines_dictionary, examples_line_information, string_to_index_mapping_table,
                                height_required_per_network_output_row, width_required_per_network_output_column,
                                transformation)
-
-
 
     def split_random_train_set_validation_set_and_test_set(self,
                                                            train_examples_fraction,
@@ -217,13 +216,20 @@ class IamLinesDataset(Dataset):
 
             image_height_original, image_width_original = image_original.shape
 
-            image_height = int(image_height_original / scale_reduction_factor)
-            image_width = int(image_width_original / scale_reduction_factor)
-            rescale = Rescale(tuple([image_height, image_width]))
+            # Only images with both dimensions larger than the scale reduction factor
+            # are rescaled, to avoid errors in scaling
+            if image_height_original > scale_reduction_factor and image_width_original > scale_reduction_factor:
+                image_height = int(image_height_original / scale_reduction_factor)
+                image_width = int(image_width_original / scale_reduction_factor)
+                rescale = Rescale(tuple([image_height, image_width]))
 
-            # Rescale works on ndarrays, not on pytorch tensors
-            # print("before: sample[\"image\"].dtype: " + str(sample["image"].dtype))
-            sample = rescale(sample)
+                # Rescale works on ndarrays, not on pytorch tensors
+                # print("before: sample[\"image\"].dtype: " + str(sample["image"].dtype))
+
+                sample = rescale(sample)
+            else:
+                image_height = image_height_original
+                image_width = image_width_original
             image_rescaled = sample["image"]
             # print("image_rescaled.dtype: " + str(image_rescaled.dtype))
 
@@ -272,9 +278,10 @@ class IamLinesDataset(Dataset):
             # Show padded images with the least padding, to see if the
             # padding is really necessary
             visualization_cutoff = 0.90 * max_image_height
-            if image_height > visualization_cutoff:
-                util.image_visualization.imshow_tensor_2d(image_padded)
+            #if image_height > visualization_cutoff:
+            #     util.image_visualization.imshow_tensor_2d(image_padded)
 
+            # util.image_visualization.imshow_tensor_2d(image_padded)
 
             # Add additional bogus channel dimension, since a channel dimension is expected by downstream
             # users of this method
@@ -368,10 +375,13 @@ class IamLinesDataset(Dataset):
     def __getitem__(self, idx):
         line_information = self.examples_line_information[idx]
         # print("__getitem__ line_information: " + str(line_information))
-        image_file_path = self.iam_lines_dictionary.get_image_file_path(line_information)
+        # image_file_path = self.iam_lines_dictionary.get_image_file_path(line_information)
         # print("image_file_path: " + str(image_file_path))
 
         sample = {'image': self.get_image(idx), 'labels': self.get_labels(idx)}
+
+        # rescale = Rescale(tuple([10, 10]))
+        # rescale(sample)
 
         if self.transform:
             sample = self.transform(sample)
@@ -533,9 +543,10 @@ class ToTensor(object):
 def test_iam_lines_dataset():
     lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
     iam_database_line_images_root_folder_path = "/datastore/data/iam-database/lines"
-    iam_lines_dicionary = IamLinesDictionary.create_iam_dictionary(lines_file_path,
-                                                                   iam_database_line_images_root_folder_path)
-    iam_lines_dataset = IamLinesDataset.create_iam_lines_dataset(iam_lines_dicionary, "ok", None)
+    iam_lines_dicionary = IamExamplesDictionary.create_iam_lines_dictionary(lines_file_path,
+                                                                            iam_database_line_images_root_folder_path,
+                                                                            True)
+    iam_lines_dataset = IamLinesDataset.create_iam_dataset(iam_lines_dicionary, "ok", None)
     sample = iam_lines_dataset[0]
     print("iam_lines_dataset[0]: " + str(sample))
     print("(iam_lines_dataset[0])[image]: " + str(sample["image"]))
@@ -560,9 +571,10 @@ def test_iam_lines_dataset():
 def test_iam_words_dataset():
     words_file_path = "/datastore/data/iam-database/ascii/words.txt"
     iam_database_word_images_root_folder_path = "/datastore/data/iam-database/words"
-    iam_words_dicionary = IamLinesDictionary.create_iam_dictionary(words_file_path,
-                                                                   iam_database_word_images_root_folder_path)
-    iam_lines_dataset = IamLinesDataset.create_iam_lines_dataset(iam_words_dicionary, "ok", None)
+    iam_words_dicionary = IamExamplesDictionary.create_iam_words_dictionary(words_file_path,
+                                                                            iam_database_word_images_root_folder_path,
+                                                                            False)
+    iam_lines_dataset = IamLinesDataset.create_iam_dataset(iam_words_dicionary, "ok", None)
     sample = iam_lines_dataset[0]
     print("iam_words_dataset[0]: " + str(sample))
     print("(iam_words_dataset[0])[image]: " + str(sample["image"]))
@@ -579,10 +591,14 @@ def test_iam_words_dataset():
     # for i in range(0, torch_tensors['image'].view(-1).size(0)):
     #    print("torch_tensor['image'][" + str(i) + "]: " + str(torch_tensors['image'].view(-1)[i]))
 
+    permutation_save_or_load_file_path = "test_permutation_file3.txt"
+    iam_lines_dataset.get_random_train_set_validation_set_test_set_data_loaders(16, 0.5, 0.2, 0.3,
+                                                                                permutation_save_or_load_file_path)
+
 
 def main():
-    test_iam_lines_dataset()
-    # test_iam_words_dataset()
+    # test_iam_lines_dataset()
+    test_iam_words_dataset()
 
 
 if __name__ == "__main__":
