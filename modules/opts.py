@@ -54,6 +54,12 @@ def train_opts(parser):
                        help="Path to the IAM database (ascii) lines file",
                        required=True)
 
+    group.add_argument('-data_permutation_file_path', type=str,
+                       help="""Path to the data permutation file for saving or 
+                            loading from. This is used to keep the data order
+                             fixed between experiments, or when loading from a
+                             checkpoint""",
+                       required=True)
 
     group.add_argument('-save_model', default='model',
                        help="""Model filename (the model will be saved as
@@ -131,8 +137,7 @@ def train_opts(parser):
                        adadelta = 1, adam = 0.001""")
     group.add_argument('-learning_rate_decay', type=float, default=0.5,
                        help="""If update_learning_rate, decay learning rate by
-                       this much if (i) perplexity does not decrease on the
-                       validation set or (ii) epoch has gone past
+                       scaling it with this factor if epoch has gone past
                        start_decay_at""")
     group.add_argument('-start_decay_at', type=int, default=8,
                        help="""Start decaying every epoch after and including this

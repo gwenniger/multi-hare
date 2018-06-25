@@ -756,10 +756,13 @@ def iam_recognition(model_opt, checkpoint):
         validation_examples_fraction = 0.10
         test_examples_fraction = 0.20
 
+        permutation_save_or_load_file_path = opt.data_permutation_file_path
+
         train_loader, validation_loader, test_loader = iam_lines_dataset.\
             get_random_train_set_validation_set_test_set_data_loaders(batch_size, train_examples_fraction,
                                                                       validation_examples_fraction,
-                                                                      test_examples_fraction)
+                                                                      test_examples_fraction,
+                                                                      permutation_save_or_load_file_path)
         print("Loading IAM dataset: DONE")
 
         # test_mdrnn_cell()

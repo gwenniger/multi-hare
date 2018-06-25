@@ -8,7 +8,7 @@ import numpy
 import os
 import sys
 import util.image_visualization
-
+from data_preprocessing.iam_database_preprocessing.data_permutation import DataPermutation
 
 class IamLinesDataset(Dataset):
     EXAMPLE_TYPES_OK = "ok"
@@ -71,22 +71,28 @@ class IamLinesDataset(Dataset):
                                height_required_per_network_output_row, width_required_per_network_output_column,
                                transformation)
 
+
+
     def split_random_train_set_validation_set_and_test_set(self,
                                                            train_examples_fraction,
                                                            validation_examples_fraction,
-                                                           test_examples_fraction):
-        random_permutation = numpy.random.permutation(self.__len__())
+                                                           permutation_save_or_load_file_path: str):
+
+        permutation_length = self.__len__()
+        data_permutation = DataPermutation.load_or_create_and_save_permutation(permutation_length,
+                                                                               permutation_save_or_load_file_path)
+        permutation = data_permutation.permutation
         last_train_index = int(self.__len__() * train_examples_fraction - 1)
         last_validation_index = int(self.__len__() * (train_examples_fraction
                                                       + validation_examples_fraction) - 1)
 
         # print("last_train_index: " + str(last_train_index))
         examples_line_information_train = \
-            [self.examples_line_information[i] for i in random_permutation[0:last_train_index]]
+            [self.examples_line_information[i] for i in permutation[0:last_train_index]]
         examples_line_information_validation = \
-            [self.examples_line_information[i] for i in random_permutation[last_train_index:last_validation_index]]
+            [self.examples_line_information[i] for i in permutation[last_train_index:last_validation_index]]
         examples_line_information_test = \
-            [self.examples_line_information[i] for i in random_permutation[last_validation_index:]]
+            [self.examples_line_information[i] for i in permutation[last_validation_index:]]
         train_set = IamLinesDataset(self.iam_lines_dictionary, examples_line_information_train,
                                     self.string_to_index_mapping_table, 64, 8, self.transform)
         validation_set = IamLinesDataset(self.iam_lines_dictionary, examples_line_information_validation,
@@ -269,13 +275,12 @@ class IamLinesDataset(Dataset):
     def get_random_train_set_validation_set_test_set_data_loaders(self, batch_size: int,
                                                                   train_examples_fraction: float,
                                                                   validation_examples_fraction: float,
-                                                                  test_examples_fraction: float):
+                                                                  test_examples_fraction: float,
+                                                                  permutation_save_or_load_file_path: str):
 
         IamLinesDataset.check_fractions_add_up_to_one(list([train_examples_fraction,
                                                            validation_examples_fraction,
                                                            test_examples_fraction]))
-
-
 
         max_image_height, max_image_width = self.get_max_image_dimension()
         # print("max image height: " + str(max_image_height))
@@ -286,7 +291,7 @@ class IamLinesDataset(Dataset):
         train_set, validation_set, test_set = self.\
             split_random_train_set_validation_set_and_test_set(train_examples_fraction,
                                                                validation_examples_fraction,
-                                                               test_examples_fraction)
+                                                               permutation_save_or_load_file_path)
 
         print("Prepare IAM data train loader...")
         train_loader = self.get_data_loader_with_appropriate_padding(train_set, max_image_height, max_image_width,
@@ -494,7 +499,9 @@ def test_iam_lines_dataset():
     # for i in range(0, torch_tensors['image'].view(-1).size(0)):
     #    print("torch_tensor['image'][" + str(i) + "]: " + str(torch_tensors['image'].view(-1)[i]))
 
-    iam_lines_dataset.get_random_train_set_validation_set_test_set_data_loaders(16, 0.5)
+    permutation_save_or_load_file_path = "test_permutation_file.txt"
+    iam_lines_dataset.get_random_train_set_validation_set_test_set_data_loaders(16, 0.5, 0.2, 0.3,
+                                                                                permutation_save_or_load_file_path)
 
 
 def test_iam_words_dataset():
