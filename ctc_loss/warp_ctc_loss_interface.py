@@ -3,7 +3,7 @@ import torch.tensor
 from util.utils import Utils
 from torch.autograd import Variable
 import util.tensor_utils
-
+import math
 
 class WarpCTCLossInterface:
 
@@ -48,7 +48,13 @@ class WarpCTCLossInterface:
     @staticmethod
     def get_real_probabilities_length(label_row_tensor_slice, horizontal_reduction_factor: int,
                                       probabilities_tensor_sequence_length: int):
-        result = -(label_row_tensor_slice[label_row_tensor_slice.size(0) - 2] / horizontal_reduction_factor)
+        real_width = float(-(label_row_tensor_slice[label_row_tensor_slice.size(0) - 2]))
+        # The real width is divided by the horizontal reduction factor to get the
+        # number of output symbols corresponding to the real width.
+        # The result must be rounded up to the smallest bigger or equal integer, to make sure no information is
+        # being lost, as the real width will typically not be an exact multiple of
+        # horizontal_reduction_factor.
+        result = math.ceil(real_width / horizontal_reduction_factor)
 
         # Check that the computed result makes sense: it should not be larger than the
         # probabilities_tensor_sequence_length, otherwise the result of warp_ctc_loss

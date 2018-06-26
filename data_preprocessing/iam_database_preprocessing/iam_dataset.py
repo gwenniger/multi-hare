@@ -128,22 +128,41 @@ class IamLinesDataset(Dataset):
     def compute_max_adjusted_by_scale_reduction_factor(max_value, scale_reduction_factor):
         return int((max_value + (max_value % scale_reduction_factor)) / scale_reduction_factor)
 
-    # Find the smallest scale reduction factor larger than min_scaling_factor, that makes
-    # the rescaled max_image_height fit in a multiple of self.height_required_per_network_output_row
+    """
+        Find the smallest scale reduction factor larger or equal than min_scaling_factor, that makes
+        the rescaled max_image_height fit in a multiple of self.height_required_per_network_output_row
+        If less than half a row of self.height_required_per_network_output_row can be saved
+        by increasing the scale reduction factor further, the value of 
+        min_scaling_factor is returned 
+        :return scaling factor: float
+        found_suitable_higher_scale_reduction_factor: bool 
+    """
     def get_scale_reduction_factor_that_minimizes_horizontal_padding(self, max_image_height, min_scaling_factor):
         height_after_min_scaling = max_image_height / min_scaling_factor
         actual_number_of_rows = float(height_after_min_scaling) / self.height_required_per_network_output_row
         print("actual number of rows: " + str(actual_number_of_rows))
-        closest_number_of_rows = int(height_after_min_scaling / self.height_required_per_network_output_row)
-        print("closest number of rows: " + str(closest_number_of_rows))
-        second_scale_reduction_required = 1 / (closest_number_of_rows / actual_number_of_rows)
+
+        closest_number_of_rows = round(actual_number_of_rows)
+        print("closest lower number of rows: " + str(closest_number_of_rows))
+        # Don't increase the scale reduction factor to save less than half the value
+        # of self.height_required_per_network_output_row in terms of padding
+        if (actual_number_of_rows - round(actual_number_of_rows)) < 0.5:
+            print("Minimal scaling factor requires less than half a row of extra " +
+                  " row of extra padding, therefore not increasing the scale reduction "
+                  + "factor further")
+            return min_scaling_factor, False
+
+        closest_lower_number_of_rows = int(height_after_min_scaling / self.height_required_per_network_output_row)
+        print("closest lower number of rows: " + str(closest_lower_number_of_rows))
+
+        second_scale_reduction_required = 1 / (closest_lower_number_of_rows / actual_number_of_rows)
         print("second scale reduction required: " + str(second_scale_reduction_required))
         result = min_scaling_factor * second_scale_reduction_required
 
         print("number of rows for max height:" + str((float(max_image_height) /
                                                      self.height_required_per_network_output_row) / result))
 
-        return result
+        return result, True
 
     @staticmethod
     def get_additional_amount_required_to_make_multiple_of_value(value, value_to_be_multiple_of: int):
@@ -167,8 +186,8 @@ class IamLinesDataset(Dataset):
 
         # Find a scaling factor > 2 that makes the highest image fit in a multiple of
         # self.height_required_per_network_output_row
-        scale_reduction_factor = self.get_scale_reduction_factor_that_minimizes_horizontal_padding(max_image_height, 2)
-        print("Found scale_reduction_factor > 2 optimal for minimizing vertical padding: " +
+        scale_reduction_factor, found_suitable_higher_scale_reduction_factor = self.get_scale_reduction_factor_that_minimizes_horizontal_padding(max_image_height, 2)
+        print("Found scale_reduction_factor >= 2 optimal for minimizing vertical padding: " +
               str(scale_reduction_factor))
 
         # Not only must images be padded to be all the same size, they
@@ -181,7 +200,7 @@ class IamLinesDataset(Dataset):
 
         # Sanity check: after the special rescaling the max_image_height should fit
         # exactly in a multiple of self.height_required_per_network_output_row
-        if (max_image_height % self.height_required_per_network_output_row) > 0:
+        if found_suitable_higher_scale_reduction_factor and (max_image_height % self.height_required_per_network_output_row) > 0:
             raise RuntimeError("Error: the max_image_height " + str(max_image_height) +
                                " after rescaling should be an exact multiple of " +
                                str(self.height_required_per_network_output_row) +
