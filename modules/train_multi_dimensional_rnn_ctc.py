@@ -754,7 +754,7 @@ def iam_line_recognition(model_opt, checkpoint):
         iam_lines_dicionary = IamExamplesDictionary.\
             create_iam_lines_dictionary(lines_file_path, iam_database_line_images_root_folder_path, True)
         iam_lines_dataset = IamLinesDataset.create_iam_dataset(iam_lines_dicionary,
-                                                               opt.string_to_index_mapping_table_file_path,
+                                                               opt.vocabulary_file_path,
                                                                "ok", None)
 
         # This vocab_list will be used by the decoder
@@ -822,7 +822,7 @@ def iam_word_recognition(model_opt, checkpoint):
         create_iam_words_dictionary(lines_file_path, iam_database_line_images_root_folder_path,
                                     False)
     iam_words_dataset = IamLinesDataset.create_iam_dataset(iam_words_dicionary,
-                                                           opt.string_to_index_mapping_table_file_path,
+                                                           opt.vocabulary_file_path,
                                                            "ok", None)
 
     # This vocab_list will be used by the decoder

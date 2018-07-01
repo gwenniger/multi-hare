@@ -67,8 +67,8 @@ def train_opts(parser):
                              checkpoint""",
                        required=True)
 
-    group.add_argument('-string_to_index_mapping_table_file_path', type=str,
-                       help="""Path to the string_to_index_mapping_table file for saving or 
+    group.add_argument('-vocabulary_file_path', type=str,
+                       help="""Path to the vocabulary file for saving or 
                                 loading from. This is used to keep the vocabulary the 
                                 same, even when for example the order of the lines in the file 
                                 with the training data changes in between saving to and 
