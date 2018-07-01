@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import sys
 import util.image_visualization
 from data_preprocessing.iam_database_preprocessing.data_permutation import DataPermutation
+import os.path
 
 
 class IamLinesDataset(Dataset):
@@ -49,19 +50,34 @@ class IamLinesDataset(Dataset):
         return result
 
     @staticmethod
-    def create_string_to_index_mapping_table(examples_line_information):
+    def create_or_load_string_to_index_mapping_table(examples_line_information,
+                                                     string_to_index_table_save_or_load_path: str):
+
+        if os.path.isfile(string_to_index_table_save_or_load_path):
+            return StringToIndexMappingTable.\
+                read_string_to_index_mapping_table_from_file(string_to_index_table_save_or_load_path)
+
         string_to_index_mapping_table = StringToIndexMappingTable.create_string_to_index_mapping_table()
         # print("examples_line_information: \n" + str(examples_line_information))
         for iam_line_information in examples_line_information:
             letters = iam_line_information.get_characters()
             string_to_index_mapping_table.add_strings(letters)
+
+        string_to_index_mapping_table.\
+            save_string_to_index_mapping_table_to_file(string_to_index_table_save_or_load_path)
         return string_to_index_mapping_table
 
     @staticmethod
     def create_iam_dataset(iam_lines_dictionary: IamExamplesDictionary,
-                           example_types: str = EXAMPLE_TYPES_OK, transformation=None):
+                           save_word_to_string_mapping_table_path: str,
+                           example_types: str = EXAMPLE_TYPES_OK,
+                           transformation=None,
+                           ):
         examples_line_information = IamLinesDataset.get_examples_line_information(iam_lines_dictionary, example_types)
-        string_to_index_mapping_table = IamLinesDataset.create_string_to_index_mapping_table(examples_line_information)
+
+        string_to_index_mapping_table = IamLinesDataset.\
+            create_or_load_string_to_index_mapping_table(examples_line_information,
+                                                         save_word_to_string_mapping_table_path)
 
         # TODO : compute these from an input parameter
         height_required_per_network_output_row = 64
@@ -569,7 +585,10 @@ def test_iam_lines_dataset():
     iam_lines_dicionary = IamExamplesDictionary.create_iam_lines_dictionary(lines_file_path,
                                                                             iam_database_line_images_root_folder_path,
                                                                             True)
-    iam_lines_dataset = IamLinesDataset.create_iam_dataset(iam_lines_dicionary, "ok", None)
+    iam_lines_dataset = IamLinesDataset.create_iam_dataset(iam_lines_dicionary,
+                                                           "./string_to_index_mapping_table_test.txt",
+                                                           "ok",
+                                                           None)
     sample = iam_lines_dataset[0]
     print("iam_lines_dataset[0]: " + str(sample))
     print("(iam_lines_dataset[0])[image]: " + str(sample["image"]))
@@ -597,7 +616,8 @@ def test_iam_words_dataset():
     iam_words_dicionary = IamExamplesDictionary.create_iam_words_dictionary(words_file_path,
                                                                             iam_database_word_images_root_folder_path,
                                                                             False)
-    iam_lines_dataset = IamLinesDataset.create_iam_dataset(iam_words_dicionary, "ok", None)
+    iam_lines_dataset = IamLinesDataset.create_iam_dataset(iam_words_dicionary,
+                                                           "./string_to_index_mapping_table_test.txt", "ok", None)
     sample = iam_lines_dataset[0]
     print("iam_words_dataset[0]: " + str(sample))
     print("(iam_words_dataset[0])[image]: " + str(sample["image"]))

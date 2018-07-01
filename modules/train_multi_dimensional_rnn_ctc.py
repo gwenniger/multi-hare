@@ -556,6 +556,9 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
                     image_input_is_unsigned_int: bool,
                     data_set_name):
 
+
+
+
     # http://pytorch.org/docs/master/notes/cuda.html
     device = torch.device("cuda:0")
     # device_ids should include device!
@@ -750,7 +753,9 @@ def iam_line_recognition(model_opt, checkpoint):
         print("Loading IAM dataset...")
         iam_lines_dicionary = IamExamplesDictionary.\
             create_iam_lines_dictionary(lines_file_path, iam_database_line_images_root_folder_path, True)
-        iam_lines_dataset = IamLinesDataset.create_iam_dataset(iam_lines_dicionary, "ok", None)
+        iam_lines_dataset = IamLinesDataset.create_iam_dataset(iam_lines_dicionary,
+                                                               opt.string_to_index_mapping_table_file_path,
+                                                               "ok", None)
 
         # This vocab_list will be used by the decoder
         vocab_list = iam_lines_dataset.get_vocabulary_list()
@@ -816,7 +821,9 @@ def iam_word_recognition(model_opt, checkpoint):
     iam_words_dicionary = IamExamplesDictionary.\
         create_iam_words_dictionary(lines_file_path, iam_database_line_images_root_folder_path,
                                     False)
-    iam_words_dataset = IamLinesDataset.create_iam_dataset(iam_words_dicionary, "ok", None)
+    iam_words_dataset = IamLinesDataset.create_iam_dataset(iam_words_dicionary,
+                                                           opt.string_to_index_mapping_table_file_path,
+                                                           "ok", None)
 
     # This vocab_list will be used by the decoder
     vocab_list = iam_words_dataset.get_vocabulary_list()
