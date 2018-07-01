@@ -391,7 +391,9 @@ def create_model(checkpoint, data_height: int, input_channels: int, input_size: 
                                                                          data_height, clamp_gradients)
 
     if checkpoint is not None:
+        print("before loading checkpoint: network.module.fc3" + str(network.fc3.weight))
         network.load_state_dict(checkpoint["model"])
+        print("after loading checkpoint: network.module.fc3" + str(network.fc3.weight))
 
     return network
 

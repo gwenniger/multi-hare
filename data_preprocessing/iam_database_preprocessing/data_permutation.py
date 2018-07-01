@@ -25,6 +25,7 @@ class DataPermutation:
                                             permutation_save_or_load_file_path: str):
 
         if os.path.isfile(permutation_save_or_load_file_path):
+            print("load_or_create_and_save_permutation - file exists, loading...")
             data_permutation = DataPermutation. \
                 create_data_permutation_from_saved_permutation(permutation_save_or_load_file_path)
             if not len(data_permutation.permutation) == permutation_length:

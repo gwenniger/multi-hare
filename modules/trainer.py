@@ -162,7 +162,6 @@ class Trainer:
                 num_gradient_corrections += 1
             gradient_norms_sum += total_norm
 
-
             # print statistics
             # print("loss.data: " + str(loss.data))
             # print("loss.data[0]: " + str(loss.data[0]))

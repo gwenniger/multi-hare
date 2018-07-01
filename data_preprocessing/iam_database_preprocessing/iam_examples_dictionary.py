@@ -1,4 +1,5 @@
 from skimage import io
+from collections import OrderedDict
 
 class BoundingBox():
     def __init__(self, x: int, y: int, w: int, h: int):
@@ -221,9 +222,12 @@ class IamExamplesDictionary():
                               information_creation_function,
                               require_min_image_size: bool, get_file_path_part_function):
 
-        ok_lines_dictionary = dict([])
-        error_lines_dictionary = dict([])
-        size_rejected_images_lines_dictionary = dict([])
+        # Ordered dictionaries should be used so that enumerations over the
+        # items added to the dictionaries have a deterministic order
+        # corresponding to the order in which items were added
+        ok_lines_dictionary = OrderedDict([])
+        error_lines_dictionary = OrderedDict([])
+        size_rejected_images_lines_dictionary = OrderedDict([])
 
         total_ok_images = 0
         number_of_rejected_images_labeled_ok = 0
@@ -285,7 +289,7 @@ class IamExamplesDictionary():
         return self.error_lines_dictionary.items()
 
     def get_all_examples(self):
-        result = dict([])
+        result = OrderedDict([])
         result.update(self.ok_lines_dictionary)
         result.update(self.error_lines_dictionary)
         return result

@@ -77,6 +77,8 @@ class IamLinesDataset(Dataset):
                                                            validation_examples_fraction,
                                                            permutation_save_or_load_file_path: str):
 
+        print("Entered split_random_train_set_validation_set_and_test_set...")
+
         permutation_length = self.__len__()
         data_permutation = DataPermutation.load_or_create_and_save_permutation(permutation_length,
                                                                                permutation_save_or_load_file_path)
@@ -356,6 +358,8 @@ class IamLinesDataset(Dataset):
                                                                   validation_examples_fraction: float,
                                                                   test_examples_fraction: float,
                                                                   permutation_save_or_load_file_path: str):
+
+        print("Entered get_random_train_set_validation_set_test_set_data_loaders...")
 
         IamLinesDataset.check_fractions_add_up_to_one(list([train_examples_fraction,
                                                            validation_examples_fraction,

@@ -13,6 +13,8 @@ class StringToIndexMappingTable:
     def __str__(self):
         result = "<StringToIndexMappingTable>" + "\n"
         result += "number of elements: " + str(len(self.index_to_string_table)) + "\n"
+        for index in range(0, len(self.index_to_string_table)):
+            result += "\nindex: " + str(index) + " => \"" + self.index_to_string_table[index] + "\""
         result += "</StringToIndexMappingTable>"
         return result
 
