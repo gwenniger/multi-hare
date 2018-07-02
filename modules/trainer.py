@@ -35,18 +35,42 @@ class Trainer:
     # Reading the data and preserving it in this type is sort of tricky, so it is
     # best to check that the inputs is indeed of the expected type
     @staticmethod
-    def check_inputs_is_right_type(inputs):
+    def check_inputs_is_right_type(inputs, minimize_horizontal_padding: bool):
         if Utils.use_cuda():
             expected_type_instance = torch.cuda.ByteTensor()
         else:
             expected_type_instance = torch.ByteTensor()
 
-        if inputs.type() != expected_type_instance.type():
+        # If minimize_horizontal_padding is used, the inputs will be a list
+        # in this case just check the first element of the list
+        if minimize_horizontal_padding:
+            item_to_compare = inputs[0]
+        else:
+            item_to_compare = inputs
+
+        if item_to_compare.type() != expected_type_instance.type():
             raise RuntimeError("Error: expected a " + str(expected_type_instance.type()) + " type image tensor" +
-                               " but got : " + str(inputs.type()))
+                               " but got : " + str(item_to_compare.type()))
+
+    @staticmethod
+    def check_there_are_no_zero_labels(labels, minimize_horizontal_padding: bool):
+        # The format expected by warp_ctc, which reserves the 0 label for blanks
+        if not minimize_horizontal_padding:
+            number_of_zeros = util.tensor_utils.TensorUtils.number_of_zeros(labels)
+        else:
+            # If minimize_horizontal_padding is used labels will be a list
+            # rather than a tensor
+            number_of_zeros = 0
+            for label_tensor in labels:
+                number_of_zeros = util.tensor_utils.TensorUtils.number_of_zeros(label_tensor)
+
+        # Check that labels indeed start from 1 as required
+        if number_of_zeros != 0:
+            raise RuntimeError("Error: labels tensor contains zeros, which is " +
+                               " not allowed, since 0 is reserved for blanks")
 
     def train_one_epoch(self, train_loader, epoch: int, start: int, batch_size,
-                        device, report_func=None):
+                        device, inputs_is_list: bool, report_func=None):
         """ Train next epoch.
         Args:
             train_iter: training data iterator
@@ -72,25 +96,34 @@ class Trainer:
             # get the inputs
             inputs, labels = data
 
-            # The format expected by warp_ctc, which reserves the 0 label for blanks
-            number_of_zeros = util.tensor_utils.TensorUtils.number_of_zeros(labels)
-            # Check that labels indeed start from 1 as required
-            if number_of_zeros != 0:
-                raise RuntimeError("Error: labels tensor contains zeros, which is " +
-                                   " not allowed, since 0 is reserved for blanks")
+            Trainer.check_there_are_no_zero_labels(labels, inputs_is_list)
 
+            # If minimize_horizontal_padding is used, inputs will be a list
             if Utils.use_cuda():
-                inputs = inputs.to(device)
+                if not inputs_is_list:
+                    inputs = inputs.to(device)
+                else:
+                    # We cannot copy an entire list to gpu using to(device)
+                    # so we need to do it one by one
+                    inputs_on_gpu = list([])
+                    for element in inputs:
+                        element = element.to(device)
+                        inputs_on_gpu.append(element)
+                    inputs = inputs_on_gpu
 
             # If the image input comes in the form of unsigned ints, they need to
             # be converted to floats (after moving to GPU, i.e. directly on GPU
             # which is faster)
             if self.model_properties.image_input_is_unsigned_int:
-                Trainer.check_inputs_is_right_type(inputs)
-                inputs = IamLinesDataset.convert_unsigned_int_image_tensor_to_float_image_tensor(inputs)
+                Trainer.check_inputs_is_right_type(inputs, inputs_is_list)
+                inputs = IamLinesDataset.convert_unsigned_int_image_tensor_or_list_to_float_image_tensor_or_list(inputs)
 
-            # Set requires_grad(True) directly and only for the input
-            inputs.requires_grad_(True)
+            if inputs_is_list:
+                for element in inputs:
+                    element.requires_grad_(True)
+            else:
+                # Set requires_grad(True) directly and only for the input
+                inputs.requires_grad_(True)
 
             # wrap them in Variable
             # labels = Variable(labels)  # Labels need no gradient apparently

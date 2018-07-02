@@ -312,7 +312,7 @@ def printgradnorm(self, grad_input, grad_output):
 
 def create_model(checkpoint, data_height: int, input_channels: int, input_size: SizeTwoDimensional, hidden_states_size: int,
                  compute_multi_directional: bool, use_dropout: bool, vocab_list,
-                 clamp_gradients: bool, data_set_name: str):
+                 clamp_gradients: bool, data_set_name: str, minimize_horizontal_padding: bool):
 
     # multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(input_channels,
     #                                                                                 hidden_states_size,
@@ -371,13 +371,15 @@ def create_model(checkpoint, data_height: int, input_channels: int, input_size: 
     #                                 block_strided_convolution_block_size)
 
     elif data_set_name == "IAM":
+        inputs_and_outputs_are_lists = minimize_horizontal_padding
         multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
             create_three_layer_pair_network_linear_parameter_size_increase(input_channels, hidden_states_size,
                                                                            mdlstm_block_size,
                                                                            block_strided_convolution_block_size,
                                                                            compute_multi_directional,
                                                                            clamp_gradients,
-                                                                           use_dropout)
+                                                                           use_dropout,
+                                                                           inputs_and_outputs_are_lists)
     else:
         raise RuntimeError("Error: unrecognized dataset name")
 
@@ -388,7 +390,8 @@ def create_model(checkpoint, data_height: int, input_channels: int, input_size: 
 
     network = NetworkToSoftMaxNetwork.create_network_to_soft_max_network(multi_dimensional_rnn,
                                                                          input_size, number_of_classes_excluding_blank,
-                                                                         data_height, clamp_gradients)
+                                                                         data_height, clamp_gradients,
+                                                                         inputs_and_outputs_are_lists)
 
     if checkpoint is not None:
         print("before loading checkpoint: network.module.fc3" + str(network.fc3.weight))
@@ -554,7 +557,7 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
                     compute_multi_directional: bool, use_dropout: bool,
                     vocab_list: list, blank_symbol: str,
                     image_input_is_unsigned_int: bool,
-                    data_set_name):
+                    data_set_name, minimize_horizontal_padding: bool):
 
 
 
@@ -574,7 +577,7 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
     clamp_gradients = False
     network = create_model(checkpoint, data_height, input_channels, input_size, hidden_states_size,
                            compute_multi_directional, use_dropout, vocab_list,
-                           clamp_gradients, data_set_name)
+                           clamp_gradients, data_set_name, minimize_horizontal_padding)
 
     check_save_model_path()
 
@@ -629,7 +632,8 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
 
         # print("Time used for this batch: " + str(util.timing.time_since(time_start_batch)))
 
-        trainer.train_one_epoch(train_loader, epoch, start, batch_size, device)
+        trainer.train_one_epoch(train_loader, epoch, start, batch_size, device,
+                                minimize_horizontal_padding)
 
         # Update the iteration / minibatch number
         iteration += 1
@@ -810,7 +814,7 @@ def iam_word_recognition(model_opt, checkpoint):
     # With the improved padding, the height of the images is 128,
     # and memory usage is less, so batch_size 30 instead of 20 is possible,
     # but it is only slightly faster (GPU usage appears to be already maxed out)
-    batch_size = 64
+    batch_size = 2  # 64
 
     # lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
     lines_file_path = model_opt.iam_database_lines_file_path
@@ -835,11 +839,13 @@ def iam_word_recognition(model_opt, checkpoint):
 
     permutation_save_or_load_file_path = opt.data_permutation_file_path
 
+    minimize_horizontal_padding = True
     train_loader, validation_loader, test_loader = iam_words_dataset. \
         get_random_train_set_validation_set_test_set_data_loaders(batch_size, train_examples_fraction,
                                                                   validation_examples_fraction,
                                                                   test_examples_fraction,
-                                                                  permutation_save_or_load_file_path)
+                                                                  permutation_save_or_load_file_path,
+                                                                  minimize_horizontal_padding)
     print("Loading IAM dataset: DONE")
 
     # test_mdrnn_cell()
@@ -870,7 +876,7 @@ def iam_word_recognition(model_opt, checkpoint):
     train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels, input_size,
                     hidden_states_size,
                     batch_size, compute_multi_directional, use_dropout, vocab_list, blank_symbol,
-                    image_input_is_unsigned_int, "IAM")
+                    image_input_is_unsigned_int, "IAM", minimize_horizontal_padding)
     # train_mdrnn_no_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
     #                 compute_multi_directional, use_dropout, vocab_list)
 

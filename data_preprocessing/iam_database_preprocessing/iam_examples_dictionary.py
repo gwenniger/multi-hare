@@ -1,6 +1,7 @@
 from skimage import io
 from collections import OrderedDict
 
+
 class BoundingBox():
     def __init__(self, x: int, y: int, w: int, h: int):
         self.x = x

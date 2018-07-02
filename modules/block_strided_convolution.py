@@ -3,6 +3,7 @@ from torch.nn.modules.module import Module
 import torch.nn as nn
 import torch.nn.functional as F
 from util.tensor_chunking import TensorChunking
+from util.tensor_list_chunking import TensorListChunking
 from modules.inside_model_gradient_clipping import InsideModelGradientClamping
 
 
@@ -10,6 +11,7 @@ class BlockStridedConvolution(Module):
 
     def __init__(self, input_channels: int, output_channels: int, block_size: SizeTwoDimensional,
                  clamp_gradients: bool,
+                 input_and_output_are_lists: bool,
                  nonlinearity="tanh"):
         super(BlockStridedConvolution, self).__init__()
         self.input_channels = input_channels
@@ -17,6 +19,7 @@ class BlockStridedConvolution(Module):
         self.block_size = block_size
         self.nonlinearity = nonlinearity
         self.clamp_gradients = clamp_gradients
+        self.input_and_output_are_list = input_and_output_are_lists
         # What types of convolutions are there:
         # https://github.com/vdumoulin/conv_arithmetic/blob/master/README.md
         # https://towardsdatascience.com/types-of-convolutions-in-deep-learning-717013397f4d
@@ -35,10 +38,10 @@ class BlockStridedConvolution(Module):
 
     @staticmethod
     def create_block_strided_convolution(input_channels: int, output_channels: int, block_size: SizeTwoDimensional,
-                                         clamp_gradients: bool,
+                                         clamp_gradients: bool,inputs_and_outputs_are_lists: bool,
                  nonlinearity="tanh"):
         return BlockStridedConvolution(input_channels, output_channels, block_size,
-                                       clamp_gradients, nonlinearity)
+                                       clamp_gradients, inputs_and_outputs_are_lists, nonlinearity)
 
     def get_activation_function(self):
         if self.nonlinearity == "tanh":
@@ -71,7 +74,13 @@ class BlockStridedConvolution(Module):
         return
 
     def forward(self, x):
-        convolution_output = self.convolution(x)
+        if self.input_and_output_are_list:
+            tensor_list_chunking = TensorListChunking.create_tensor_list_chunking(x, self.block_size)
+            x_chunked = tensor_list_chunking.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension(x)
+        else:
+            x_chunked = x
+
+        convolution_output = self.convolution(x_chunked)
         if self.clamp_gradients:
             convolution_output = InsideModelGradientClamping.register_gradient_clamping(convolution_output)
         # print("convolution output: " + str(convolution_output))
@@ -82,6 +91,16 @@ class BlockStridedConvolution(Module):
         # if self.clamp_gradients:
             # print("BlockStridedConvolution.forward - clamp gradients")
         #result = InsideModelGradientClamping.register_gradient_clamping(result)
+
+        # If the input and output are lists, the output of the convolution
+        # and activation function must again be converted back to the original list
+        # format
+        if self.input_and_output_are_list:
+            convolution_output_size = SizeTwoDimensional.create_size_two_dimensional(1, 1)
+            output_ordered_back_to_input_format = tensor_list_chunking. \
+                dechunk_block_tensor_concatenated_along_batch_dimension_changed_block_size(result,
+                                                                                           convolution_output_size)
+            return output_ordered_back_to_input_format
 
         return result
 

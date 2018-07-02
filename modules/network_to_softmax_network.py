@@ -97,10 +97,12 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
     def __init__(self, network, input_size: SizeTwoDimensional,
                  number_of_classes_excluding_blank: int,
                  activations_resizer: ActivationsResizer,
-                 clamp_gradients: bool
+                 clamp_gradients: bool,
+                 input_is_list: bool
                  ):
         super(NetworkToSoftMaxNetwork, self).__init__()
         self.clamp_gradients = clamp_gradients
+        self.input_is_list = input_is_list
         self.network = network
         self.activations_resizer = activations_resizer
         self.input_size = input_size
@@ -137,12 +139,13 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
     @staticmethod
     def create_network_to_soft_max_network(network, input_size: SizeTwoDimensional,
                                            number_of_classes_excluding_blank: int,
-                                           data_height: int, clamp_gradients: bool):
+                                           data_height: int, clamp_gradients: bool,
+                                           input_is_list: bool):
         activations_resizer = KeepAllActivationsResizer(network, data_height)
         # activations_resizer = SumActivationsResizer(network)
         return NetworkToSoftMaxNetwork(network, input_size, number_of_classes_excluding_blank,
                                        activations_resizer,
-                                       clamp_gradients
+                                       clamp_gradients, input_is_list
                                        )
 
     def get_number_of_classes_including_blank(self):
@@ -152,6 +155,11 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         self.network.set_training(training)
 
     def forward(self, x):
+
+        if self.input_is_list:
+            raise RuntimeError("Not implemented")
+            # Fixme this needs to be implemented
+
         activations = self.network(x)
         batch_size = activations.size(0)
         # print(">>> activations.size(): " + str(activations.size()))

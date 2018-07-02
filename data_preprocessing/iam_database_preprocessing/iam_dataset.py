@@ -11,6 +11,77 @@ import sys
 import util.image_visualization
 from data_preprocessing.iam_database_preprocessing.data_permutation import DataPermutation
 import os.path
+from abc import abstractmethod
+
+
+class PaddingStrategy:
+    """
+    This strategy class will determine how the padding of the training examples is
+    being done
+    """
+
+    def __init__(self, width_required_per_network_output_column):
+        self.width_required_per_network_output_column = width_required_per_network_output_column
+
+    @abstractmethod
+    def get_collumns_padding_required(self, image_width, max_image_width):
+        raise RuntimeError("not implemented")
+
+    @abstractmethod
+    def create_train_loader(self, train_set_pairs, batch_size):
+        raise RuntimeError("not implemented")
+
+
+class FullPaddingStrategy(PaddingStrategy):
+
+    def __init__(self, width_required_per_network_output_column):
+        super(FullPaddingStrategy, self).__init__(width_required_per_network_output_column)
+
+    def get_collumns_padding_required(self, image_width, max_image_width):
+        return max_image_width - image_width
+
+    def create_train_loader(self, train_set_pairs, batch_size):
+
+        train_loader = torch.utils.data.DataLoader(
+            dataset=train_set_pairs,
+            batch_size=batch_size,
+            shuffle=True)
+        return train_loader
+
+
+class MinimalHorizontalPaddingStrategy(PaddingStrategy):
+
+    def __init__(self, width_required_per_network_output_column):
+        super(MinimalHorizontalPaddingStrategy, self).__init__(width_required_per_network_output_column)
+
+    def get_collumns_padding_required(self, image_width, max_image_width):
+        return IamLinesDataset.\
+            get_additional_amount_required_to_make_multiple_of_value(image_width,
+                                                                     self.width_required_per_network_output_column)
+
+    # a simple custom collate function
+    @staticmethod
+    def my_collate(batch):
+        print("my_collate - batch: " + str(batch))
+        data = [item[0] for item in batch]
+
+        print("my_collate - data: " + str(data))
+        target = [item[1] for item in batch]
+        print("my_collate - target: " + str(target))
+        # target = torch.LongTensor(target)
+        return [data, target]
+
+    # https://discuss.pytorch.org/t/how-to-create-a-dataloader-with-variable-size-input/8278/3
+    def create_train_loader(self, train_set_pairs, batch_size):
+
+        train_loader = torch.utils.data.DataLoader(
+            dataset=train_set_pairs,
+            batch_size=batch_size,
+            shuffle=True,
+            collate_fn=MinimalHorizontalPaddingStrategy.my_collate,
+            pin_memory=True)
+
+        return train_loader
 
 
 class IamLinesDataset(Dataset):
@@ -142,6 +213,19 @@ class IamLinesDataset(Dataset):
         result = torch.div(result, 255)
         return result
 
+    # This method converts a tensor with uint8 values in the range 0-255 to
+    # a float tensor with values in the range 0-1
+    @staticmethod
+    def convert_unsigned_int_image_tensor_or_list_to_float_image_tensor_or_list(image_tensor):
+        if not isinstance(image_tensor, (list, tuple)):
+            return IamLinesDataset.convert_unsigned_int_image_tensor_to_float_image_tensor(image_tensor)
+        else:
+            result = list([])
+            for element in image_tensor:
+                element_converted = IamLinesDataset.convert_unsigned_int_image_tensor_to_float_image_tensor(element)
+                result.append(element_converted)
+        return result
+
     @staticmethod
     def compute_max_adjusted_by_scale_reduction_factor(max_value, scale_reduction_factor):
         return int((max_value + (max_value % scale_reduction_factor)) / scale_reduction_factor)
@@ -188,13 +272,13 @@ class IamLinesDataset(Dataset):
             value_to_be_multiple_of - (value % value_to_be_multiple_of)
         additional_amount_required = \
             additional_amount_required % value_to_be_multiple_of
-        print("get_additional_amount_required_to_make_multiple_of_value(" +
-              str(value) + "," + str(value_to_be_multiple_of) + "): " + str(additional_amount_required))
+        # print("get_additional_amount_required_to_make_multiple_of_value(" +
+        #      str(value) + "," + str(value_to_be_multiple_of) + "): " + str(additional_amount_required))
         return additional_amount_required
 
     def get_data_loader_with_appropriate_padding(self, data_set, max_image_height,
                                                  max_image_width, max_labels_length,
-                                                 batch_size: int):
+                                                 batch_size: int, padding_strategy: PaddingStrategy):
         to_tensor = ToTensor()
 
         train_set_pairs = list([])
@@ -289,7 +373,9 @@ class IamLinesDataset(Dataset):
             # print("image_width: " + str(image_width))
             # print("labels_length: " + str(labels_length))
 
-            columns_padding_required = max_image_width - image_width
+            # Use the provided function "get_collumns_padding_required_fuction" to
+            # determine the columns of padding required
+            columns_padding_required = padding_strategy.get_collumns_padding_required(image_width, max_image_width)
             rows_padding_required = max_image_height - image_height
             rows_padding_required_top = int(rows_padding_required / 2)
             # Make sure no row gets lost through integer division
@@ -319,6 +405,12 @@ class IamLinesDataset(Dataset):
             #     util.image_visualization.imshow_tensor_2d(image_padded)
 
             # util.image_visualization.imshow_tensor_2d(image_padded)
+
+            # outputs_per_label = (image_width / float(self.width_required_per_network_output_column)) / labels.size(0)
+            # if outputs_per_label > 15:
+            #     print("outputs_per_label: " + str(outputs_per_label))
+            #     print("labels: " + str(labels))
+            #     util.image_visualization.imshow_tensor_2d(image)
 
             # Add additional bogus channel dimension, since a channel dimension is expected by downstream
             # users of this method
@@ -351,12 +443,8 @@ class IamLinesDataset(Dataset):
                 last_percentage_complete = percentage_complete
             sample_index += 1
 
-        train_loader = torch.utils.data.DataLoader(
-            dataset=train_set_pairs,
-            batch_size=batch_size,
-            shuffle=True)
+        train_loader = padding_strategy.create_train_loader(train_set_pairs, batch_size)
         return train_loader
-
 
     @staticmethod
     def check_fractions_add_up_to_one(fractions: list):
@@ -373,7 +461,8 @@ class IamLinesDataset(Dataset):
                                                                   train_examples_fraction: float,
                                                                   validation_examples_fraction: float,
                                                                   test_examples_fraction: float,
-                                                                  permutation_save_or_load_file_path: str):
+                                                                  permutation_save_or_load_file_path: str,
+                                                                  minimize_horizontal_padding: bool):
 
         print("Entered get_random_train_set_validation_set_test_set_data_loaders...")
 
@@ -392,24 +481,31 @@ class IamLinesDataset(Dataset):
                                                                validation_examples_fraction,
                                                                permutation_save_or_load_file_path)
 
+        if minimize_horizontal_padding:
+            padding_strategy = MinimalHorizontalPaddingStrategy(self.width_required_per_network_output_column)
+        else:
+            padding_strategy = FullPaddingStrategy(self.width_required_per_network_output_column)
+
         print("Prepare IAM data train loader...")
         train_loader = self.get_data_loader_with_appropriate_padding(train_set, max_image_height, max_image_width,
-                                                                     max_labels_length, batch_size)
+                                                                     max_labels_length, batch_size, padding_strategy)
 
         print("Prepare IAM data validation loader...")
         validation_loader = self.get_data_loader_with_appropriate_padding(validation_set, max_image_height,
                                                                           max_image_width,
-                                                                          max_labels_length, batch_size)
+                                                                          max_labels_length, batch_size,
+                                                                          padding_strategy)
 
         print("Prepare IAM data test loader...")
         test_loader = self.get_data_loader_with_appropriate_padding(test_set, max_image_height, max_image_width,
-                                                                    max_labels_length, batch_size)
+                                                                    max_labels_length, batch_size,
+                                                                    padding_strategy)
 
         return train_loader, validation_loader, test_loader
 
     def __len__(self):
-        return len(self.examples_line_information)
-        # return int(len(self.examples_line_information) / 30)  # Hack for faster training during development
+        # return len(self.examples_line_information)
+        return int(len(self.examples_line_information) / 30)  # Hack for faster training during development
 
     def __getitem__(self, idx):
         line_information = self.examples_line_information[idx]
@@ -453,12 +549,17 @@ class IamLinesDataset(Dataset):
     # Print statistics about the size of the images in the dataset. This useful to get an idea about how much
     # computation we "waste" by padding everything to the maximum width and maximum height
     @staticmethod
-    def print_image_dimension_statistics(min_height, max_height, mean_height, min_width, max_width, mean_width):
+    def print_image_dimension_statistics(min_height, max_height, mean_height, min_width, max_width, mean_width,
+                                         min_outputs_per_label, max_outputs_per_label, mean_outputs_per_label):
         print(">>> IamLinesDataset.get_max_image_dimensions: ")
         print(" min_height: " + str(min_height) + " max_height: " + str(max_height) +
               " mean_height: " + str(mean_height))
         print(" min_width: " + str(min_width) + " max_width: " + str(max_width) +
               " mean_width: " + str(mean_width))
+        print("Outputs per label statistics before any input downscaling:")
+        print(" min_outputs_per_label: " + str(min_outputs_per_label) + " max_outputs_per_label: "
+              + str(max_outputs_per_label) +
+              " mean_outputs_per_label: " + str(mean_outputs_per_label))
 
     def get_max_image_dimension(self):
         # Initialize the minimum to the maximum integer value
@@ -471,24 +572,39 @@ class IamLinesDataset(Dataset):
         max_width = 0
         summed_widths = 0
 
+        # Statistics for number of outputs
+        min_outputs_per_label = sys.maxsize
+        max_outputs_per_label = 0
+        summed_outputs_per_label = 0
+
         for index in range(0, self.__len__()):
             image = self.get_image(index)
             height, width = image.shape
 
+            number_of_labels = len(self.get_labels(index))
+            outputs = width / float(self.width_required_per_network_output_column)
+            outputs_per_label = outputs / number_of_labels
+
             min_height = min(min_height, height)
             min_width = min(min_width, width)
+            min_outputs_per_label = min(min_outputs_per_label, outputs_per_label)
 
             max_height = max(max_height, height)
             max_width = max(max_width, width)
+            max_outputs_per_label = max(max_outputs_per_label, outputs_per_label)
 
             summed_heights += height
             summed_widths += width
+            summed_outputs_per_label += outputs_per_label
 
         mean_height = summed_heights / float(self.__len__())
         mean_width = summed_widths / float(self.__len__())
+        mean_outputs_per_label = summed_outputs_per_label / float(self.__len__())
 
         IamLinesDataset.print_image_dimension_statistics(min_height, max_height, mean_height,
-                                                         min_width, max_width, mean_width)
+                                                         min_width, max_width, mean_width,
+                                                         min_outputs_per_label, max_outputs_per_label,
+                                                         mean_outputs_per_label)
 
         return max_height, max_width
 
@@ -606,8 +722,10 @@ def test_iam_lines_dataset():
     #    print("torch_tensor['image'][" + str(i) + "]: " + str(torch_tensors['image'].view(-1)[i]))
 
     permutation_save_or_load_file_path = "test_permutation_file.txt"
+    minimize_horizontal_padding = True
     iam_lines_dataset.get_random_train_set_validation_set_test_set_data_loaders(16, 0.5, 0.2, 0.3,
-                                                                                permutation_save_or_load_file_path)
+                                                                                permutation_save_or_load_file_path,
+                                                                                minimize_horizontal_padding)
 
 
 def test_iam_words_dataset():
@@ -635,8 +753,10 @@ def test_iam_words_dataset():
     #    print("torch_tensor['image'][" + str(i) + "]: " + str(torch_tensors['image'].view(-1)[i]))
 
     permutation_save_or_load_file_path = "test_permutation_file3.txt"
+    minimize_horizontal_padding = True
     iam_lines_dataset.get_random_train_set_validation_set_test_set_data_loaders(16, 0.5, 0.2, 0.3,
-                                                                                permutation_save_or_load_file_path)
+                                                                                permutation_save_or_load_file_path,
+                                                                                minimize_horizontal_padding)
 
 
 def main():
