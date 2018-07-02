@@ -233,6 +233,11 @@ class IamExamplesDictionary():
         number_of_rejected_images_labeled_ok = 0
         with open(lines_file_path, "r") as ifile:
             for line in ifile:
+                # The lines end with a new line character and hence need
+                # to be stripped to get rid of those otherwise disrupting newline
+                # characters
+                # See: https://stackoverflow.com/questions/12330522/reading-a-file-without-newlines
+                line = line.rstrip('\n')
                 if not IamExamplesDictionary.is_comment(line):
                     line_information = information_creation_function(line)
 
