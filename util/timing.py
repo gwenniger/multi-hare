@@ -1,6 +1,7 @@
 
 import time
 import math
+import datetime
 
 
 def as_minutes(s):
@@ -22,3 +23,12 @@ def time_since_and_expected_remaining_time(since, percent):
     rs = es - s
     return '%s (- "expected time remaining: %s)' % (as_minutes(s), as_minutes(rs))
 
+
+def date_time_start():
+    return datetime.datetime.now()
+
+
+def milliseconds_since(since: datetime):
+    b = datetime.datetime.now()
+    c = b - since
+    return c.total_seconds() * 1000

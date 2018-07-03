@@ -2,7 +2,7 @@ import torch.tensor
 from util.utils import Utils
 from modules.size_two_dimensional import SizeTwoDimensional
 from util.tensor_chunking import TensorChunking
-
+import util.timing
 # This class takes care of chunking a list of four-dimensional image tensors with
 # list elements of the dimensions
 # 1: channels, 2: height, 3: width
@@ -89,7 +89,11 @@ class TensorListChunking:
     # a new batch dimension
     def chunk_tensor_list_into_blocks_concatenate_along_batch_dimension(self,
             tensor: torch.tensor):
-        return self.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once(tensor)
+        time_start = util.timing.date_time_start()
+        result = self.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once(tensor)
+        print("chunk_tensor_list_into_blocks_concatenate_along_batch_dimension - time used: \n" +
+              str(util.timing.milliseconds_since(time_start)) + " milliseconds.")
+        return result
 
         # No-cat implementation: slower on loss.backward
         # return self.chunk_tensor_into_blocks_concatenate_along_batch_dimension_no_cat(tensor)
@@ -104,10 +108,7 @@ class TensorListChunking:
     # which for some reason yields better loss.backward performance than the original
     # implementation using torch.cat with a for loop and slicing
     @staticmethod
-    def reconstruct_tensor_block_row_split_squeeze_cat(tensor_grouped_by_block, row_index, blocks_per_row):
-        first_block_index = row_index * blocks_per_row
-
-        row_slice = tensor_grouped_by_block[first_block_index:first_block_index+blocks_per_row, :, :, :]
+    def reconstruct_tensor_block_row_split_squeeze_cat(row_slice):
         tensors_split = torch.split(row_slice, 1, 0)
         # print("tensors_split[0].size(): " + str(tensors_split[0].size()))
         # Splitting still retains the extra first dimension, which must be removed then
@@ -122,18 +123,30 @@ class TensorListChunking:
     # goes over the blocks int the original tensor, and whose other three dimensions go over
     # the channel dimension and height and width dimensions of these blocks
     @staticmethod
-    def reconstruct_tensor_block_row(tensor_grouped_by_block, row_index, blocks_per_row):
+    def reconstruct_tensor_block_row(row_slice):
         # return self.reconstruct_tensor_block_row_original(tensor_grouped_by_block, row_index)
         # This implementation somehow yields much faster loss.backward performance than the original
-        return TensorListChunking.reconstruct_tensor_block_row_split_squeeze_cat(tensor_grouped_by_block, row_index,
-                                                                   blocks_per_row)
+        return TensorListChunking.reconstruct_tensor_block_row_split_squeeze_cat(row_slice)
 
     def get_number_of_blocks_for_example(self, example_index):
         original_size = self.original_sizes[example_index]
         blocks_per_row = int(original_size.width / self.block_size.width)
         blocks_per_column = int(original_size.height / self.block_size.height)
-        number_of_feature_blocks_example = blocks_per_column * blocks_per_row
-        return blocks_per_column, blocks_per_row, number_of_feature_blocks_example
+        blocks_for_example = blocks_per_column * blocks_per_row
+        return blocks_per_column, blocks_per_row, blocks_for_example
+
+    def get_number_of_blocks_for_examples(self):
+        blocks_per_row_list = list([])
+        blocks_per_column_list = list([])
+        blocks_for_examples_list = list([])
+        for example_index in range(0, len(self.original_sizes)):
+            blocks_per_column, blocks_per_row, blocks_for_example = \
+                self.get_number_of_blocks_for_example(example_index)
+            blocks_per_column_list.append(blocks_per_column)
+            blocks_per_row_list.append(blocks_per_row)
+            blocks_for_examples_list.append(blocks_for_example)
+        return blocks_per_column_list, blocks_per_row_list, blocks_for_examples_list
+
 
 
     # This function performs the inverse of
@@ -145,6 +158,8 @@ class TensorListChunking:
     # leads to a faulty implementation, as this does not preserve gradient information.
     def dechunk_block_tensor_concatenated_along_batch_dimension_changed_block_size(self, tensor: torch.tensor,
                                                                                    block_size: SizeTwoDimensional):
+        time_start = util.timing.date_time_start()
+
         number_of_examples = len(self.original_sizes)
 
         # print(">>> dechunk_block_tensor_concatenated_along_batch_dimension: - tensor.grad_fn "
@@ -155,22 +170,29 @@ class TensorListChunking:
 
         result = list([])
 
+        blocks_per_column_list, blocks_per_row_list, blocks_for_examples_list = \
+            self.get_number_of_blocks_for_examples()
+
+        example_sub_tensors = torch.split(tensor, blocks_for_examples_list, 0)
+
         blocks_start_index = 0
         for example_index in range(0, number_of_examples):
-            blocks_per_column, blocks_per_row, blocks_for_example = self.get_number_of_blocks_for_example(example_index)
-            blocks_end_index = blocks_start_index + blocks_for_example
-            example_sub_tensor = tensor[blocks_start_index:blocks_end_index]
+            blocks_per_column = blocks_per_column_list[example_index]
+            blocks_per_row = blocks_per_row_list[example_index]
+            blocks_for_example = blocks_for_examples_list[example_index]
+            example_sub_tensor = example_sub_tensors[example_index]
             # print("example_sub_tensor: " + str(example_sub_tensor))
 
             tensor_grouped_by_block = example_sub_tensor.view(blocks_for_example, channels,
                                                               block_size.height, block_size.width)
+            row_slices = torch.split(tensor_grouped_by_block, blocks_per_row, 0)
             # print("tensor_grouped_by_block: " + str(tensor_grouped_by_block))
 
-            tensor_block_row = TensorListChunking.reconstruct_tensor_block_row(tensor_grouped_by_block, 0, blocks_per_row)
+            tensor_block_row = TensorListChunking.reconstruct_tensor_block_row(row_slices[0])
             reconstructed_example_tensor = tensor_block_row
 
             for row_index in range(1, blocks_per_column):
-                tensor_block_row = TensorListChunking.reconstruct_tensor_block_row(tensor_grouped_by_block, row_index, blocks_per_row)
+                tensor_block_row = TensorListChunking.reconstruct_tensor_block_row(row_slices[0])
                 reconstructed_example_tensor = torch.cat((reconstructed_example_tensor, tensor_block_row), 1)
 
             result.append(reconstructed_example_tensor)
@@ -179,6 +201,9 @@ class TensorListChunking:
             #      + str(result.grad_fn))
 
             blocks_start_index += blocks_for_example
+
+        print("dechunk_block_tensor_concatenated_along_batch_dimension_changed_block_size - time used: \n" +
+              str(util.timing.milliseconds_since(time_start)) + " milliseconds.")
 
         return result
 
