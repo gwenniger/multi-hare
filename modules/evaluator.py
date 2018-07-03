@@ -60,8 +60,8 @@ class Evaluator:
             # be converted to floats (after moving to GPU, i.e. directly on GPU
             # which is faster)
             if image_input_is_unsigned_int:
-                Trainer.check_inputs_is_right_type(inputs)
-                inputs = IamLinesDataset.convert_unsigned_int_image_tensor_to_float_image_tensor(inputs)
+                Trainer.check_inputs_is_right_type(inputs, minimize_horizontal_padding)
+                inputs = IamLinesDataset.convert_unsigned_int_image_tensor_or_list_to_float_image_tensor_or_list(inputs)
 
             # https://github.com/pytorch/pytorch/issues/235
             # Running the evaluation without computing gradients is the recommended way
