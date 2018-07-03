@@ -81,7 +81,8 @@ class BlockMultiDimensionalLSTMLayerPairStacking(Module):
     def create_two_layer_pair_network(first_mdlstm_hidden_states_size: int,
                                       mdlstm_block_size: SizeTwoDimensional,
                                       block_strided_convolution_block_size: SizeTwoDimensional,
-                                      clamp_gradients: bool):
+                                      clamp_gradients: bool,
+                                      input_and_output_are_lists: bool):
         compute_multi_directional = False
         use_dropout = False
         nonlinearity = "tanh"
@@ -113,6 +114,7 @@ class BlockMultiDimensionalLSTMLayerPairStacking(Module):
         return BlockMultiDimensionalLSTMLayerPairStacking.\
             create_block_multi_dimensional_lstm_pair_stacking(layer_pairs_specific_parameters_list,
                                                               compute_multi_directional, clamp_gradients, use_dropout,
+                                                              input_and_output_are_lists,
                                                               nonlinearity)
 
         # This is an example of a network that stacks two

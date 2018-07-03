@@ -75,7 +75,7 @@ class TensorListChunking:
 
             for row_block in tensor_split_on_height:
                 blocks = torch.split(row_block, self.block_size.width, 3)
-                print("blocks: " + str(blocks))
+                # print("blocks: " + str(blocks))
                 list_for_cat.extend(blocks)
         result = torch.cat(list_for_cat, 0)
         # print("chunk_tensor_into_blocks_concatenate_along_batch_dimension - result.size(): " + str(result.size()))
@@ -160,11 +160,11 @@ class TensorListChunking:
             blocks_per_column, blocks_per_row, blocks_for_example = self.get_number_of_blocks_for_example(example_index)
             blocks_end_index = blocks_start_index + blocks_for_example
             example_sub_tensor = tensor[blocks_start_index:blocks_end_index]
-            print("example_sub_tensor: " + str(example_sub_tensor))
+            # print("example_sub_tensor: " + str(example_sub_tensor))
 
             tensor_grouped_by_block = example_sub_tensor.view(blocks_for_example, channels,
                                                               block_size.height, block_size.width)
-            print("tensor_grouped_by_block: " + str(tensor_grouped_by_block))
+            # print("tensor_grouped_by_block: " + str(tensor_grouped_by_block))
 
             tensor_block_row = TensorListChunking.reconstruct_tensor_block_row(tensor_grouped_by_block, 0, blocks_per_row)
             reconstructed_example_tensor = tensor_block_row

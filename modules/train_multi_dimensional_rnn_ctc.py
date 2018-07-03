@@ -361,17 +361,18 @@ def create_model(checkpoint, data_height: int, input_channels: int, input_size: 
     # mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
     block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
 
+    inputs_and_outputs_are_lists = minimize_horizontal_padding
+
     if data_set_name == "MNIST":
         multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking.\
             create_two_layer_pair_network(hidden_states_size, mdlstm_block_size,
-                                      block_strided_convolution_block_size,
-                                       clamp_gradients)
+                                          block_strided_convolution_block_size,
+                                          clamp_gradients, inputs_and_outputs_are_lists)
     # multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
     #    create_three_layer_pair_network(hidden_states_size, mdlstm_block_size,
     #                                 block_strided_convolution_block_size)
 
     elif data_set_name == "IAM":
-        inputs_and_outputs_are_lists = minimize_horizontal_padding
         multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
             create_three_layer_pair_network_linear_parameter_size_increase(input_channels, hidden_states_size,
                                                                            mdlstm_block_size,
@@ -567,8 +568,8 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
     # device_ids should include device!
     # device_ids lists all the gpus that may be used for parallelization
     # device is the initial device the model will be put on
-    device_ids = [0, 1]
-    # device_ids = [0]
+    #device_ids = [0, 1]
+    device_ids = [0]
 
     # See: https://pytorch.org/tutorials/beginner/former_torchies/nn_tutorial.html
     # multi_dimensional_rnn.register_backward_hook(printgradnorm)
@@ -643,7 +644,9 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
         # multi_dimensional_rnn.set_training(False) # Normal case
         network.module.set_training(False)  # When using DataParallel
         validation_stats = Evaluator.evaluate_mdrnn(validation_loader, network, device, vocab_list, blank_symbol,
-                                 width_reduction_factor, image_input_is_unsigned_int)
+                                                    width_reduction_factor, image_input_is_unsigned_int,
+                                                    minimize_horizontal_padding
+                                                    )
         network.module.set_training(True)  # When using DataParallel
         print("</validation evaluation epoch " + str(epoch) + " >")
 
@@ -707,10 +710,13 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     # In MNIST there are the digits 0-9, and we also add a symbol for blanks
     # This vocab_list will be used by the decoder
     vocab_list = list(['_', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'])
+    minimize_horizontal_padding = True
     train_loader = data_preprocessing.load_mnist.\
-        get_multi_digit_train_loader_random_length(batch_size, min_num_digits, max_num_digits)
+        get_multi_digit_train_loader_random_length(batch_size, min_num_digits, max_num_digits,
+                                                   minimize_horizontal_padding)
     test_loader = data_preprocessing.load_mnist.\
-        get_multi_digit_test_loader_random_length(batch_size, min_num_digits, max_num_digits)
+        get_multi_digit_test_loader_random_length(batch_size, min_num_digits, max_num_digits,
+                                                  minimize_horizontal_padding)
 
     # test_mdrnn_cell()
     #test_mdrnn()
@@ -738,7 +744,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     image_input_is_unsigned_int = False
     train_mdrnn_ctc(model_opt, checkpoint, train_loader, test_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
                     compute_multi_directional, use_dropout, vocab_list, blank_symbol,
-                    image_input_is_unsigned_int, "MNIST")
+                    image_input_is_unsigned_int, "MNIST", minimize_horizontal_padding)
     #print(prof)
 
 
@@ -814,7 +820,7 @@ def iam_word_recognition(model_opt, checkpoint):
     # With the improved padding, the height of the images is 128,
     # and memory usage is less, so batch_size 30 instead of 20 is possible,
     # but it is only slightly faster (GPU usage appears to be already maxed out)
-    batch_size = 2  # 64
+    batch_size = 128
 
     # lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
     lines_file_path = model_opt.iam_database_lines_file_path
@@ -894,15 +900,15 @@ def main():
         model_opt = opt
 
     # mnist_recognition_fixed_length()
-    # mnist_recognition_variable_length(model_opt, checkpoint,)
+    mnist_recognition_variable_length(model_opt, checkpoint,)
 
-    if opt.iam_database_data_type == "lines":
-        iam_line_recognition(model_opt, checkpoint)
-    elif opt.iam_database_data_type == "words":
-        iam_word_recognition(model_opt, checkpoint)
-    else:
-        raise RuntimeError("Unrecognized data type")
-    #cifar_ten_basic_recognition()
+    # if opt.iam_database_data_type == "lines":
+    #     iam_line_recognition(model_opt, checkpoint)
+    # elif opt.iam_database_data_type == "words":
+    #     iam_word_recognition(model_opt, checkpoint)
+    # else:
+    #     raise RuntimeError("Unrecognized data type")
+    # #cifar_ten_basic_recognition()
 
 
 if __name__ == "__main__":

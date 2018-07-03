@@ -8,9 +8,11 @@ import torchvision
 from util.image_input_transformer import ImageInputTransformer
 from random import randint
 import torch.nn.functional
+from data_preprocessing.padding_strategy import PaddingStrategy
 
 IMAGE_HEIGHT = 16
 IMAGE_WIDTH = 16
+WIDTH_REQUIRED_PER_NETWORK_OUTPUT_COLUMN = 2
 
 
 def get_train_set():
@@ -135,7 +137,7 @@ def get_item_labels_with_probabilities_length_and_real_sequence_length(item_labe
 # to max_num_digits (including) elements
 # https://discuss.pytorch.org/t/solved-training-lstm-by-using-samples-of-various-sequence-length/9641
 def get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_digits,
-                                         data_set):
+                                         data_set, padding_strategy: PaddingStrategy):
     train_set_pairs = list([])
     print("data_set: " + str(data_set))
     i = 0
@@ -153,13 +155,19 @@ def get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_dig
         # print("item_tensors_combined.size(): " + str(item_tensors_combined.size()))
         # print("item_labels_combined.size(): " + str(item_labels_combined.size()))
 
-        # https://pytorch.org/docs/master/nn.html#torch.nn.functional.pad
         digits_padding_required = max_num_digits - sequence_length
-        columns_padding_required = digits_padding_required * IMAGE_WIDTH
 
+        image_width = sequence_length * IMAGE_WIDTH
+        max_image_width = max_num_digits * IMAGE_WIDTH
+        columns_padding_required = padding_strategy.get_collumns_padding_required(image_width, max_image_width)
         p1d = (0, columns_padding_required)  # pad last dim by 1 on end side
-        item_tensors_combined_padded = torch.nn.functional.\
+        item_tensors_combined_padded = torch.nn.functional. \
             pad(item_tensors_combined, p1d, "constant", 0)
+        item_tensors_combined_padded
+
+
+        # https://pytorch.org/docs/master/nn.html#torch.nn.functional.pad
+
         p1d = (0, digits_padding_required)  # pad last dim by 1 on end side
         item_labels_combined_padded = torch.nn.functional.\
             pad(item_labels_combined, p1d, "constant", -2)
@@ -183,12 +191,7 @@ def get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_dig
         #plt.show()
         i += sequence_length
 
-
-
-    train_loader = torch.utils.data.DataLoader(
-        dataset=train_set_pairs,
-        batch_size=batch_size,
-        shuffle=True)
+    train_loader = padding_strategy.create_train_loader(train_set_pairs, batch_size)
     return train_loader
 
 
@@ -202,14 +205,22 @@ def get_multi_digit_test_loader_fixed_length(batch_size, sequence_length):
                                                get_test_set())
 
 
-def get_multi_digit_train_loader_random_length(batch_size, min_num_digits, max_num_digits):
+def get_multi_digit_train_loader_random_length(batch_size, min_num_digits, max_num_digits,
+                                               minimize_horizontal_padding: bool):
+    padding_strategy = PaddingStrategy.create_padding_strategy(WIDTH_REQUIRED_PER_NETWORK_OUTPUT_COLUMN,
+                                                               minimize_horizontal_padding)
+
     return get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_digits,
-                                                get_train_set())
+                                                get_train_set(), padding_strategy)
 
 
-def get_multi_digit_test_loader_random_length(batch_size, min_num_digits, max_num_digits):
+def get_multi_digit_test_loader_random_length(batch_size, min_num_digits, max_num_digits,
+                                              minimize_horizontal_padding: bool):
+    padding_strategy = PaddingStrategy.create_padding_strategy(WIDTH_REQUIRED_PER_NETWORK_OUTPUT_COLUMN,
+                                                               minimize_horizontal_padding)
+
     return get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_digits,
-                                                get_test_set())
+                                                get_test_set(), padding_strategy)
 
 
 def get_train_loader(batch_size):

@@ -156,11 +156,19 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
 
     def forward(self, x):
 
-        if self.input_is_list:
-            raise RuntimeError("Not implemented")
-            # Fixme this needs to be implemented
-
         activations = self.network(x)
+
+        if self.input_is_list:
+            examples_activation_widths = list([])
+            for example_activations in activations:
+                example_activations_width = example_activations.size(2)
+                examples_activation_widths.append(example_activations_width)
+
+            # Create tensor with all activations concatenated on width dimension
+            activations_single_tensor = torch.cat(activations, 2)
+            activations_single_tensor = activations_single_tensor.unsqueeze(0)
+            activations = activations_single_tensor
+
         batch_size = activations.size(0)
         # print(">>> activations.size(): " + str(activations.size()))
         # print("activations: " + str(activations))
@@ -185,8 +193,29 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
 
 
         # print("class_activations: " + str(class_activations))
-        class_activations_resized = class_activations.view(batch_size, -1,
-                                                             self.get_number_of_classes_including_blank())
+        if self.input_is_list:
+            class_activations_resized_temp = class_activations.view(1, -1, self.get_number_of_classes_including_blank())
+            # print("class_activations_resized_temp.size(): " + str(class_activations_resized_temp.size()))
+            # print("examples_activation_widths: " + str(examples_activation_widths))
+            chunks = torch.split(class_activations_resized_temp, examples_activation_widths, 1)
+            max_width = max(examples_activation_widths)
+            chunks_padded = list([])
+            for chunk in chunks:
+                columns_padding_required = max_width - chunk.size(1)
+                p1d = (0, columns_padding_required)
+                # Padding is done to the last dimension but we need to padd the one-but last dimension
+                # so transpose, padd, then transpose back
+                chunk_transposed = chunk.transpose(1, 2)
+                chunk_transposed_padded = torch.nn.functional.pad(chunk_transposed, p1d, "constant", 0)
+                chunk_padded = chunk_transposed_padded.transpose(1, 2)
+                chunks_padded.append(chunk_padded)
+            class_activations_resized = torch.cat(chunks_padded, 0)
+        else:
+            class_activations_resized = class_activations.view(batch_size, -1,
+                                                               self.get_number_of_classes_including_blank())
+
+
+
         # print("class_activations.size(): " + str(class_activations.size()))
 
         # print("class_activation_resized: " + str(class_activations_resized))

@@ -1,6 +1,5 @@
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 from data_preprocessing.iam_database_preprocessing.iam_examples_dictionary import IamExamplesDictionary
-from data_preprocessing.iam_database_preprocessing.iam_examples_dictionary import IamLineInformation
 from data_preprocessing.iam_database_preprocessing.string_to_index_mapping_table import StringToIndexMappingTable
 from skimage import io, transform
 import torch
@@ -11,77 +10,7 @@ import sys
 import util.image_visualization
 from data_preprocessing.iam_database_preprocessing.data_permutation import DataPermutation
 import os.path
-from abc import abstractmethod
-
-
-class PaddingStrategy:
-    """
-    This strategy class will determine how the padding of the training examples is
-    being done
-    """
-
-    def __init__(self, width_required_per_network_output_column):
-        self.width_required_per_network_output_column = width_required_per_network_output_column
-
-    @abstractmethod
-    def get_collumns_padding_required(self, image_width, max_image_width):
-        raise RuntimeError("not implemented")
-
-    @abstractmethod
-    def create_train_loader(self, train_set_pairs, batch_size):
-        raise RuntimeError("not implemented")
-
-
-class FullPaddingStrategy(PaddingStrategy):
-
-    def __init__(self, width_required_per_network_output_column):
-        super(FullPaddingStrategy, self).__init__(width_required_per_network_output_column)
-
-    def get_collumns_padding_required(self, image_width, max_image_width):
-        return max_image_width - image_width
-
-    def create_train_loader(self, train_set_pairs, batch_size):
-
-        train_loader = torch.utils.data.DataLoader(
-            dataset=train_set_pairs,
-            batch_size=batch_size,
-            shuffle=True)
-        return train_loader
-
-
-class MinimalHorizontalPaddingStrategy(PaddingStrategy):
-
-    def __init__(self, width_required_per_network_output_column):
-        super(MinimalHorizontalPaddingStrategy, self).__init__(width_required_per_network_output_column)
-
-    def get_collumns_padding_required(self, image_width, max_image_width):
-        return IamLinesDataset.\
-            get_additional_amount_required_to_make_multiple_of_value(image_width,
-                                                                     self.width_required_per_network_output_column)
-
-    # a simple custom collate function
-    @staticmethod
-    def my_collate(batch):
-        print("my_collate - batch: " + str(batch))
-        data = [item[0] for item in batch]
-
-        print("my_collate - data: " + str(data))
-        target = [item[1] for item in batch]
-        print("my_collate - target: " + str(target))
-        # target = torch.LongTensor(target)
-        return [data, target]
-
-    # https://discuss.pytorch.org/t/how-to-create-a-dataloader-with-variable-size-input/8278/3
-    def create_train_loader(self, train_set_pairs, batch_size):
-
-        train_loader = torch.utils.data.DataLoader(
-            dataset=train_set_pairs,
-            batch_size=batch_size,
-            shuffle=True,
-            collate_fn=MinimalHorizontalPaddingStrategy.my_collate,
-            pin_memory=True)
-
-        return train_loader
+from data_preprocessing.padding_strategy import PaddingStrategy, MinimalHorizontalPaddingStrategy, FullPaddingStrategy
 
 
 class IamLinesDataset(Dataset):
@@ -266,16 +195,6 @@ class IamLinesDataset(Dataset):
 
         return result, True
 
-    @staticmethod
-    def get_additional_amount_required_to_make_multiple_of_value(value, value_to_be_multiple_of: int):
-        additional_amount_required = \
-            value_to_be_multiple_of - (value % value_to_be_multiple_of)
-        additional_amount_required = \
-            additional_amount_required % value_to_be_multiple_of
-        # print("get_additional_amount_required_to_make_multiple_of_value(" +
-        #      str(value) + "," + str(value_to_be_multiple_of) + "): " + str(additional_amount_required))
-        return additional_amount_required
-
     def get_data_loader_with_appropriate_padding(self, data_set, max_image_height,
                                                  max_image_width, max_labels_length,
                                                  batch_size: int, padding_strategy: PaddingStrategy):
@@ -311,13 +230,13 @@ class IamLinesDataset(Dataset):
         max_image_width = IamLinesDataset.compute_max_adjusted_by_scale_reduction_factor(max_image_width,
                                                                                          scale_reduction_factor)
         max_image_height = \
-            max_image_height + IamLinesDataset.get_additional_amount_required_to_make_multiple_of_value(
+            max_image_height + PaddingStrategy.get_additional_amount_required_to_make_multiple_of_value(
                 max_image_height, self.height_required_per_network_output_row)
 
         # Width that is strictly required to fit the max occurring width and also
         # be a multiple of self.width_required_per_network_output_row
 
-        max_image_width = max_image_width + IamLinesDataset.get_additional_amount_required_to_make_multiple_of_value(
+        max_image_width = max_image_width + PaddingStrategy.get_additional_amount_required_to_make_multiple_of_value(
                 max_image_width, self.width_required_per_network_output_column)
 
         print("After scaling and addition to fit into multiple of the " +
@@ -481,10 +400,8 @@ class IamLinesDataset(Dataset):
                                                                validation_examples_fraction,
                                                                permutation_save_or_load_file_path)
 
-        if minimize_horizontal_padding:
-            padding_strategy = MinimalHorizontalPaddingStrategy(self.width_required_per_network_output_column)
-        else:
-            padding_strategy = FullPaddingStrategy(self.width_required_per_network_output_column)
+        padding_strategy = PaddingStrategy.create_padding_strategy(self.width_required_per_network_output_column,
+                                                                   minimize_horizontal_padding )
 
         print("Prepare IAM data train loader...")
         train_loader = self.get_data_loader_with_appropriate_padding(train_set, max_image_height, max_image_width,

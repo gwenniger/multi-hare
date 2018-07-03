@@ -103,13 +103,7 @@ class Trainer:
                 if not inputs_is_list:
                     inputs = inputs.to(device)
                 else:
-                    # We cannot copy an entire list to gpu using to(device)
-                    # so we need to do it one by one
-                    inputs_on_gpu = list([])
-                    for element in inputs:
-                        element = element.to(device)
-                        inputs_on_gpu.append(element)
-                    inputs = inputs_on_gpu
+                    inputs = Utils.move_tensor_list_to_device(inputs, device)
 
             # If the image input comes in the form of unsigned ints, they need to
             # be converted to floats (after moving to GPU, i.e. directly on GPU
@@ -158,9 +152,13 @@ class Trainer:
             # print("outputs: " + str(outputs))
             # print("outputs.size(): " + str(outputs.size()))
             # print("labels: " + str(labels))
-            number_of_examples = inputs.size(0)
+            if inputs_is_list:
+                number_of_examples = len(inputs)
+            else:
+                number_of_examples = inputs.size(0)
 
             time_start_ctc_loss_computation = time.time()
+            print("trainer - outputs.size(): " + str(outputs.size()))
             loss = self.warp_ctc_loss_interface.compute_ctc_loss(outputs,
                                                                  labels,
                                                                  number_of_examples,
@@ -171,7 +169,7 @@ class Trainer:
             # See: https://github.com/SeanNaren/deepspeech.pytorch/blob/master/train.py
             # The averaging seems to help learning (but a smaller learning rate
             # might have the same effect!)
-            loss = loss / inputs.size(0)  # average the loss by minibatch size
+            loss = loss / number_of_examples  # average the loss by minibatch size
 
             loss_sum = loss.data.sum()
             inf = float("inf")

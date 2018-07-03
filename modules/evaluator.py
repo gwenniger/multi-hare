@@ -40,7 +40,7 @@ class Evaluator:
     @staticmethod
     def evaluate_mdrnn(test_loader, multi_dimensional_rnn, device,
                        vocab_list: list, blank_symbol: str, horizontal_reduction_factor: int,
-                       image_input_is_unsigned_int: bool):
+                       image_input_is_unsigned_int: bool, minimize_horizontal_padding: bool):
 
         correct = 0
         total = 0
@@ -50,7 +50,11 @@ class Evaluator:
 
             if Utils.use_cuda():
                 labels = labels.to(device)
-                inputs = inputs.to(device)
+
+                if minimize_horizontal_padding:
+                    inputs = Utils.move_tensor_list_to_device(inputs, device)
+                else:
+                    inputs = inputs.to(device)
 
             # If the image input comes in the form of unsigned ints, they need to
             # be converted to floats (after moving to GPU, i.e. directly on GPU
