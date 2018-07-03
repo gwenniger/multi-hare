@@ -121,8 +121,8 @@ class TensorListChunking:
         else:
             result = self.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once(tensor)
 
-        print("chunk_tensor_list_into_blocks_concatenate_along_batch_dimension - time used: \n" +
-              str(util.timing.milliseconds_since(time_start)) + " milliseconds.")
+        # print("chunk_tensor_list_into_blocks_concatenate_along_batch_dimension - time used: \n" +
+        #      str(util.timing.milliseconds_since(time_start)) + " milliseconds.")
         return result
 
         # No-cat implementation: slower on loss.backward
@@ -232,8 +232,8 @@ class TensorListChunking:
 
             blocks_start_index += blocks_for_example
 
-        print("dechunk_block_tensor_concatenated_along_batch_dimension_changed_block_size - time used: \n" +
-              str(util.timing.milliseconds_since(time_start)) + " milliseconds.")
+        # print("dechunk_block_tensor_concatenated_along_batch_dimension_changed_block_size - time used: \n" +
+        #      str(util.timing.milliseconds_since(time_start)) + " milliseconds.")
 
         return result
 

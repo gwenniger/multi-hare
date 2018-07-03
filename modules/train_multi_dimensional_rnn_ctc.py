@@ -367,7 +367,7 @@ def create_model(checkpoint, data_height: int, input_channels: int, input_size: 
         multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking.\
             create_two_layer_pair_network(hidden_states_size, mdlstm_block_size,
                                           block_strided_convolution_block_size,
-                                          clamp_gradients, inputs_and_outputs_are_lists)
+                                          clamp_gradients)
     # multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
     #    create_three_layer_pair_network(hidden_states_size, mdlstm_block_size,
     #                                 block_strided_convolution_block_size)
@@ -379,8 +379,7 @@ def create_model(checkpoint, data_height: int, input_channels: int, input_size: 
                                                                            block_strided_convolution_block_size,
                                                                            compute_multi_directional,
                                                                            clamp_gradients,
-                                                                           use_dropout,
-                                                                           inputs_and_outputs_are_lists)
+                                                                           use_dropout)
     else:
         raise RuntimeError("Error: unrecognized dataset name")
 

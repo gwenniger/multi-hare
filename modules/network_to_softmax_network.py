@@ -3,6 +3,7 @@ import torch.nn as nn
 from modules.size_two_dimensional import SizeTwoDimensional
 from abc import abstractmethod
 from modules.inside_model_gradient_clipping import InsideModelGradientClamping
+from util.tensor_list_chunking import TensorListChunking
 
 class ActivationsResizer:
 
@@ -156,9 +157,25 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
 
     def forward(self, x):
 
-        activations = self.network(x)
-
         if self.input_is_list:
+
+            # print("network_to_softmax_network - network input x sizes: " )
+            # for element in x:
+            #     print(">>> input list element size - " + str(element.size()))
+            network_consumed_block_size = SizeTwoDimensional(self.network.get_height_reduction_factor(),
+                                                             self.network.get_width_reduction_factor())
+            tensor_list_chunking = TensorListChunking.create_tensor_list_chunking(x, network_consumed_block_size)
+            input_chunked = tensor_list_chunking.\
+                chunk_tensor_list_into_blocks_concatenate_along_batch_dimension(x, True)
+            activations_chunked = self.network(input_chunked)
+            # print("network_to_softmax_network - activations_chunked.size(): " + str(activations_chunked.size()))
+            activations = tensor_list_chunking.\
+                dechunk_block_tensor_concatenated_along_batch_dimension_changed_block_size(activations_chunked,
+                                                                                           SizeTwoDimensional(1, 1))
+            # print("network_to_softmax_network - activations sizes after dechunking: ")
+            # for element in activations:
+            #     print(">>> activations list element size - " + str(element.size()))
+
             examples_activation_widths = list([])
             for example_activations in activations:
                 example_activations_width = example_activations.size(2)
@@ -168,6 +185,9 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
             activations_single_tensor = torch.cat(activations, 2)
             activations_single_tensor = activations_single_tensor.unsqueeze(0)
             activations = activations_single_tensor
+
+        else:
+            activations = self.network(x)
 
         batch_size = activations.size(0)
         # print(">>> activations.size(): " + str(activations.size()))

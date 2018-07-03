@@ -139,7 +139,7 @@ class Trainer:
 
             time_start_network_forward = util.timing.date_time_start()
             outputs = self.model(inputs)
-            print("Time used for network forward: " + str(util.timing.milliseconds_since(time_start_network_forward)))
+            # print("Time used for network forward: " + str(util.timing.milliseconds_since(time_start_network_forward)))
 
             # print(">>> outputs.size(): " + str(outputs.size()))
 
@@ -158,13 +158,13 @@ class Trainer:
                 number_of_examples = inputs.size(0)
 
             time_start_ctc_loss_computation = util.timing.date_time_start()
-            print("trainer - outputs.size(): " + str(outputs.size()))
+            # print("trainer - outputs.size(): " + str(outputs.size()))
             loss = self.warp_ctc_loss_interface.compute_ctc_loss(outputs,
                                                                  labels,
                                                                  number_of_examples,
                                                                  self.model_properties.width_reduction_factor)
 
-            print("Time used for ctc loss computation: " + str(util.timing.milliseconds_since(time_start_ctc_loss_computation)))
+            # print("Time used for ctc loss computation: " + str(util.timing.milliseconds_since(time_start_ctc_loss_computation)))
 
             # See: https://github.com/SeanNaren/deepspeech.pytorch/blob/master/train.py
             # The averaging seems to help learning (but a smaller learning rate
@@ -184,7 +184,7 @@ class Trainer:
 
             time_start_loss_backward = util.timing.date_time_start()
             loss.backward()
-            print("Time used for loss backward: " + str(util.timing.milliseconds_since(time_start_loss_backward)))
+            # print("Time used for loss backward: " + str(util.timing.milliseconds_since(time_start_loss_backward)))
 
             # Perform step including gradient clipping
             made_gradient_norm_based_correction, total_norm = self.optimizer.step()
