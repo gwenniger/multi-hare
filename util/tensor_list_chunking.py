@@ -82,15 +82,45 @@ class TensorListChunking:
 
         return result
 
+    def chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once_fast(self, tensor_list: list):
+        # New implementation: collect everything and call torch.cat only once
+        list_for_cat = list([])
+
+        # This implementation saves out a for loop by concatenating all the tensors
+        # along the width dimension first
+        # This only works if the elements in the tensor_list all have the same
+        # height and number of channels
+        tensor_list_concatenated = torch.cat(tensor_list, 2)
+
+        # A dimension 0 must be added with unsqueeze,
+        # for concatenation along the batch dimension later on
+        tensor_list_concatenated = tensor_list_concatenated.unsqueeze(0)
+        tensor_split_on_height = torch.split(tensor_list_concatenated, self.block_size.height, 2)
+
+        for row_block in tensor_split_on_height:
+            blocks = torch.split(row_block, self.block_size.width, 3)
+            # print("blocks: " + str(blocks))
+            list_for_cat.extend(blocks)
+        result = torch.cat(list_for_cat, 0)
+        # print("chunk_tensor_into_blocks_concatenate_along_batch_dimension - result.size(): " + str(result.size()))
+
+        return result
+
+
     # Chunks a list of three-dimensional tensors into blocks.
     # The first element dimension is the input channels,
     # the second and third dimension are the height and width respectively, along which
     # the chunking will be done. The result is formed by concatenating the blocks along
     # a new batch dimension
     def chunk_tensor_list_into_blocks_concatenate_along_batch_dimension(self,
-            tensor: torch.tensor):
+            tensor: torch.tensor, tensors_all_have_same_height: bool):
         time_start = util.timing.date_time_start()
-        result = self.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once(tensor)
+
+        if tensors_all_have_same_height:
+            result = self.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once_fast(tensor)
+        else:
+            result = self.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once(tensor)
+
         print("chunk_tensor_list_into_blocks_concatenate_along_batch_dimension - time used: \n" +
               str(util.timing.milliseconds_since(time_start)) + " milliseconds.")
         return result
@@ -212,16 +242,17 @@ class TensorListChunking:
 
 
 def test_tensor_list_block_chunking_followed_by_dechunking_reconstructs_original():
-    tensor_one = torch.Tensor([range(1, 49)]).view(2, 4, 6)
-    tensor_two = torch.Tensor([range(1, 17)]).view(2, 2, 4)
+    tensor_one = torch.Tensor([range(1, 49)]).view(2, 2, 12)
+    tensor_two = torch.Tensor([range(49, 65)]).view(2, 2, 4)
 
     if Utils.use_cuda():
         tensor_one = tensor_one.cuda()
         tensor_two = tensor_two.cuda()
 
-    print(tensor_one)
-    print("tensor_one[0,  :, :]: " + str(tensor_one[0, :, :]))
-    print("tensor_two[0,  :, :]: " + str(tensor_two[0, :, :]))
+    print("tensor_one: " + str(tensor_one))
+    print("tensor_two: " + str(tensor_two))
+    #print("tensor_one[0,  :, :]: " + str(tensor_one[0, :, :]))
+    #print("tensor_two[0,  :, :]: " + str(tensor_two[0, :, :]))
 
     block_size = SizeTwoDimensional.create_size_two_dimensional(2, 2)
     tensor_list = list([tensor_one, tensor_two])
@@ -229,7 +260,8 @@ def test_tensor_list_block_chunking_followed_by_dechunking_reconstructs_original
     chunking = tensor_chunking.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension(tensor_list)
     print("chunking: " + str(chunking))
     print("chunking.size(): " + str(chunking.size()))
-    dechunked_tensor_list = tensor_chunking.dechunk_block_tensor_concatenated_along_batch_dimension_changed_block_size(chunking)
+    dechunked_tensor_list = tensor_chunking.\
+        dechunk_block_tensor_concatenated_along_batch_dimension_changed_block_size(chunking, block_size)
 
     print("dechunked_tensor_list: " + str(dechunked_tensor_list))
 

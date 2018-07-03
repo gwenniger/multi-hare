@@ -58,7 +58,7 @@ class BlockMultiDimensionalLSTM(Module):
 
         if self.input_and_output_are_lists:
             tensor_list_chunking = TensorListChunking.create_tensor_list_chunking(x, self.block_size)
-            x_chunked = tensor_list_chunking.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension(x)
+            x_chunked = tensor_list_chunking.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension(x, True)
             output = self.multi_dimensional_lstm(x_chunked)
             output_ordered_back_to_input_format = tensor_list_chunking.\
                 dechunk_block_tensor_concatenated_along_batch_dimension(output)

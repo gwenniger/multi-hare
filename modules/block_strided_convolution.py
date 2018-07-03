@@ -76,7 +76,7 @@ class BlockStridedConvolution(Module):
     def forward(self, x):
         if self.input_and_output_are_list:
             tensor_list_chunking = TensorListChunking.create_tensor_list_chunking(x, self.block_size)
-            x_chunked = tensor_list_chunking.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension(x)
+            x_chunked = tensor_list_chunking.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension(x, True)
         else:
             x_chunked = x
 
