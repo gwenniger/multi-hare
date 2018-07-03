@@ -312,7 +312,8 @@ def printgradnorm(self, grad_input, grad_output):
 
 def create_model(checkpoint, data_height: int, input_channels: int, input_size: SizeTwoDimensional, hidden_states_size: int,
                  compute_multi_directional: bool, use_dropout: bool, vocab_list,
-                 clamp_gradients: bool, data_set_name: str, minimize_horizontal_padding: bool):
+                 clamp_gradients: bool, data_set_name: str, minimize_horizontal_padding: bool,
+                 device_ids: list):
 
     # multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(input_channels,
     #                                                                                 hidden_states_size,
@@ -388,10 +389,22 @@ def create_model(checkpoint, data_height: int, input_channels: int, input_size: 
 
     number_of_classes_excluding_blank = len(vocab_list) - 1
 
-    network = NetworkToSoftMaxNetwork.create_network_to_soft_max_network(multi_dimensional_rnn,
-                                                                         input_size, number_of_classes_excluding_blank,
-                                                                         data_height, clamp_gradients,
-                                                                         inputs_and_outputs_are_lists)
+    if minimize_horizontal_padding:
+        multi_dimensional_rnn = nn.DataParallel(multi_dimensional_rnn, device_ids=device_ids)
+        network = NetworkToSoftMaxNetwork.create_network_to_soft_max_network(multi_dimensional_rnn,
+                                                                             input_size,
+                                                                             number_of_classes_excluding_blank,
+                                                                             data_height, clamp_gradients,
+                                                                             inputs_and_outputs_are_lists)
+
+    else:
+        network = NetworkToSoftMaxNetwork.create_network_to_soft_max_network(multi_dimensional_rnn,
+                                                                             input_size,
+                                                                             number_of_classes_excluding_blank,
+                                                                             data_height, clamp_gradients,
+                                                                             inputs_and_outputs_are_lists)
+        network = nn.DataParallel(network, device_ids=device_ids)
+
 
     if checkpoint is not None:
         print("before loading checkpoint: network.module.fc3" + str(network.fc3.weight))
@@ -567,8 +580,8 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
     # device_ids should include device!
     # device_ids lists all the gpus that may be used for parallelization
     # device is the initial device the model will be put on
-    #device_ids = [0, 1]
-    device_ids = [0]
+    device_ids = [0, 1]
+    # device_ids = [0]
 
     # See: https://pytorch.org/tutorials/beginner/former_torchies/nn_tutorial.html
     # multi_dimensional_rnn.register_backward_hook(printgradnorm)
@@ -577,7 +590,7 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
     clamp_gradients = False
     network = create_model(checkpoint, data_height, input_channels, input_size, hidden_states_size,
                            compute_multi_directional, use_dropout, vocab_list,
-                           clamp_gradients, data_set_name, minimize_horizontal_padding)
+                           clamp_gradients, data_set_name, minimize_horizontal_padding, device_ids)
 
     check_save_model_path()
 
@@ -586,8 +599,6 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
 
     if Utils.use_cuda():
         # multi_dimensional_rnn = multi_dimensional_rnn.cuda()
-        network = nn.DataParallel(network, device_ids=device_ids)
-
         network.to(device)
         #print("multi_dimensional_rnn.module.mdlstm_direction_one_parameters.parallel_memory_state_column_computation :"
         #      + str(multi_dimensional_rnn.module.mdlstm_direction_one_parameters.parallel_memory_state_column_computation))
@@ -614,7 +625,9 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
     warp_ctc_loss_interface = WarpCTCLossInterface.create_warp_ctc_loss_interface()
     # Get the width reduction factor which will be needed to compute the real widths
     # in the output from the real input width information in the warp_ctc_loss function
-    width_reduction_factor = network.module.get_width_reduction_factor()
+
+    real_model = (network.module if isinstance(network, torch.nn.DataParallel) else network)
+    width_reduction_factor = real_model.get_width_reduction_factor()
 
     model_properties = ModelProperties(image_input_is_unsigned_int, width_reduction_factor)
     trainer = Trainer(network, optimizer, warp_ctc_loss_interface, model_properties)
@@ -641,12 +654,12 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
         print("<validation evaluation epoch " + str(epoch) + " >")
         # Run evaluation
         # multi_dimensional_rnn.set_training(False) # Normal case
-        network.module.set_training(False)  # When using DataParallel
+        real_model.set_training(False)  # When using DataParallel
         validation_stats = Evaluator.evaluate_mdrnn(validation_loader, network, device, vocab_list, blank_symbol,
                                                     width_reduction_factor, image_input_is_unsigned_int,
                                                     minimize_horizontal_padding
                                                     )
-        network.module.set_training(True)  # When using DataParallel
+        real_model.set_training(True)  # When using DataParallel
         print("</validation evaluation epoch " + str(epoch) + " >")
 
         trainer.drop_checkpoint(opt, epoch, validation_stats)
@@ -703,7 +716,7 @@ def mnist_recognition_fixed_length():
 
 
 def mnist_recognition_variable_length(model_opt, checkpoint):
-    batch_size = 128
+    batch_size = 256
     min_num_digits = 1
     max_num_digits = 3
     # In MNIST there are the digits 0-9, and we also add a symbol for blanks
