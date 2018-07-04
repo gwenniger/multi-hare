@@ -29,7 +29,10 @@ class DataPermutation:
             data_permutation = DataPermutation. \
                 create_data_permutation_from_saved_permutation(permutation_save_or_load_file_path)
             if not len(data_permutation.permutation) == permutation_length:
-                raise RuntimeError("Error: loaded permutation is not of the right length")
+                raise RuntimeError("Error: loaded permutation is not of the right length " +
+                                   "expected: " + str(permutation_length) + " but permutation in file is of length: " +
+                                   str(len(data_permutation.permutation))
+                                   )
         else:
             data_permutation = DataPermutation.create_data_permutation(permutation_length,
                                                                        permutation_save_or_load_file_path)
