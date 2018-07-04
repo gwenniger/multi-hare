@@ -113,13 +113,14 @@ class TensorListChunking:
     # the chunking will be done. The result is formed by concatenating the blocks along
     # a new batch dimension
     def chunk_tensor_list_into_blocks_concatenate_along_batch_dimension(self,
-            tensor: torch.tensor, tensors_all_have_same_height: bool):
+                                                                        tensor_list: list,
+                                                                        tensors_all_have_same_height: bool):
         time_start = util.timing.date_time_start()
 
         if tensors_all_have_same_height:
-            result = self.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once_fast(tensor)
+            result = self.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once_fast(tensor_list)
         else:
-            result = self.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once(tensor)
+            result = self.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once(tensor_list)
 
         # print("chunk_tensor_list_into_blocks_concatenate_along_batch_dimension - time used: \n" +
         #      str(util.timing.milliseconds_since(time_start)) + " milliseconds.")
@@ -222,7 +223,7 @@ class TensorListChunking:
             reconstructed_example_tensor = tensor_block_row
 
             for row_index in range(1, blocks_per_column):
-                tensor_block_row = TensorListChunking.reconstruct_tensor_block_row(row_slices[0])
+                tensor_block_row = TensorListChunking.reconstruct_tensor_block_row(row_slices[row_index])
                 reconstructed_example_tensor = torch.cat((reconstructed_example_tensor, tensor_block_row), 1)
 
             result.append(reconstructed_example_tensor)
@@ -257,7 +258,7 @@ def test_tensor_list_block_chunking_followed_by_dechunking_reconstructs_original
     block_size = SizeTwoDimensional.create_size_two_dimensional(2, 2)
     tensor_list = list([tensor_one, tensor_two])
     tensor_chunking = TensorListChunking.create_tensor_list_chunking(tensor_list, block_size)
-    chunking = tensor_chunking.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension(tensor_list)
+    chunking = tensor_chunking.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension(tensor_list, True)
     print("chunking: " + str(chunking))
     print("chunking.size(): " + str(chunking.size()))
     dechunked_tensor_list = tensor_chunking.\

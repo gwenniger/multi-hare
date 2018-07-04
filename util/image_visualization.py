@@ -8,7 +8,8 @@ import torchvision
 
 def imshow_tensor_2d(img):
     img = img / 2 + 0.5  # unnormalize
-    npimg = img.numpy()
+    # npimg = img.numpy()
+    npimg = img.detach().numpy()
     plt.imshow(npimg)
     plt.show()
 

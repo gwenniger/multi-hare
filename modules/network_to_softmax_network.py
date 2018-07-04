@@ -4,6 +4,8 @@ from modules.size_two_dimensional import SizeTwoDimensional
 from abc import abstractmethod
 from modules.inside_model_gradient_clipping import InsideModelGradientClamping
 from util.tensor_list_chunking import TensorListChunking
+from util.tensor_utils import TensorUtils
+import util.image_visualization
 
 
 class ActivationsResizer:
@@ -160,6 +162,109 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
     def set_training(self, training):
         self.get_real_network().set_training(training)
 
+    @staticmethod
+    def collect_examples_activation_heights(activations):
+        examples_activation_heights = list([])
+        for example_activations in activations:
+            example_activations_height = example_activations.size(1)
+            examples_activation_heights.append(example_activations_height)
+        return examples_activation_heights
+
+    @staticmethod
+    def collect_examples_activation_widths(activations):
+        examples_activation_widths = list([])
+        for example_activations in activations:
+            example_activations_width = example_activations.size(2)
+            examples_activation_widths.append(example_activations_width)
+        return examples_activation_widths
+
+    @staticmethod
+    def compute_paired_lists_multiples(int_list_one, int_list_two):
+        result = list([])
+        for element_one, element_two in zip(int_list_one, int_list_two):
+            multiple = element_one * element_two
+            # print("compute_paired_lists_multiples - element one: " +
+            #       str(element_one) + " element two: "
+            #       + str(element_two))
+            # print("compute_paired_lists_multiples - multiple: " + str(multiple))
+            result.append(multiple)
+        return result
+
+
+    # This debugging method checks that de-chunking the chunked tensor recovers the original
+    @staticmethod
+    def check_dechunking_chunked_tensor_list_recovers_original(tensor_list_chunking, original_tensor_list,
+                                                       input_chunked):
+        input_dechunked = tensor_list_chunking.dechunk_block_tensor_concatenated_along_batch_dimension(
+            input_chunked)
+        if not TensorUtils.tensors_lists_are_equal(original_tensor_list, input_dechunked):
+            for index in range(0, len(original_tensor_list)):
+                print("original[" + str(index) + "].size()" + str(original_tensor_list[index].size()))
+
+            for index in range(0, len(input_dechunked)):
+                print("input_dechunked[" + str(index) + "].size()" + str(input_dechunked[index].size()))
+
+            TensorUtils.find_equal_slices_over_batch_dimension(input_chunked)
+
+            raise RuntimeError("Error: original and de-chunked chunked are not the same")
+
+    # This debugging method looks if it can find equal rows in the activation
+    # (which in general should typically not happen)
+    @ staticmethod
+    def check_activation_rows_are_not_equal(activation_rows):
+        # For debugging
+        print("activation rows sizes after splitting: ")
+        last_activation_row = activation_rows[0]
+        for activation_row in activation_rows:
+            print(str(activation_row.size()))
+            if TensorUtils.tensors_are_equal(last_activation_row, activation_row):
+                print(">>> WARNING: activation rows are equal")
+
+    # Extract the summed rows from a chunk that consists multiple rows
+    @staticmethod
+    def extract_summed_rows_from_chunk_with_concatenated_rows(chunk_multiple_rows, number_of_rows, number_of_columns):
+        # print("chunk multiple rows.size(): " + str(chunk_multiple_rows.size()))
+
+        # print("number of columns: " + str(number_of_columns) +
+        #      " number of rows: " + str(number_of_rows))
+        # Notice the dimension to split on is 1, as for example we have
+        # chunk multiple rows.size(): torch.Size([1, 14, 80])
+        # That is, the last dimension goes over classes, the first one is
+        # always 1, and the second dimension goes over the width.
+        # Therefore we have to split on dim=1 using the number_of_columns
+        # for the tensor containing the horizontally-concatenated
+        # row activations
+        rows = torch.split(chunk_multiple_rows, number_of_columns, dim=1)
+        if len(rows) != number_of_rows:
+            raise RuntimeError("Error in split: expected " + str(number_of_rows)
+                               + "rows but got: " + str(len(rows)))
+
+        summed_rows = TensorUtils.sum_list_of_tensors(rows)
+        # print("summed_rows.size(): " + str(summed_rows.size()))
+        return summed_rows
+
+    @staticmethod
+    def extract_activation_chunks(examples_activation_heights, examples_activation_widths,
+                                  class_activations_resized_temp):
+        examples_activation_height_times_width = NetworkToSoftMaxNetwork. \
+            compute_paired_lists_multiples(examples_activation_heights, examples_activation_widths)
+        chunks_multiple_rows = torch.split(class_activations_resized_temp,
+                                           examples_activation_height_times_width, 1)
+        chunks = list([])
+
+        for index in range(0, len(chunks_multiple_rows)):
+            chunk_multiple_rows = chunks_multiple_rows[index]
+            number_of_rows = examples_activation_heights[index]
+            number_of_columns = examples_activation_widths[index]
+            summed_rows = NetworkToSoftMaxNetwork.\
+                extract_summed_rows_from_chunk_with_concatenated_rows(chunk_multiple_rows, number_of_rows,
+                                                                      number_of_columns)
+            chunks.append(summed_rows)
+
+
+        return chunks
+
+
     def forward(self, x):
 
         if self.input_is_list:
@@ -169,9 +274,27 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
             #     print(">>> input list element size - " + str(element.size()))
             network_consumed_block_size = SizeTwoDimensional(self.get_real_network().get_height_reduction_factor(),
                                                              self.get_real_network().get_width_reduction_factor())
+
+            # # Plot two row images for debugging
+            # for element in x:
+            #     if element.size(1) > 64:
+            #         print("image to be plotted size: " + str(element.size()))
+            #         element_without_channel_dimension = element.squeeze(0)
+            #         util.image_visualization.imshow_tensor_2d(element_without_channel_dimension)
+
             tensor_list_chunking = TensorListChunking.create_tensor_list_chunking(x, network_consumed_block_size)
+
             input_chunked = tensor_list_chunking.\
-                chunk_tensor_list_into_blocks_concatenate_along_batch_dimension(x, True)
+                chunk_tensor_list_into_blocks_concatenate_along_batch_dimension(x, False)
+
+            # print("input_chunked.size(): " + str(input_chunked.size()))
+
+            # Debugging: check that the de-chunked version recovers the original
+            NetworkToSoftMaxNetwork.\
+                check_dechunking_chunked_tensor_list_recovers_original(tensor_list_chunking, x, input_chunked)
+
+            # print("input_chunked :" + str(input_chunked))
+
             activations_chunked = self.network(input_chunked)
             # print("network_to_softmax_network - activations_chunked.size(): " + str(activations_chunked.size()))
             activations = tensor_list_chunking.\
@@ -181,13 +304,25 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
             # for element in activations:
             #     print(">>> activations list element size - " + str(element.size()))
 
-            examples_activation_widths = list([])
-            for example_activations in activations:
-                example_activations_width = example_activations.size(2)
-                examples_activation_widths.append(example_activations_width)
+            examples_activation_heights = NetworkToSoftMaxNetwork.collect_examples_activation_heights(activations)
+            examples_activation_widths = NetworkToSoftMaxNetwork.collect_examples_activation_widths(activations)
+
+            activations_height_one = list([])
+            for activation in activations:
+                if activation.size(1) > 1:
+                    # print("activation.size(): " + str(activation.size()))
+                    activation_rows = torch.split(activation, 1, dim=1)
+                    # Debugging check
+                    # NetworkToSoftMaxNetwork.check_activation_rows_are_not_equal(activation_rows)
+                    activations_height_one.extend(activation_rows)
+                else:
+                    activations_height_one.append(activation)
+
+            # for activation in activations_height_one:
+            #     print("activations_height_one_element size: " + str(activation.size()))
 
             # Create tensor with all activations concatenated on width dimension
-            activations_single_tensor = torch.cat(activations, 2)
+            activations_single_tensor = torch.cat(activations_height_one, 2)
             activations_single_tensor = activations_single_tensor.unsqueeze(0)
             activations = activations_single_tensor
 
@@ -216,13 +351,16 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
             # print("NetworkToSoftMaxNetwork - register gradient clamping...")
             class_activations = InsideModelGradientClamping.register_gradient_clamping(class_activations)
 
-
         # print("class_activations: " + str(class_activations))
         if self.input_is_list:
             class_activations_resized_temp = class_activations.view(1, -1, self.get_number_of_classes_including_blank())
             # print("class_activations_resized_temp.size(): " + str(class_activations_resized_temp.size()))
             # print("examples_activation_widths: " + str(examples_activation_widths))
-            chunks = torch.split(class_activations_resized_temp, examples_activation_widths, 1)
+
+            chunks = NetworkToSoftMaxNetwork.extract_activation_chunks(examples_activation_heights,
+                                                                       examples_activation_widths,
+                                                                       class_activations_resized_temp)
+
             max_width = max(examples_activation_widths)
             chunks_padded = list([])
             for chunk in chunks:
@@ -261,7 +399,6 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         result = class_activations_resized
 
         # print(">>> MultiDimensionalRNNToSoftMaxNetwork.forward.result: " + str(result))
-
         return result
 
     def get_real_network(self):
