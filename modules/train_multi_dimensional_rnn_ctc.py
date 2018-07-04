@@ -38,7 +38,6 @@ opts.train_opts(parser)
 opt = parser.parse_args()
 
 
-
 def test_mdrnn_cell():
     print("Testing the MultDimensionalRNN Cell... ")
     mdrnn = MDRNNCell(10, 5, nonlinearity="relu")
@@ -80,6 +79,7 @@ def print_number_of_parameters(model):
         i += 1
     print("total parameters: " + str(total_parameters))
 
+
 # Method takes a tensor of labels starting from 0 and increases
 # all elements by one to get a tensor of labels starting form 1
 def create_labels_starting_from_one(labels):
@@ -110,9 +110,10 @@ def replace_all_negative_values_by_zero(tensor):
     return result
 
 
-def train_mdrnn_no_ctc(train_loader, test_loader, input_channels: int, input_size: SizeTwoDimensional, hidden_states_size: int, batch_size,
-                    compute_multi_directional: bool, use_dropout: bool,
-                    vocab_list: list):
+def train_mdrnn_no_ctc(train_loader, test_loader, input_channels: int, input_size: SizeTwoDimensional,
+                       hidden_states_size: int, batch_size,
+                       compute_multi_directional: bool, use_dropout: bool,
+                       vocab_list: list):
 
     criterion = nn.CrossEntropyLoss()
 
@@ -380,7 +381,8 @@ def create_model(checkpoint, data_height: int, input_channels: int, input_size: 
                                                                            block_strided_convolution_block_size,
                                                                            compute_multi_directional,
                                                                            clamp_gradients,
-                                                                           use_dropout)
+                                                                           use_dropout,
+                                                                           opt.use_bias_in_block_strided_convolution)
     else:
         raise RuntimeError("Error: unrecognized dataset name")
 
@@ -824,15 +826,13 @@ def iam_line_recognition(model_opt, checkpoint):
         train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels, input_size, hidden_states_size,
                         batch_size, compute_multi_directional, use_dropout, vocab_list, blank_symbol,
                         image_input_is_unsigned_int, "IAM")
-        # train_mdrnn_no_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
-        #                 compute_multi_directional, use_dropout, vocab_list)
 
 
 def iam_word_recognition(model_opt, checkpoint):
     # With the improved padding, the height of the images is 128,
     # and memory usage is less, so batch_size 30 instead of 20 is possible,
     # but it is only slightly faster (GPU usage appears to be already maxed out)
-    batch_size = 128
+    batch_size = 32 #128
 
     # lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
     lines_file_path = model_opt.iam_database_lines_file_path
@@ -857,12 +857,14 @@ def iam_word_recognition(model_opt, checkpoint):
 
     permutation_save_or_load_file_path = opt.data_permutation_file_path
 
+    minimize_vertical_padding = True
     minimize_horizontal_padding = True
     train_loader, validation_loader, test_loader = iam_words_dataset. \
         get_random_train_set_validation_set_test_set_data_loaders(batch_size, train_examples_fraction,
                                                                   validation_examples_fraction,
                                                                   test_examples_fraction,
                                                                   permutation_save_or_load_file_path,
+                                                                  minimize_vertical_padding,
                                                                   minimize_horizontal_padding)
     print("Loading IAM dataset: DONE")
 

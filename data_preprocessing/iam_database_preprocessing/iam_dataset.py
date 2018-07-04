@@ -295,7 +295,7 @@ class IamLinesDataset(Dataset):
             # Use the provided function "get_collumns_padding_required_fuction" to
             # determine the columns of padding required
             columns_padding_required = padding_strategy.get_collumns_padding_required(image_width, max_image_width)
-            rows_padding_required = max_image_height - image_height
+            rows_padding_required = padding_strategy.get_rows_padding_required(image_height, max_image_height)
             rows_padding_required_top = int(rows_padding_required / 2)
             # Make sure no row gets lost through integer division
             rows_padding_required_bottom = rows_padding_required - rows_padding_required_top
@@ -323,7 +323,7 @@ class IamLinesDataset(Dataset):
             #if image_height > visualization_cutoff:
             #     util.image_visualization.imshow_tensor_2d(image_padded)
 
-            # util.image_visualization.imshow_tensor_2d(image_padded)
+            #util.image_visualization.imshow_tensor_2d(image_padded)
 
             # outputs_per_label = (image_width / float(self.width_required_per_network_output_column)) / labels.size(0)
             # if outputs_per_label > 15:
@@ -357,6 +357,7 @@ class IamLinesDataset(Dataset):
             if ((percentage_complete % 10) == 0) and (percentage_complete != last_percentage_complete):
                 print("iam_lines_dataset.get_data_loader_with_appropriate_padding - completed " +
                       str(percentage_complete) + "%")
+                sys.stdout.flush()
                 # print(" sample index: " + str(sample_index) + " len(data_set):" +
                 #      str(len(data_set)))
                 last_percentage_complete = percentage_complete
@@ -381,6 +382,7 @@ class IamLinesDataset(Dataset):
                                                                   validation_examples_fraction: float,
                                                                   test_examples_fraction: float,
                                                                   permutation_save_or_load_file_path: str,
+                                                                  minimize_vertical_padding: bool,
                                                                   minimize_horizontal_padding: bool):
 
         print("Entered get_random_train_set_validation_set_test_set_data_loaders...")
@@ -400,8 +402,10 @@ class IamLinesDataset(Dataset):
                                                                validation_examples_fraction,
                                                                permutation_save_or_load_file_path)
 
-        padding_strategy = PaddingStrategy.create_padding_strategy(self.width_required_per_network_output_column,
-                                                                   minimize_horizontal_padding )
+        padding_strategy = PaddingStrategy.create_padding_strategy(self.height_required_per_network_output_row,
+                                                                   self.width_required_per_network_output_column,
+                                                                   minimize_vertical_padding,
+                                                                   minimize_horizontal_padding)
 
         print("Prepare IAM data train loader...")
         train_loader = self.get_data_loader_with_appropriate_padding(train_set, max_image_height, max_image_width,
@@ -421,8 +425,8 @@ class IamLinesDataset(Dataset):
         return train_loader, validation_loader, test_loader
 
     def __len__(self):
-        return len(self.examples_line_information)
-        # return int(len(self.examples_line_information) / 30)  # Hack for faster training during development
+        #return len(self.examples_line_information)
+        return int(len(self.examples_line_information) / 30)  # Hack for faster training during development
 
     def __getitem__(self, idx):
         line_information = self.examples_line_information[idx]

@@ -11,6 +11,7 @@ class BlockStridedConvolution(Module):
 
     def __init__(self, input_channels: int, output_channels: int, block_size: SizeTwoDimensional,
                  clamp_gradients: bool,
+                 use_bias: bool,
                  nonlinearity="tanh"):
         super(BlockStridedConvolution, self).__init__()
         self.input_channels = input_channels
@@ -26,7 +27,12 @@ class BlockStridedConvolution(Module):
         self.convolution = nn.Conv2d(self.input_channels, self.output_channels,
                                      (block_size.height, block_size.width),
                                      stride=(block_size.height, block_size.width),
-                                     bias=True)
+                                     bias=use_bias) #bias=True)
+
+        if use_bias:
+            print("WARNING: using bias with block_strided_Convolution")
+        else:
+            print("Creating block_strided_convolution without bias parameters...")
 
         # Initialize the convolution with the
         # Xavier Glorot scheme
@@ -36,10 +42,10 @@ class BlockStridedConvolution(Module):
 
     @staticmethod
     def create_block_strided_convolution(input_channels: int, output_channels: int, block_size: SizeTwoDimensional,
-                                         clamp_gradients: bool,inputs_and_outputs_are_lists: bool,
+                                         clamp_gradients: bool, use_bias: bool,
                  nonlinearity="tanh"):
         return BlockStridedConvolution(input_channels, output_channels, block_size,
-                                       clamp_gradients, nonlinearity)
+                                       clamp_gradients, use_bias, nonlinearity)
 
     def get_activation_function(self):
         if self.nonlinearity == "tanh":

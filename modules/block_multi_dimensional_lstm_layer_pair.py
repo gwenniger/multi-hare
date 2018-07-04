@@ -20,6 +20,7 @@ class BlockMultiDimensionalLSTMLayerPair(Module):
             block_strided_convolution_block_size: SizeTwoDimensional,
             compute_multi_directional: bool, clamp_gradients: bool,
             use_dropout: bool,
+            use_bias_with_block_strided_convolution: bool,
             nonlinearity="tanh"):
         block_multi_dimensional_lstm = \
             BlockMultiDimensionalLSTM.create_block_multi_dimensional_lstm(
@@ -30,7 +31,9 @@ class BlockMultiDimensionalLSTMLayerPair(Module):
         block_strided_convolution = BlockStridedConvolution.\
             create_block_strided_convolution(mdlstm_hidden_states_size, output_channels,
                                              block_strided_convolution_block_size,
-                                             clamp_gradients, nonlinearity)
+                                             clamp_gradients,
+                                             use_bias_with_block_strided_convolution,
+                                             nonlinearity)
 
         return BlockMultiDimensionalLSTMLayerPair(block_multi_dimensional_lstm, block_strided_convolution)
 

@@ -21,6 +21,16 @@ def model_opts(parser):
                        help='Size of hidden states in the first layer',
                        required=True)
 
+    # We want a boolean flag that is required, but that is allowed to be either true or false
+    # The way below works to do this
+    # See: https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('-use_bias_in_block_strided_convolution', dest='use_bias_in_block_strided_convolution',
+                       action='store_true')
+    group.add_argument('-no_bias_in_block_strided_convolution', dest='use_bias_in_block_strided_convolution',
+                       action='store_false')
+    # parser.set_defaults(feature=False)
+
 
 def preprocess_opts(parser):
     # Data options
