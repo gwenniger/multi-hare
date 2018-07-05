@@ -294,7 +294,7 @@ class IamLinesDataset(Dataset):
 
             # Use the provided function "get_collumns_padding_required_fuction" to
             # determine the columns of padding required
-            columns_padding_required = padding_strategy.get_collumns_padding_required(image_width, max_image_width)
+            columns_padding_required = padding_strategy.get_columns_padding_required(image_width, max_image_width)
             rows_padding_required = padding_strategy.get_rows_padding_required(image_height, max_image_height)
             rows_padding_required_top = int(rows_padding_required / 2)
             # Make sure no row gets lost through integer division

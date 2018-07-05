@@ -19,7 +19,7 @@ class PaddingStrategy(ABC):
         raise RuntimeError("not implemented")
 
     @abstractmethod
-    def get_collumns_padding_required(self, image_width, max_image_width):
+    def get_columns_padding_required(self, image_width, max_image_width):
         raise RuntimeError("not implemented")
 
     @abstractmethod
@@ -63,7 +63,7 @@ class FullPaddingStrategy(PaddingStrategy):
     def get_rows_padding_required(self, image_height, max_image_height):
         return max_image_height - image_height
 
-    def get_collumns_padding_required(self, image_width, max_image_width):
+    def get_columns_padding_required(self, image_width, max_image_width):
         return max_image_width - image_width
 
     def create_train_loader(self, train_set_pairs, batch_size):
@@ -86,7 +86,7 @@ class MinimalHorizontalPaddingStrategyBase(PaddingStrategy):
     def get_rows_padding_required(self, image_width, max_image_width):
         raise RuntimeError("not implemented")
 
-    def get_collumns_padding_required(self, image_width, max_image_width):
+    def get_columns_padding_required(self, image_width, max_image_width):
         return PaddingStrategy.\
             get_additional_amount_required_to_make_multiple_of_value(image_width,
                                                                      self.width_required_per_network_output_column)

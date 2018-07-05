@@ -159,7 +159,7 @@ def get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_dig
 
         image_width = sequence_length * IMAGE_WIDTH
         max_image_width = max_num_digits * IMAGE_WIDTH
-        columns_padding_required = padding_strategy.get_collumns_padding_required(image_width, max_image_width)
+        columns_padding_required = padding_strategy.get_columns_padding_required(image_width, max_image_width)
         p1d = (0, columns_padding_required)  # pad last dim by 1 on end side
         item_tensors_combined_padded = torch.nn.functional. \
             pad(item_tensors_combined, p1d, "constant", 0)

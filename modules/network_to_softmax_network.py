@@ -6,7 +6,7 @@ from modules.inside_model_gradient_clipping import InsideModelGradientClamping
 from util.tensor_list_chunking import TensorListChunking
 from util.tensor_utils import TensorUtils
 import util.image_visualization
-
+from data_preprocessing.last_minute_padding import LastMinutePadding
 
 class ActivationsResizer:
 
@@ -106,11 +106,13 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
                  number_of_classes_excluding_blank: int,
                  activations_resizer: ActivationsResizer,
                  clamp_gradients: bool,
-                 input_is_list: bool
+                 input_is_list: bool,
+                 use_block_mdlstm: bool
                  ):
         super(NetworkToSoftMaxNetwork, self).__init__()
         self.clamp_gradients = clamp_gradients
         self.input_is_list = input_is_list
+        self.use_block_mdlstm = use_block_mdlstm
         self.network = network
         self.activations_resizer = activations_resizer
         self.number_of_output_channels = activations_resizer.get_number_of_output_channels()
@@ -147,12 +149,14 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
     def create_network_to_soft_max_network(network,
                                            number_of_classes_excluding_blank: int,
                                            data_height: int, clamp_gradients: bool,
-                                           input_is_list: bool):
+                                           input_is_list: bool,
+                                           use_block_mdlstm: bool=False):
         activations_resizer = KeepAllActivationsResizer(network, data_height)
         # activations_resizer = SumActivationsResizer(network)
         return NetworkToSoftMaxNetwork(network, number_of_classes_excluding_blank,
                                        activations_resizer,
-                                       clamp_gradients, input_is_list
+                                       clamp_gradients, input_is_list,
+                                       use_block_mdlstm
                                        )
 
     def get_number_of_classes_including_blank(self):
@@ -263,67 +267,76 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
 
         return chunks
 
+    def compute_activations_with_block_mdlstm(self, x):
+        # print("network_to_softmax_network - network input x sizes: " )
+        # for element in x:
+        #     print(">>> input list element size - " + str(element.size()))
+        network_consumed_block_size = SizeTwoDimensional(self.get_real_network().get_height_reduction_factor(),
+                                                         self.get_real_network().get_width_reduction_factor())
+
+        # # Plot two row images for debugging
+        # for element in x:
+        #     if element.size(1) > 64:
+        #         print("image to be plotted size: " + str(element.size()))
+        #         element_without_channel_dimension = element.squeeze(0)
+        #         util.image_visualization.imshow_tensor_2d(element_without_channel_dimension)
+
+        tensor_list_chunking = TensorListChunking.create_tensor_list_chunking(x, network_consumed_block_size)
+
+        input_chunked = tensor_list_chunking. \
+            chunk_tensor_list_into_blocks_concatenate_along_batch_dimension(x, False)
+
+        # print("input_chunked.size(): " + str(input_chunked.size()))
+
+        # Debugging: check that the de-chunked version recovers the original
+        NetworkToSoftMaxNetwork. \
+            check_dechunking_chunked_tensor_list_recovers_original(tensor_list_chunking, x, input_chunked)
+
+        # print("input_chunked :" + str(input_chunked))
+
+        activations_chunked = self.network(input_chunked)
+        # print("network_to_softmax_network - activations_chunked.size(): " + str(activations_chunked.size()))
+        activations = tensor_list_chunking. \
+            dechunk_block_tensor_concatenated_along_batch_dimension_changed_block_size(activations_chunked,
+                                                                                       SizeTwoDimensional(1, 1))
+        # print("network_to_softmax_network - activations sizes after dechunking: ")
+        # for element in activations:
+        #     print(">>> activations list element size - " + str(element.size()))
+
+        activations_height_one = list([])
+        for activation in activations:
+            if activation.size(1) > 1:
+                # print("activation.size(): " + str(activation.size()))
+                activation_rows = torch.split(activation, 1, dim=1)
+                # Debugging check
+                # NetworkToSoftMaxNetwork.check_activation_rows_are_not_equal(activation_rows)
+                activations_height_one.extend(activation_rows)
+            else:
+                activations_height_one.append(activation)
+
+        # for activation in activations_height_one:
+        #     print("activations_height_one_element size: " + str(activation.size()))
+
+        # Create tensor with all activations concatenated on width dimension
+        activations_single_tensor = torch.cat(activations_height_one, 2)
+        activations_single_tensor = activations_single_tensor.unsqueeze(0)
+        activations = activations_single_tensor
+
+        return activations
+
     def forward(self, x):
 
         if self.input_is_list:
 
-            # print("network_to_softmax_network - network input x sizes: " )
-            # for element in x:
-            #     print(">>> input list element size - " + str(element.size()))
-            network_consumed_block_size = SizeTwoDimensional(self.get_real_network().get_height_reduction_factor(),
-                                                             self.get_real_network().get_width_reduction_factor())
-
-            # # Plot two row images for debugging
-            # for element in x:
-            #     if element.size(1) > 64:
-            #         print("image to be plotted size: " + str(element.size()))
-            #         element_without_channel_dimension = element.squeeze(0)
-            #         util.image_visualization.imshow_tensor_2d(element_without_channel_dimension)
-
-            tensor_list_chunking = TensorListChunking.create_tensor_list_chunking(x, network_consumed_block_size)
-
-            input_chunked = tensor_list_chunking.\
-                chunk_tensor_list_into_blocks_concatenate_along_batch_dimension(x, False)
-
-            # print("input_chunked.size(): " + str(input_chunked.size()))
-
-            # Debugging: check that the de-chunked version recovers the original
-            NetworkToSoftMaxNetwork.\
-                check_dechunking_chunked_tensor_list_recovers_original(tensor_list_chunking, x, input_chunked)
-
-            # print("input_chunked :" + str(input_chunked))
-
-            activations_chunked = self.network(input_chunked)
-            # print("network_to_softmax_network - activations_chunked.size(): " + str(activations_chunked.size()))
-            activations = tensor_list_chunking.\
-                dechunk_block_tensor_concatenated_along_batch_dimension_changed_block_size(activations_chunked,
-                                                                                           SizeTwoDimensional(1, 1))
-            # print("network_to_softmax_network - activations sizes after dechunking: ")
-            # for element in activations:
-            #     print(">>> activations list element size - " + str(element.size()))
-
-            examples_activation_heights = NetworkToSoftMaxNetwork.collect_examples_activation_heights(activations)
-            examples_activation_widths = NetworkToSoftMaxNetwork.collect_examples_activation_widths(activations)
-
-            activations_height_one = list([])
-            for activation in activations:
-                if activation.size(1) > 1:
-                    # print("activation.size(): " + str(activation.size()))
-                    activation_rows = torch.split(activation, 1, dim=1)
-                    # Debugging check
-                    # NetworkToSoftMaxNetwork.check_activation_rows_are_not_equal(activation_rows)
-                    activations_height_one.extend(activation_rows)
-                else:
-                    activations_height_one.append(activation)
-
-            # for activation in activations_height_one:
-            #     print("activations_height_one_element size: " + str(activation.size()))
-
-            # Create tensor with all activations concatenated on width dimension
-            activations_single_tensor = torch.cat(activations_height_one, 2)
-            activations_single_tensor = activations_single_tensor.unsqueeze(0)
-            activations = activations_single_tensor
-
+            if self.use_block_mdlstm:
+                activations = self.compute_activations_with_block_mdlstm(x)
+                examples_activation_heights = NetworkToSoftMaxNetwork.collect_examples_activation_heights(activations)
+                examples_activation_widths = NetworkToSoftMaxNetwork.collect_examples_activation_widths(activations)
+            else:
+                last_minute_padding = LastMinutePadding(self.get_height_reduction_factor(),
+                                                        self.get_width_reduction_factor())
+                padded_examples_tensor = last_minute_padding.pad_and_cat_list_of_examples(x)
+                activations = self.network(padded_examples_tensor)
         else:
             activations = self.network(x)
 
@@ -353,7 +366,7 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
             class_activations = InsideModelGradientClamping.register_gradient_clamping(class_activations)
 
         # print("class_activations: " + str(class_activations))
-        if self.input_is_list:
+        if self.input_is_list and self.use_block_mdlstm:
             class_activations_resized_temp = class_activations.view(1, -1, self.get_number_of_classes_including_blank())
             # print("class_activations_resized_temp.size(): " + str(class_activations_resized_temp.size()))
             # print("examples_activation_widths: " + str(examples_activation_widths))
@@ -409,3 +422,11 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
     # of the network
     def get_width_reduction_factor(self):
         return self.get_real_network().get_width_reduction_factor()
+
+    # Get the factor by which the original input height is reduced in the output
+    # of the network
+    def get_height_reduction_factor(self):
+        return self.get_real_network().get_height_reduction_factor()
+
+
+
