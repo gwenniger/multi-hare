@@ -7,7 +7,7 @@ from modules.multi_dimensional_rnn import MDRNNCell
 from modules.network_to_softmax_network import NetworkToSoftMaxNetwork
 from modules.multi_dimensional_rnn import MultiDimensionalRNNBase
 from modules.multi_dimensional_rnn import MultiDimensionalRNN
-from modules.block_multi_dimensional_lstm_layer_pair_stacking import BlockMultiDimensionalLSTMLayerPairStacking
+from modules.multi_dimensional_lstm_layer_pair_stacking import MultiDimensionalLSTMLayerPairStacking
 import data_preprocessing.load_mnist
 import data_preprocessing.load_cifar_ten
 from data_preprocessing.iam_database_preprocessing.iam_dataset import IamLinesDataset
@@ -129,12 +129,12 @@ def train_mdrnn_no_ctc(train_loader, test_loader, input_channels: int, input_siz
     # mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
     block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
 
-    multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
-        create_three_layer_pair_network_linear_parameter_size_increase(input_channels, hidden_states_size,
-                                                                       mdlstm_block_size,
-                                                                       block_strided_convolution_block_size,
-                                                                       compute_multi_directional,
-                                                                       use_dropout)
+    multi_dimensional_rnn = MultiDimensionalLSTMLayerPairStacking. \
+        create_block_mdlstm_three_layer_pair_network_linear_parameter_size_increase(input_channels, hidden_states_size,
+                                                                                    mdlstm_block_size,
+                                                                                    block_strided_convolution_block_size,
+                                                                                    compute_multi_directional,
+                                                                                    use_dropout)
 
     number_of_classes_excluding_blank = len(vocab_list) - 1
     # number_of_classes_excluding_blank = 10
@@ -311,7 +311,7 @@ def printgradnorm(self, grad_input, grad_output):
     print('grad_output norm: ', grad_output[0].norm())
 
 
-def create_model(checkpoint, data_height: int, input_channels: int, input_size: SizeTwoDimensional, hidden_states_size: int,
+def create_model(checkpoint, data_height: int, input_channels: int, hidden_states_size: int,
                  compute_multi_directional: bool, use_dropout: bool, vocab_list,
                  clamp_gradients: bool, data_set_name: str, minimize_horizontal_padding: bool,
                  device_ids: list):
@@ -366,7 +366,7 @@ def create_model(checkpoint, data_height: int, input_channels: int, input_size: 
     inputs_and_outputs_are_lists = minimize_horizontal_padding
 
     if data_set_name == "MNIST":
-        multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking.\
+        multi_dimensional_rnn = MultiDimensionalLSTMLayerPairStacking.\
             create_two_layer_pair_network(hidden_states_size, mdlstm_block_size,
                                           block_strided_convolution_block_size,
                                           clamp_gradients)
@@ -375,14 +375,17 @@ def create_model(checkpoint, data_height: int, input_channels: int, input_size: 
     #                                 block_strided_convolution_block_size)
 
     elif data_set_name == "IAM":
-        multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
-            create_three_layer_pair_network_linear_parameter_size_increase(input_channels, hidden_states_size,
-                                                                           mdlstm_block_size,
-                                                                           block_strided_convolution_block_size,
-                                                                           compute_multi_directional,
-                                                                           clamp_gradients,
-                                                                           use_dropout,
-                                                                           opt.use_bias_in_block_strided_convolution)
+        # multi_dimensional_rnn = MultiDimensionalLSTMLayerPairStacking. \
+        #     create_block_mdlstm_three_layer_pair_network_linear_parameter_size_increase(
+        #         input_channels, hidden_states_size, mdlstm_block_size, block_strided_convolution_block_size,
+        #         compute_multi_directional,clamp_gradients, use_dropout, opt.use_bias_in_block_strided_convolution)
+
+        # Create network with MDLSTM layers instead of block-MDLSTM layers
+        multi_dimensional_rnn = MultiDimensionalLSTMLayerPairStacking. \
+            create_mdlstm_three_layer_pair_network_linear_parameter_size_increase(
+                input_channels, hidden_states_size, block_strided_convolution_block_size,
+                compute_multi_directional, clamp_gradients, use_dropout, opt.use_bias_in_block_strided_convolution)
+
     else:
         raise RuntimeError("Error: unrecognized dataset name")
 
@@ -390,23 +393,22 @@ def create_model(checkpoint, data_height: int, input_channels: int, input_size: 
     # multi_dimensional_rnn.register_backward_hook(printgradnorm)
 
     number_of_classes_excluding_blank = len(vocab_list) - 1
+    print("create_model - number_of_classes_excluding_blank: " +
+          str(number_of_classes_excluding_blank))
 
     if minimize_horizontal_padding:
         multi_dimensional_rnn = nn.DataParallel(multi_dimensional_rnn, device_ids=device_ids)
         network = NetworkToSoftMaxNetwork.create_network_to_soft_max_network(multi_dimensional_rnn,
-                                                                             input_size,
                                                                              number_of_classes_excluding_blank,
                                                                              data_height, clamp_gradients,
                                                                              inputs_and_outputs_are_lists)
 
     else:
         network = NetworkToSoftMaxNetwork.create_network_to_soft_max_network(multi_dimensional_rnn,
-                                                                             input_size,
                                                                              number_of_classes_excluding_blank,
                                                                              data_height, clamp_gradients,
                                                                              inputs_and_outputs_are_lists)
         network = nn.DataParallel(network, device_ids=device_ids)
-
 
     if checkpoint is not None:
         print("before loading checkpoint: network.module.fc3" + str(network.fc3.weight))
@@ -568,14 +570,12 @@ def check_save_model_path():
         os.makedirs(model_dirname)
 
 
-def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels: int, input_size: SizeTwoDimensional, hidden_states_size: int, batch_size,
+def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels: int,
+                    hidden_states_size: int, batch_size,
                     compute_multi_directional: bool, use_dropout: bool,
                     vocab_list: list, blank_symbol: str,
                     image_input_is_unsigned_int: bool,
                     data_set_name, minimize_horizontal_padding: bool):
-
-
-
 
     # http://pytorch.org/docs/master/notes/cuda.html
     device = torch.device("cuda:0")
@@ -590,7 +590,7 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
 
     data_height = get_data_height(train_loader)
     clamp_gradients = False
-    network = create_model(checkpoint, data_height, input_channels, input_size, hidden_states_size,
+    network = create_model(checkpoint, data_height, input_channels, hidden_states_size,
                            compute_multi_directional, use_dropout, vocab_list,
                            clamp_gradients, data_set_name, minimize_horizontal_padding, device_ids)
 
@@ -832,7 +832,7 @@ def iam_word_recognition(model_opt, checkpoint):
     # With the improved padding, the height of the images is 128,
     # and memory usage is less, so batch_size 30 instead of 20 is possible,
     # but it is only slightly faster (GPU usage appears to be already maxed out)
-    batch_size = 32 #128
+    batch_size = 128 #32 #128
 
     # lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
     lines_file_path = model_opt.iam_database_lines_file_path
@@ -857,8 +857,8 @@ def iam_word_recognition(model_opt, checkpoint):
 
     permutation_save_or_load_file_path = opt.data_permutation_file_path
 
-    minimize_vertical_padding = True
-    minimize_horizontal_padding = True
+    minimize_vertical_padding = False
+    minimize_horizontal_padding = False
     train_loader, validation_loader, test_loader = iam_words_dataset. \
         get_random_train_set_validation_set_test_set_data_loaders(batch_size, train_examples_fraction,
                                                                   validation_examples_fraction,
@@ -870,8 +870,6 @@ def iam_word_recognition(model_opt, checkpoint):
 
     # test_mdrnn_cell()
     # test_mdrnn()
-    input_height = 16
-    input_width = 16
     input_channels = 1
     # hidden_states_size = 32
     # hidden_states_size = 8  # Start with a lower initial hidden states size since there are more layers
@@ -890,10 +888,9 @@ def iam_word_recognition(model_opt, checkpoint):
     # https://discuss.pytorch.org/t/about-torch-nn-utils-clip-grad-norm/13873
     # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191
 
-    input_size = SizeTwoDimensional.create_size_two_dimensional(input_height, input_width)
     # with torch.autograd.profiler.profile(use_cuda=False) as prof:
     image_input_is_unsigned_int = True
-    train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels, input_size,
+    train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels,
                     hidden_states_size,
                     batch_size, compute_multi_directional, use_dropout, vocab_list, blank_symbol,
                     image_input_is_unsigned_int, "IAM", minimize_horizontal_padding)

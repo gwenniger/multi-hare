@@ -102,7 +102,7 @@ class KeepAllActivationsResizer(ActivationsResizer):
 # that maps the input network's output to a sequential output
 # of dimension: batch_size * number_of_output_channels * number_of_classes
 class NetworkToSoftMaxNetwork(torch.nn.Module):
-    def __init__(self, network, input_size: SizeTwoDimensional,
+    def __init__(self, network,
                  number_of_classes_excluding_blank: int,
                  activations_resizer: ActivationsResizer,
                  clamp_gradients: bool,
@@ -113,12 +113,12 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         self.input_is_list = input_is_list
         self.network = network
         self.activations_resizer = activations_resizer
-        self.input_size = input_size
         self.number_of_output_channels = activations_resizer.get_number_of_output_channels()
         self.number_of_classes_excluding_blank = number_of_classes_excluding_blank
 
         print(">>> number_of_output_channels: " + str(self.number_of_output_channels))
 
+        print("NetworkToSoftMaxNetwork - number of classes: " + str(self.get_number_of_classes_including_blank()))
         self.fc3 = nn.Linear(self.number_of_output_channels, self.get_number_of_classes_including_blank())
 
 
@@ -143,15 +143,14 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
 
         print("NetworkToSoftMaxNetwork - clamp_gradients: " + str(clamp_gradients))
 
-
     @staticmethod
-    def create_network_to_soft_max_network(network, input_size: SizeTwoDimensional,
+    def create_network_to_soft_max_network(network,
                                            number_of_classes_excluding_blank: int,
                                            data_height: int, clamp_gradients: bool,
                                            input_is_list: bool):
         activations_resizer = KeepAllActivationsResizer(network, data_height)
         # activations_resizer = SumActivationsResizer(network)
-        return NetworkToSoftMaxNetwork(network, input_size, number_of_classes_excluding_blank,
+        return NetworkToSoftMaxNetwork(network, number_of_classes_excluding_blank,
                                        activations_resizer,
                                        clamp_gradients, input_is_list
                                        )
@@ -264,7 +263,6 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
 
         return chunks
 
-
     def forward(self, x):
 
         if self.input_is_list:
@@ -335,7 +333,10 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
 
         activations_height = activations.size(2)
 
-        activations = self.activations_resizer.create_resized_activations(activations)
+        # Activations resizing should only be done in the old way with activations
+        # resizer if the input is not a list
+        if not self.input_is_list:
+            activations = self.activations_resizer.create_resized_activations(activations)
 
         activations_height_removed = activations.squeeze(2)
         activations_with_swapped_channels_and_width = activations_height_removed.transpose(1, 2)

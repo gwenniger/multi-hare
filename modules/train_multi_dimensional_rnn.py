@@ -9,8 +9,8 @@ from modules.multi_dimensional_rnn import MultiDimensionalRNNToSingleClassNetwor
 from modules.multi_dimensional_rnn import MultiDimensionalRNNFast
 from modules.multi_dimensional_lstm import MultiDimensionalLSTM
 from modules.block_multi_dimensional_lstm import BlockMultiDimensionalLSTM
-from modules.block_multi_dimensional_lstm_layer_pair import BlockMultiDimensionalLSTMLayerPair
-from modules.block_multi_dimensional_lstm_layer_pair_stacking import BlockMultiDimensionalLSTMLayerPairStacking
+from modules.mdlstm_layer_block_strided_convolution_layer_pair import MDLSTMLayerBlockStridedConvolutionLayerPair
+from modules.multi_dimensional_lstm_layer_pair_stacking import MultiDimensionalLSTMLayerPairStacking
 import data_preprocessing.load_mnist
 import data_preprocessing.load_cifar_ten
 from util.utils import Utils
@@ -203,7 +203,7 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     #
     mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
     block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
-    multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking.\
+    multi_dimensional_rnn = MultiDimensionalLSTMLayerPairStacking.\
         create_two_layer_pair_network(hidden_states_size, mdlstm_block_size,
                                       block_strided_convolution_block_size, False)
 

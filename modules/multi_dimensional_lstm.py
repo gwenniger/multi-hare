@@ -90,13 +90,11 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             self.state_convolutions.extend(self.mdlstm_direction_three_parameters.get_all_parameters_as_list())
             self.state_convolutions.extend(self.mdlstm_direction_four_parameters.get_all_parameters_as_list())
 
-
-
     @staticmethod
     def create_multi_dimensional_lstm(input_channels: int, hidden_states_size: int, compute_multi_directional: bool,
                                       clamp_gradients: bool,
                                       use_dropout: bool,
-                                     nonlinearity="tanh"):
+                                      nonlinearity="tanh"):
         return MultiDimensionalLSTM(input_channels, hidden_states_size, compute_multi_directional,
                                     clamp_gradients, use_dropout,
                                     True,
@@ -129,6 +127,9 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         if MultiDimensionalRNNBase.use_cuda():
             # https://discuss.pytorch.org/t/which-device-is-model-tensor-stored-on/4908/7
             device = x.get_device()
+
+        # print("compute_multi_dimensional_lstm_one_direction - x.size(): " + str(x.size()))
+        # print("compute_multi_dimensional_lstm_one_direction - self.hidden_states_size: " + str(self.hidden_states_size))
 
         # Step 1: Create a skewed version of the input image
         # skewed_image = ImageInputTransformer.create_row_diagonal_offset_tensor(x)
