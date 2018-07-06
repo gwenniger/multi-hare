@@ -31,6 +31,13 @@ def model_opts(parser):
                        action='store_false')
     # parser.set_defaults(feature=False)
 
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('-use_block_mdlstm_layers', dest='use_block_mdlstm',
+                       action='store_true')
+    group.add_argument('-use_regular_mdlstm_layers', dest='use_block_mdlstm',
+                       action='store_false')
+
+
 
 def preprocess_opts(parser):
     # Data options

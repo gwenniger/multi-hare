@@ -899,7 +899,7 @@ def iam_word_recognition(model_opt, checkpoint):
 
     # with torch.autograd.profiler.profile(use_cuda=False) as prof:
     image_input_is_unsigned_int = True
-    use_block_mdlstm = False
+    use_block_mdlstm = opt.use_block_mdlstm
     train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels,
                     hidden_states_size,
                     batch_size, compute_multi_directional, use_dropout, vocab_list, blank_symbol,
