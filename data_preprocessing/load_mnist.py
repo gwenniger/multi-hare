@@ -12,7 +12,8 @@ from data_preprocessing.padding_strategy import PaddingStrategy
 
 IMAGE_HEIGHT = 16
 IMAGE_WIDTH = 16
-WIDTH_REQUIRED_PER_NETWORK_OUTPUT_COLUMN = 2
+HEIGHT_REQUIRED_PER_NETWORK_OUTPUT_COLUMN = 16
+WIDTH_REQUIRED_PER_NETWORK_OUTPUT_COLUMN = 4
 
 
 def get_train_set():
@@ -207,8 +208,9 @@ def get_multi_digit_test_loader_fixed_length(batch_size, sequence_length):
 
 def get_multi_digit_train_loader_random_length(batch_size, min_num_digits, max_num_digits,
                                                minimize_horizontal_padding: bool):
-    padding_strategy = PaddingStrategy.create_padding_strategy(WIDTH_REQUIRED_PER_NETWORK_OUTPUT_COLUMN,
-                                                               minimize_horizontal_padding)
+    padding_strategy = PaddingStrategy.create_padding_strategy(HEIGHT_REQUIRED_PER_NETWORK_OUTPUT_COLUMN,
+                                                               WIDTH_REQUIRED_PER_NETWORK_OUTPUT_COLUMN,
+                                                               True, minimize_horizontal_padding)
 
     return get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_digits,
                                                 get_train_set(), padding_strategy)
@@ -216,7 +218,9 @@ def get_multi_digit_train_loader_random_length(batch_size, min_num_digits, max_n
 
 def get_multi_digit_test_loader_random_length(batch_size, min_num_digits, max_num_digits,
                                               minimize_horizontal_padding: bool):
-    padding_strategy = PaddingStrategy.create_padding_strategy(WIDTH_REQUIRED_PER_NETWORK_OUTPUT_COLUMN,
+    padding_strategy = PaddingStrategy.create_padding_strategy(HEIGHT_REQUIRED_PER_NETWORK_OUTPUT_COLUMN,
+                                                               WIDTH_REQUIRED_PER_NETWORK_OUTPUT_COLUMN,
+                                                               True,
                                                                minimize_horizontal_padding)
 
     return get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_digits,

@@ -387,7 +387,7 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
                 compute_multi_directional, clamp_gradients, use_dropout, opt.use_bias_in_block_strided_convolution)
 
     else:
-        raise RuntimeError("Error: unrecognized dataset name")
+        raise RuntimeError("Error: \"" + str(data_set_name) + "\" is an unrecognized dataset name")
 
     # See: https://pytorch.org/tutorials/beginner/former_torchies/nn_tutorial.html
     # multi_dimensional_rnn.register_backward_hook(printgradnorm)
@@ -585,8 +585,8 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
     # device_ids should include device!
     # device_ids lists all the gpus that may be used for parallelization
     # device is the initial device the model will be put on
-    device_ids = [0, 1]
-    # device_ids = [0]
+    # device_ids = [0, 1]
+    device_ids = [0]
 
     # See: https://pytorch.org/tutorials/beginner/former_torchies/nn_tutorial.html
     # multi_dimensional_rnn.register_backward_hook(printgradnorm)
@@ -722,7 +722,7 @@ def mnist_recognition_fixed_length():
 
 
 def mnist_recognition_variable_length(model_opt, checkpoint):
-    batch_size = 256
+    batch_size = 128
     min_num_digits = 1
     max_num_digits = 3
     # In MNIST there are the digits 0-9, and we also add a symbol for blanks
@@ -760,9 +760,14 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     #with torch.autograd.profiler.profile(use_cuda=False) as prof:
     blank_symbol = "_"
     image_input_is_unsigned_int = False
-    train_mdrnn_ctc(model_opt, checkpoint, train_loader, test_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
+    use_block_mdlstm = True
+    train_mdrnn_ctc(model_opt, checkpoint, train_loader, test_loader,
+                    test_loader, input_channels,
+                    hidden_states_size, batch_size,
                     compute_multi_directional, use_dropout, vocab_list, blank_symbol,
-                    image_input_is_unsigned_int, "MNIST", minimize_horizontal_padding)
+                    image_input_is_unsigned_int, "MNIST", minimize_horizontal_padding,
+                    use_block_mdlstm)
+
     #print(prof)
 
 
@@ -836,7 +841,7 @@ def iam_word_recognition(model_opt, checkpoint):
     # With the improved padding, the height of the images is 128,
     # and memory usage is less, so batch_size 30 instead of 20 is possible,
     # but it is only slightly faster (GPU usage appears to be already maxed out)
-    batch_size = 128 #32 #128
+    batch_size = 64  #128 #32 #128
 
     # lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
     lines_file_path = model_opt.iam_database_lines_file_path
@@ -917,15 +922,15 @@ def main():
         model_opt = opt
 
     # mnist_recognition_fixed_length()
-    # mnist_recognition_variable_length(model_opt, checkpoint,)
+    mnist_recognition_variable_length(model_opt, checkpoint,)
 
-    if opt.iam_database_data_type == "lines":
-        iam_line_recognition(model_opt, checkpoint)
-    elif opt.iam_database_data_type == "words":
-        iam_word_recognition(model_opt, checkpoint)
-    else:
-        raise RuntimeError("Unrecognized data type")
-    # #cifar_ten_basic_recognition()
+    # if opt.iam_database_data_type == "lines":
+    #     iam_line_recognition(model_opt, checkpoint)
+    # elif opt.iam_database_data_type == "words":
+    #     iam_word_recognition(model_opt, checkpoint)
+    # else:
+    #     raise RuntimeError("Unrecognized data type")
+    # # #cifar_ten_basic_recognition()
 
 
 if __name__ == "__main__":

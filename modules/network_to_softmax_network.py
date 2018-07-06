@@ -7,6 +7,7 @@ from util.tensor_list_chunking import TensorListChunking
 from util.tensor_utils import TensorUtils
 import util.image_visualization
 from data_preprocessing.last_minute_padding import LastMinutePadding
+from modules.module_io_structuring import ModuleIOStructuring
 
 class ActivationsResizer:
 
@@ -115,7 +116,8 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         self.use_block_mdlstm = use_block_mdlstm
         self.network = network
         self.activations_resizer = activations_resizer
-        self.number_of_output_channels = activations_resizer.get_number_of_output_channels()
+        self.number_of_output_channels =self.get_real_network().get_number_of_output_channels()
+            #activations_resizer.get_number_of_output_channels()
         self.number_of_classes_excluding_blank = number_of_classes_excluding_blank
 
         print(">>> number_of_output_channels: " + str(self.number_of_output_channels))
@@ -177,95 +179,59 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
     def collect_examples_activation_widths(activations):
         examples_activation_widths = list([])
         for example_activations in activations:
+            # print(">>> example_activations.size(): " + str(example_activations.size()))
             example_activations_width = example_activations.size(2)
             examples_activation_widths.append(example_activations_width)
         return examples_activation_widths
 
+    """ 
+        Extracts concatenated height one activations from block activations.
+        The method takes as input a list of activations, one for each example.
+        It loops over all the examples, and for each collects the activation rows.
+        Finally all these activation rows are concatenated, so the final output 
+        is in the form:  
+        example_1_row_1_activations, , ..., example_1_row_m_activations, 
+        ..., 
+        example_n_row_1_activations, ..., example_n_row_m_activations
+        
+        The motivation for removing the height dimension like this, is that the 
+        examples can have different heights, but these can be removed for the 
+        sake of the linear layer activation and later restored, retrieving the 
+        example-specific activation rows that need to be summed to get the final 
+        activations for each example.
+    """
     @staticmethod
-    def compute_paired_lists_multiples(int_list_one, int_list_two):
-        result = list([])
-        for element_one, element_two in zip(int_list_one, int_list_two):
-            multiple = element_one * element_two
-            # print("compute_paired_lists_multiples - element one: " +
-            #       str(element_one) + " element two: "
-            #       + str(element_two))
-            # print("compute_paired_lists_multiples - multiple: " + str(multiple))
-            result.append(multiple)
-        return result
+    def extract_concatenated_height_one_activations_from_block_activations(activations_per_example_list):
 
+        # print("network_to_softmax_network - activations sizes after dechunking: ")
+        # for element in activations_per_example_list:
+        #     print(">>> activations list element size - " + str(element.size()))
 
-    # This debugging method checks that de-chunking the chunked tensor recovers the original
+        activations_height_one = list([])
+        for example_activations in activations_per_example_list:
+            if example_activations.size(1) > 1:
+                # print("example_activations.size(): " + str(example_activations.size()))
+                activation_rows = torch.split(example_activations, 1, dim=1)
+                # Debugging check
+                ModuleIOStructuring.check_activation_rows_are_not_equal(activation_rows)
+                activations_height_one.extend(activation_rows)
+            else:
+                activations_height_one.append(example_activations)
+
+        # for example_activations in activations_height_one:
+        #     print("activations_height_one_element size: " + str(example_activations.size()))
+
+        # Create tensor with all activations concatenated on width dimension
+        activations_single_tensor = torch.cat(activations_height_one, 2)
+        return activations_single_tensor
+
+    # de-chunk the chunked activations, yielding a list with for every element
+    # the activations of one example
     @staticmethod
-    def check_dechunking_chunked_tensor_list_recovers_original(tensor_list_chunking, original_tensor_list,
-                                                       input_chunked):
-        input_dechunked = tensor_list_chunking.dechunk_block_tensor_concatenated_along_batch_dimension(
-            input_chunked)
-        if not TensorUtils.tensors_lists_are_equal(original_tensor_list, input_dechunked):
-            for index in range(0, len(original_tensor_list)):
-                print("original[" + str(index) + "].size()" + str(original_tensor_list[index].size()))
-
-            for index in range(0, len(input_dechunked)):
-                print("input_dechunked[" + str(index) + "].size()" + str(input_dechunked[index].size()))
-
-            TensorUtils.find_equal_slices_over_batch_dimension(input_chunked)
-
-            raise RuntimeError("Error: original and de-chunked chunked are not the same")
-
-    # This debugging method looks if it can find equal rows in the activation
-    # (which in general should typically not happen)
-    @ staticmethod
-    def check_activation_rows_are_not_equal(activation_rows):
-        # For debugging
-        print("activation rows sizes after splitting: ")
-        last_activation_row = activation_rows[0]
-        for activation_row in activation_rows:
-            print(str(activation_row.size()))
-            if TensorUtils.tensors_are_equal(last_activation_row, activation_row):
-                print(">>> WARNING: activation rows are equal")
-
-    # Extract the summed rows from a chunk that consists multiple rows
-    @staticmethod
-    def extract_summed_rows_from_chunk_with_concatenated_rows(chunk_multiple_rows, number_of_rows, number_of_columns):
-        # print("chunk multiple rows.size(): " + str(chunk_multiple_rows.size()))
-
-        # print("number of columns: " + str(number_of_columns) +
-        #      " number of rows: " + str(number_of_rows))
-        # Notice the dimension to split on is 1, as for example we have
-        # chunk multiple rows.size(): torch.Size([1, 14, 80])
-        # That is, the last dimension goes over classes, the first one is
-        # always 1, and the second dimension goes over the width.
-        # Therefore we have to split on dim=1 using the number_of_columns
-        # for the tensor containing the horizontally-concatenated
-        # row activations
-        rows = torch.split(chunk_multiple_rows, number_of_columns, dim=1)
-        if len(rows) != number_of_rows:
-            raise RuntimeError("Error in split: expected " + str(number_of_rows)
-                               + "rows but got: " + str(len(rows)))
-
-        summed_rows = TensorUtils.sum_list_of_tensors(rows)
-        # print("summed_rows.size(): " + str(summed_rows.size()))
-        return summed_rows
-
-    @staticmethod
-    def extract_activation_chunks(examples_activation_heights, examples_activation_widths,
-                                  class_activations_resized_temp):
-        examples_activation_height_times_width = NetworkToSoftMaxNetwork. \
-            compute_paired_lists_multiples(examples_activation_heights, examples_activation_widths)
-        chunks_multiple_rows = torch.split(class_activations_resized_temp,
-                                           examples_activation_height_times_width, 1)
-        chunks = list([])
-
-        for index in range(0, len(chunks_multiple_rows)):
-            chunk_multiple_rows = chunks_multiple_rows[index]
-            number_of_rows = examples_activation_heights[index]
-            number_of_columns = examples_activation_widths[index]
-            summed_rows = NetworkToSoftMaxNetwork.\
-                extract_summed_rows_from_chunk_with_concatenated_rows(chunk_multiple_rows, number_of_rows,
-                                                                      number_of_columns)
-            chunks.append(summed_rows)
-
-
-        return chunks
+    def dechunk_activations(activations_chunked, tensor_list_chunking):
+        return tensor_list_chunking. \
+            dechunk_block_tensor_concatenated_along_batch_dimension_changed_block_size(activations_chunked,
+                                                                                       SizeTwoDimensional(1, 1))
 
     def compute_activations_with_block_mdlstm(self, x):
         # print("network_to_softmax_network - network input x sizes: " )
@@ -273,6 +239,7 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         #     print(">>> input list element size - " + str(element.size()))
         network_consumed_block_size = SizeTwoDimensional(self.get_real_network().get_height_reduction_factor(),
                                                          self.get_real_network().get_width_reduction_factor())
+        # print("Network_consumed_block_size: " + str(network_consumed_block_size))
 
         # # Plot two row images for debugging
         # for element in x:
@@ -283,83 +250,125 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
 
         tensor_list_chunking = TensorListChunking.create_tensor_list_chunking(x, network_consumed_block_size)
 
+        # Chunk the input
         input_chunked = tensor_list_chunking. \
             chunk_tensor_list_into_blocks_concatenate_along_batch_dimension(x, False)
 
         # print("input_chunked.size(): " + str(input_chunked.size()))
 
         # Debugging: check that the de-chunked version recovers the original
-        NetworkToSoftMaxNetwork. \
+        ModuleIOStructuring.\
             check_dechunking_chunked_tensor_list_recovers_original(tensor_list_chunking, x, input_chunked)
 
         # print("input_chunked :" + str(input_chunked))
 
+        # Compute the activations on the chunked input
         activations_chunked = self.network(input_chunked)
         # print("network_to_softmax_network - activations_chunked.size(): " + str(activations_chunked.size()))
-        activations = tensor_list_chunking. \
-            dechunk_block_tensor_concatenated_along_batch_dimension_changed_block_size(activations_chunked,
-                                                                                       SizeTwoDimensional(1, 1))
-        # print("network_to_softmax_network - activations sizes after dechunking: ")
-        # for element in activations:
-        #     print(">>> activations list element size - " + str(element.size()))
 
-        activations_height_one = list([])
-        for activation in activations:
-            if activation.size(1) > 1:
-                # print("activation.size(): " + str(activation.size()))
-                activation_rows = torch.split(activation, 1, dim=1)
-                # Debugging check
-                # NetworkToSoftMaxNetwork.check_activation_rows_are_not_equal(activation_rows)
-                activations_height_one.extend(activation_rows)
-            else:
-                activations_height_one.append(activation)
+        # de-chunk the chunked activations
+        activations = NetworkToSoftMaxNetwork.dechunk_activations(activations_chunked, tensor_list_chunking)
 
-        # for activation in activations_height_one:
-        #     print("activations_height_one_element size: " + str(activation.size()))
+        # From the de-chunked activations, collect the examples activation heights and widths
+        # for later use when recovering the class activations belonging to each example
+        # after computing all the class activations in one go from one long concatenated tensor
+        examples_activation_heights = NetworkToSoftMaxNetwork.collect_examples_activation_heights(activations)
+        examples_activation_widths = NetworkToSoftMaxNetwork.collect_examples_activation_widths(activations)
 
-        # Create tensor with all activations concatenated on width dimension
-        activations_single_tensor = torch.cat(activations_height_one, 2)
-        activations_single_tensor = activations_single_tensor.unsqueeze(0)
-        activations = activations_single_tensor
+        # Concatenate the activations of the examples
+        activations_single_tensor = NetworkToSoftMaxNetwork.\
+            extract_concatenated_height_one_activations_from_block_activations(activations)
 
-        return activations
+        return activations_single_tensor, examples_activation_heights, examples_activation_widths
+
+    @staticmethod
+    def resize_activations_block_mdlstm_minimal_padding(activations):
+        # In this case there is no batch dimension, activations has three dimensions:
+        # the first dimension is the number of
+        # channels and everything is concatenated on the width dimension (the third dimension)
+        # Activations of the format e.g.:  activations.size(): torch.Size([2048, 1, 24])
+        activations_height_removed = activations.squeeze(1)
+        activations_with_swapped_channels_and_width = activations_height_removed.transpose(0, 1)
+        return activations_with_swapped_channels_and_width
+
+    def resize_activations_padded_batch(self, activations):
+        # In this case there is a batch dimension: activations has four dimensions:
+        # batch_size, channels, height, width
+        # Activations of the format e.g.:  activations.size(): torch.Size([4, 2048, 1, 12])
+        # activations_resized_no_height = ModuleIOStructuring. \
+        #     extract_and_concatenate_nonpadding_parts_activations(x, activations,
+        #                                                          self.get_width_reduction_factor())
+        height_times_width = activations.size(2) * activations.size(3)
+        activations_height_removed = activations.view(activations.size(0), activations.size(1),
+                                                      height_times_width)
+
+        activations_with_swapped_channels_and_width = activations_height_removed.transpose(1, 2)
+        # Change view to remove the batch dimension
+        activations_resized_no_batch_dimension = activations_with_swapped_channels_and_width.contiguous(). \
+            view(-1, self.number_of_output_channels)
+        return activations_resized_no_batch_dimension
 
     def forward(self, x):
 
         if self.input_is_list:
 
+            if not isinstance(x, list):
+                raise RuntimeError("Error: was expecting input to forward function "
+                                   + "to be a list")
+
             if self.use_block_mdlstm:
-                activations = self.compute_activations_with_block_mdlstm(x)
-                examples_activation_heights = NetworkToSoftMaxNetwork.collect_examples_activation_heights(activations)
-                examples_activation_widths = NetworkToSoftMaxNetwork.collect_examples_activation_widths(activations)
+                activations, examples_activation_heights, examples_activation_widths = \
+                    self.compute_activations_with_block_mdlstm(x)
+                # print("examples_activation_heights: " + str(examples_activation_heights))
+                # print("activations.size(): " + str(activations.size()))
+                max_input_width = 0
+                for example in x:
+                    # print("example.size(): " + str(example.size()))
+                    max_input_width = max(max_input_width, example.size(2))
             else:
                 last_minute_padding = LastMinutePadding(self.get_height_reduction_factor(),
                                                         self.get_width_reduction_factor())
-                padded_examples_tensor = last_minute_padding.pad_and_cat_list_of_examples(x)
+                padded_examples_tensor, max_input_width = last_minute_padding.pad_and_cat_list_of_examples(x)
                 activations = self.network(padded_examples_tensor)
         else:
             activations = self.network(x)
+            max_input_width = x.size(3)
+
+        # The expected output width of the network. All outputs must be this width,
+        # because the warp_ctc loss expects a single width (i.e. requires padding)
+        expected_output_width = int(max_input_width / self.get_width_reduction_factor())
 
         batch_size = activations.size(0)
+        number_of_activation_rows = activations.size(2)
         # print(">>> activations.size(): " + str(activations.size()))
         # print("activations: " + str(activations))
 
-        activations_height = activations.size(2)
+        # activations_height = activations.size(2)
+        #
+        # # Activations resizing should only be done in the old way with activations
+        # # resizer if the input is not a list
+        # # if not self.input_is_list:
+        # #    activations = self.activations_resizer.create_resized_activations(activations)
+        #
+        # activations_height_removed = activations.squeeze(2)
+        # activations_with_swapped_channels_and_width = activations_height_removed.transpose(1, 2)
+        # # print(">>> activations_with_swapped_channels_and_width.size(): " +
+        # #      str(activations_with_swapped_channels_and_width.size()))
+        # activations_resized_no_height = activations_with_swapped_channels_and_width.contiguous().\
+        #     view(-1, self.number_of_output_channels)
 
-        # Activations resizing should only be done in the old way with activations
-        # resizer if the input is not a list
-        if not self.input_is_list:
-            activations = self.activations_resizer.create_resized_activations(activations)
+        # Restructure the activations to be 2-dimensional, with the first dimension
+        # the number of activations and the second dimension the number of channels
+        if self.use_block_mdlstm and self.input_is_list:
+            activations_resized_two_dimensional = \
+                NetworkToSoftMaxNetwork.resize_activations_block_mdlstm_minimal_padding(activations)
+        else:
+            activations_resized_two_dimensional = self.resize_activations_padded_batch(activations)
 
-        activations_height_removed = activations.squeeze(2)
-        activations_with_swapped_channels_and_width = activations_height_removed.transpose(1, 2)
-        # print(">>> activations_with_swapped_channels_and_width.size(): " +
-        #      str(activations_with_swapped_channels_and_width.size()))
-        activations_resized_one_dimensional = activations_with_swapped_channels_and_width.contiguous().\
-            view(-1, self.number_of_output_channels)
 
-        # print("activations_resized_one_dimensional: " + str(activations_resized_one_dimensional))
-        class_activations = self.fc3(activations_resized_one_dimensional)
+
+        # print("activations_resized_no_height: " + str(activations_resized_no_height))
+        class_activations = self.fc3(activations_resized_two_dimensional)
 
         if self.clamp_gradients:
             # print("NetworkToSoftMaxNetwork - register gradient clamping...")
@@ -367,18 +376,21 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
 
         # print("class_activations: " + str(class_activations))
         if self.input_is_list and self.use_block_mdlstm:
+            # print("class_activations.size(): " + str(class_activations.size()))
+
             class_activations_resized_temp = class_activations.view(1, -1, self.get_number_of_classes_including_blank())
             # print("class_activations_resized_temp.size(): " + str(class_activations_resized_temp.size()))
             # print("examples_activation_widths: " + str(examples_activation_widths))
 
-            chunks = NetworkToSoftMaxNetwork.extract_activation_chunks(examples_activation_heights,
-                                                                       examples_activation_widths,
-                                                                       class_activations_resized_temp)
+            chunks = ModuleIOStructuring.extract_activation_chunks(examples_activation_heights,
+                                                                   examples_activation_widths,
+                                                                   class_activations_resized_temp)
 
-            max_width = max(examples_activation_widths)
             chunks_padded = list([])
             for chunk in chunks:
-                columns_padding_required = max_width - chunk.size(1)
+                columns_padding_required = expected_output_width - chunk.size(1)
+                # print("chunk.size: " + str(chunk.size()))
+                # print("columns_padding_required: " + str(columns_padding_required))
                 p1d = (0, columns_padding_required)
                 # Padding is done to the last dimension but we need to padd the one-but last dimension
                 # so transpose, padd, then transpose back
@@ -388,12 +400,14 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
                 chunks_padded.append(chunk_padded)
             class_activations_resized = torch.cat(chunks_padded, 0)
         else:
+            # print("class_activations.size(): " + str(class_activations.size()))
+            class_activations = NetworkToSoftMaxNetwork.\
+                get_class_activations_summed_over_height_from_2d_activations_tensor(class_activations,
+                                                                                    number_of_activation_rows)
             class_activations_resized = class_activations.view(batch_size, -1,
                                                                self.get_number_of_classes_including_blank())
 
 
-
-        # print("class_activations.size(): " + str(class_activations.size()))
 
         # print("class_activation_resized: " + str(class_activations_resized))
         # print(">>> class_activations_resized.size(): " +
@@ -412,8 +426,35 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         # Don't compute softmax
         result = class_activations_resized
 
+        # Sanity check that the network produces an output width that matches the
+        # (padded) input width
+        # print("class_activations_resized.size(): " + str(class_activations_resized.size()))
+        output_width = class_activations_resized.size(1)
+        if not output_width == expected_output_width:
+            raise RuntimeError("Error: Expected output_width: " + str(expected_output_width) +
+                               " but got: " + str(output_width))
+
         # print(">>> MultiDimensionalRNNToSoftMaxNetwork.forward.result: " + str(result))
         return result
+
+    # Gets the class activations summed over height, from a 2D tensor of class activations
+    # in which all the class activation rows from the first example are concatenated, followed
+    # by all rows for the second example etc
+    # This method requires that all the concatenated rows are of equal length in the input
+    # tensor, that is, the class activations have been computed from padded activation
+    # tensors
+    @staticmethod
+    def get_class_activations_summed_over_height_from_2d_activations_tensor(class_activations, number_of_activation_rows):
+        # print("get_class_activations_summed_over_height - number_of_activation_rows: "
+        # + str(number_of_activation_rows))
+        # print("get_class_activations_summed_over_height - input.size(): " + str(class_activations.size()))
+        columns_after_height_extraction = int(class_activations.size(0) / number_of_activation_rows)
+        class_activations_with_height = class_activations.view(columns_after_height_extraction,
+                                                               number_of_activation_rows, -1)
+        result = torch.sum(class_activations_with_height, 1)
+        # print("get_class_activations_summed_over_height - result.size(): " + str(result.size()))
+        return result
+
 
     def get_real_network(self):
         return self.activations_resizer.get_real_network()

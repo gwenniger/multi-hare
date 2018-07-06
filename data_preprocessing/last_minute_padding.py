@@ -69,21 +69,21 @@ class LastMinutePadding:
 
         percentage_padding_pixels = (float(total_padding_pixels) / total_pixels) * 100
         percentage_real_pixels = (float(total_real_pixels) / total_pixels) * 100
-        print("batch-padded images height, width: " + str(required_height) + "," + str(required_width))
-        print("percentage real pixels: " + str(percentage_real_pixels))
+        # print("batch-padded images height, width: " + str(required_height) + "," + str(required_width))
+        # print("percentage real pixels: " + str(percentage_real_pixels))
         print("percentage padding pixels: " + str(percentage_padding_pixels))
 
-        return image_tensors_padded_and_unsqueezed
+        return image_tensors_padded_and_unsqueezed, required_width
 
     # Pad a list of examples (3-D tensors) based on the maximum height and with
     # within the examples and the constraint that the height and width
     # must be dividable by height_required_per_network_row and and
     # width_required_per_network_output_column respectively
     def pad_and_cat_list_of_examples(self, image_tensor_list):
-        print("Performing last minute padding and concatenation of the provided examples for this batch...")
-        image_tensors_padded_and_unsqueezed = self.pad_and_unsqueeze_list_of_examples(image_tensor_list)
+        # print("Performing last minute padding and concatenation of the provided examples for this batch...")
+        image_tensors_padded_and_unsqueezed, required_width = self.pad_and_unsqueeze_list_of_examples(image_tensor_list)
         concatenated_padded_examples = torch.cat(image_tensors_padded_and_unsqueezed, 0)
-        return concatenated_padded_examples
+        return concatenated_padded_examples, required_width
 
 
 
