@@ -135,7 +135,7 @@ def train_opts(parser):
                        Mirrors the initial_accumulator_value option
                        in the tensorflow adagrad (use 0.1 for their default).
                        """)
-    group.add_argument('-max_grad_norm', type=float, default=10,
+    group.add_argument('-max_grad_norm', type=float, default=1,
                        help="""If the norm of the gradient vector exceeds this,
                        renormalize it to have the norm equal to
                        max_grad_norm""")

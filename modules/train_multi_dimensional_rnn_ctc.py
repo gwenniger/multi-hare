@@ -585,14 +585,14 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
     # device_ids should include device!
     # device_ids lists all the gpus that may be used for parallelization
     # device is the initial device the model will be put on
-    # device_ids = [0, 1]
-    device_ids = [0]
+    device_ids = [0, 1]
+    # device_ids = [0]
 
     # See: https://pytorch.org/tutorials/beginner/former_torchies/nn_tutorial.html
     # multi_dimensional_rnn.register_backward_hook(printgradnorm)
 
     data_height = get_data_height(train_loader)
-    clamp_gradients = False
+    clamp_gradients = True
     network = create_model(checkpoint, data_height, input_channels, hidden_states_size,
                            compute_multi_directional, use_dropout, vocab_list,
                            clamp_gradients, data_set_name, minimize_horizontal_padding, device_ids,
@@ -922,15 +922,15 @@ def main():
         model_opt = opt
 
     # mnist_recognition_fixed_length()
-    mnist_recognition_variable_length(model_opt, checkpoint,)
+    # mnist_recognition_variable_length(model_opt, checkpoint,)
 
-    # if opt.iam_database_data_type == "lines":
-    #     iam_line_recognition(model_opt, checkpoint)
-    # elif opt.iam_database_data_type == "words":
-    #     iam_word_recognition(model_opt, checkpoint)
-    # else:
-    #     raise RuntimeError("Unrecognized data type")
-    # # #cifar_ten_basic_recognition()
+    if opt.iam_database_data_type == "lines":
+        iam_line_recognition(model_opt, checkpoint)
+    elif opt.iam_database_data_type == "words":
+        iam_word_recognition(model_opt, checkpoint)
+    else:
+        raise RuntimeError("Unrecognized data type")
+    # #cifar_ten_basic_recognition()
 
 
 if __name__ == "__main__":

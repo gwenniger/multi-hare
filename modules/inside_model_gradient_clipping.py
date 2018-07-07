@@ -2,9 +2,10 @@ import torch
 
 
 class InsideModelGradientClamping:
-    #    CLAMPING_BOUND = 0.001
-    CLAMPING_BOUND = 0.1
-    #CLAMPING_BOUND = 0.01
+    # CLAMPING_BOUND = 0.05
+    # CLAMPING_BOUND = 0.1
+    # CLAMPING_BOUND = 0.000001
+    CLAMPING_BOUND = 0.01
     # CLAMPING_BOUND = 1
 
     # This method registers a gradient clamping hook for the gradient of the
@@ -68,7 +69,8 @@ class InsideModelGradientClamping:
             #                     )
             tensor.register_hook(lambda x: InsideModelGradientClamping.clamp_grad_and_print(x))
 
-        else:
-            raise RuntimeError("Error: register_gradient_clamping - not requiring gradient")
+        # In evaluation mode no gradient will be required
+        # else:
+        #     raise RuntimeError("Error: register_gradient_clamping - not requiring gradient")
 
         return tensor

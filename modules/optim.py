@@ -119,6 +119,13 @@ class Optim(object):
         self._step += 1
 
         if self.max_grad_norm:
+            # First clip by gradient value, in case some gradient values became infinity
+            # this will set them back, which norm-based correction cannot. This
+            # is a somewhat dirty trick to assure that at least the gradient norm can
+            # be correctly computed and does not become nan (because of some infinite
+            # gradient component), which leads to correction not being at all possible
+            GradientClipping.clip_gradient_value(self.params)
+            # Then perform the norm-based correction
             made_gradient_norm_based_correction, total_norm = GradientClipping.\
                 clip_gradient_norm(self.params, self.max_grad_norm)
         else:

@@ -188,7 +188,7 @@ class Trainer:
 
             # Perform step including gradient clipping
             made_gradient_norm_based_correction, total_norm = self.optimizer.step()
-            # print("trainer - total norm: " + str(total_norm))
+            print("trainer - total norm: " + str(total_norm))
 
             if made_gradient_norm_based_correction:
                 num_gradient_corrections += 1

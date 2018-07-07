@@ -45,11 +45,11 @@ class GradientClipping:
         return made_gradient_norm_based_correction, total_norm
 
     @staticmethod
-    def clip_gradient_value(model):
+    def clip_gradient_value(parameters):
         # Clipping the gradient value is an alternative to clipping the gradient norm,
         # and seems to be more effective
         # https://pytorch.org/docs/master/_modules/torch/nn/utils/clip_grad.html
         # https://www.reddit.com/r/MachineLearning/comments/3n8g28/gradient_clipping_what_are_good_values_to_clip_at/
         # https://machinelearningmastery.com/exploding-gradients-in-neural-networks/
         grad_clip_value_ = 100
-        torch.nn.utils.clip_grad_value_(model.parameters(), grad_clip_value_)
+        torch.nn.utils.clip_grad_value_(parameters, grad_clip_value_)
