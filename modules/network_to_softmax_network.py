@@ -103,6 +103,9 @@ class KeepAllActivationsResizer(ActivationsResizer):
 # that maps the input network's output to a sequential output
 # of dimension: batch_size * number_of_output_channels * number_of_classes
 class NetworkToSoftMaxNetwork(torch.nn.Module):
+
+    LINEAR_LAYER_GRADIENT_CLAMPING_BOUND = 100
+
     def __init__(self, network,
                  number_of_classes_excluding_blank: int,
                  activations_resizer: ActivationsResizer,
@@ -372,7 +375,9 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
 
         if self.clamp_gradients:
             # print("NetworkToSoftMaxNetwork - register gradient clamping...")
-            class_activations = InsideModelGradientClamping.register_gradient_clamping(class_activations)
+            class_activations = InsideModelGradientClamping.\
+                register_gradient_clamping(class_activations,
+                                           NetworkToSoftMaxNetwork.LINEAR_LAYER_GRADIENT_CLAMPING_BOUND)
 
         # print("class_activations: " + str(class_activations))
         if self.input_is_list and self.use_block_mdlstm:

@@ -71,7 +71,7 @@ class ParallelMultipleStateWeightingsComputation(Module):
         if self.clamp_gradients:
             # print("ParallelMultipleStateWeightingsComputation - register gradient clamping...")
             # Create a 1d convolution with clamping of the gradient
-            result = InsideModelGradientClamping.register_gradient_clamping(result)
+            result = InsideModelGradientClamping.register_gradient_clamping_default_clamping_bound(result)
 
         return result
 

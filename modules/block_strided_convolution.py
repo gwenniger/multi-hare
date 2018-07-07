@@ -86,7 +86,7 @@ class BlockStridedConvolution(Module):
 
         convolution_output = self.convolution(x_chunked)
         if self.clamp_gradients:
-            convolution_output = InsideModelGradientClamping.register_gradient_clamping(convolution_output)
+            convolution_output = InsideModelGradientClamping.register_gradient_clamping_default_clamping_bound(convolution_output)
         # print("convolution output: " + str(convolution_output))
         result = self.get_activation_function()(convolution_output)
 

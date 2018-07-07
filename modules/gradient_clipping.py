@@ -52,4 +52,5 @@ class GradientClipping:
         # https://www.reddit.com/r/MachineLearning/comments/3n8g28/gradient_clipping_what_are_good_values_to_clip_at/
         # https://machinelearningmastery.com/exploding-gradients-in-neural-networks/
         grad_clip_value_ = 100
+        # grad_clip_value_ = 1
         torch.nn.utils.clip_grad_value_(parameters, grad_clip_value_)

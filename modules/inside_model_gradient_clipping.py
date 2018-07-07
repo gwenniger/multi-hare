@@ -5,8 +5,16 @@ class InsideModelGradientClamping:
     # CLAMPING_BOUND = 0.05
     # CLAMPING_BOUND = 0.1
     # CLAMPING_BOUND = 0.000001
-    CLAMPING_BOUND = 0.01
-    # CLAMPING_BOUND = 1
+    # CLAMPING_BOUND = 0.01
+    # CLAMPING_BOUND = 10
+    # https://machinelearningmastery.com/exploding-gradients-in-neural-networks/
+    # See: https://keras.io/optimizers/
+
+    # See: https://github.com/t-vi/pytorch-tvmisc/blob/master/misc/graves_handwriting_generation.ipynb
+    # A default clamping bound of 10 seems to work well for (MD)LSTM internal states
+    # a higher bound of e.g. 100 can be used for linear layers etc
+    # Choosing the clamping bounds too low seems to potentially slow down learning.
+    CLAMPING_BOUND = 10
 
     # This method registers a gradient clamping hook for the gradient of the
     # weight tensor, which will clamp/clip the gradient to the clamping range.
@@ -37,11 +45,11 @@ class InsideModelGradientClamping:
     #
 
     @staticmethod
-    def clamp_grad_and_print(grad_input):
-        # print("clamp_grad_and_pring - grad_input: " + str(grad_input))
-        grad_output = grad_input.clamp(min=-InsideModelGradientClamping.CLAMPING_BOUND,
-                                       max=InsideModelGradientClamping.CLAMPING_BOUND)
-        # print("clamp_grad_and_pring - grad_output: " + str(grad_output))
+    def clamp_grad_and_print(grad_input, clamping_bound):
+        # print("clamp_grad_and_print - grad_input: " + str(grad_input))
+        grad_output = grad_input.clamp(min=-clamping_bound,
+                                       max=clamping_bound)
+        # print("clamp_grad_and_print - grad_output: " + str(grad_output))
         return grad_output
 
     # Note: register_gradient_clipping does have an effect. To see this effect though,
@@ -52,7 +60,7 @@ class InsideModelGradientClamping:
     # variables in forward functions of the concerned modules, this has the effect of
     # making the total gradient norm very small
     @staticmethod
-    def register_gradient_clamping(tensor: torch.Tensor):
+    def register_gradient_clamping(tensor: torch.Tensor, clamping_bound):
 
         # See: https://discuss.pytorch.org/t/gradient-clipping/2836/9
         # See: https://github.com/DingKe/pytorch_workplace/blob/master/rnn/modules.py#L122
@@ -67,10 +75,16 @@ class InsideModelGradientClamping:
             #                            x.clamp(min=-InsideModelGradientClamping.CLAMPING_BOUND,
             #                            max=InsideModelGradientClamping.CLAMPING_BOUND)
             #                     )
-            tensor.register_hook(lambda x: InsideModelGradientClamping.clamp_grad_and_print(x))
+            tensor.register_hook(lambda x: InsideModelGradientClamping.
+                                 clamp_grad_and_print(x, clamping_bound))
 
         # In evaluation mode no gradient will be required
         # else:
         #     raise RuntimeError("Error: register_gradient_clamping - not requiring gradient")
 
         return tensor
+
+    @staticmethod
+    def register_gradient_clamping_default_clamping_bound(tensor: torch.Tensor):
+        return InsideModelGradientClamping.register_gradient_clamping(tensor,
+                                                                      InsideModelGradientClamping.CLAMPING_BOUND)

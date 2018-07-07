@@ -760,7 +760,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     #with torch.autograd.profiler.profile(use_cuda=False) as prof:
     blank_symbol = "_"
     image_input_is_unsigned_int = False
-    use_block_mdlstm = True
+    use_block_mdlstm = False
     train_mdrnn_ctc(model_opt, checkpoint, train_loader, test_loader,
                     test_loader, input_channels,
                     hidden_states_size, batch_size,
