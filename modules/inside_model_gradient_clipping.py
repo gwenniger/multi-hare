@@ -45,11 +45,17 @@ class InsideModelGradientClamping:
     #
 
     @staticmethod
-    def clamp_grad_and_print(grad_input, clamping_bound):
-        # print("clamp_grad_and_print - grad_input: " + str(grad_input))
+    def clamp_grad(grad_input, clamping_bound):
         grad_output = grad_input.clamp(min=-clamping_bound,
                                        max=clamping_bound)
-        # print("clamp_grad_and_print - grad_output: " + str(grad_output))
+        return grad_output
+
+    @staticmethod
+    def clamp_grad_and_print(grad_input, clamping_bound):
+        print("clamp_grad_and_print - grad_input: " + str(grad_input))
+        grad_output = grad_input.clamp(min=-clamping_bound,
+                                       max=clamping_bound)
+        print("clamp_grad_and_print - grad_output: " + str(grad_output))
         return grad_output
 
     # Note: register_gradient_clipping does have an effect. To see this effect though,
@@ -60,7 +66,7 @@ class InsideModelGradientClamping:
     # variables in forward functions of the concerned modules, this has the effect of
     # making the total gradient norm very small
     @staticmethod
-    def register_gradient_clamping(tensor: torch.Tensor, clamping_bound):
+    def register_gradient_clamping(tensor: torch.Tensor, clamping_bound, print_gradient: bool):
 
         # See: https://discuss.pytorch.org/t/gradient-clipping/2836/9
         # See: https://github.com/DingKe/pytorch_workplace/blob/master/rnn/modules.py#L122
@@ -75,8 +81,12 @@ class InsideModelGradientClamping:
             #                            x.clamp(min=-InsideModelGradientClamping.CLAMPING_BOUND,
             #                            max=InsideModelGradientClamping.CLAMPING_BOUND)
             #                     )
-            tensor.register_hook(lambda x: InsideModelGradientClamping.
-                                 clamp_grad_and_print(x, clamping_bound))
+            if print_gradient:
+                tensor.register_hook(lambda x: InsideModelGradientClamping.
+                                     clamp_grad_and_print(x, clamping_bound))
+            else:
+                tensor.register_hook(lambda x: InsideModelGradientClamping.
+                                     clamp_grad(x, clamping_bound))
 
         # In evaluation mode no gradient will be required
         # else:
@@ -87,4 +97,5 @@ class InsideModelGradientClamping:
     @staticmethod
     def register_gradient_clamping_default_clamping_bound(tensor: torch.Tensor):
         return InsideModelGradientClamping.register_gradient_clamping(tensor,
-                                                                      InsideModelGradientClamping.CLAMPING_BOUND)
+                                                                      InsideModelGradientClamping.CLAMPING_BOUND,
+                                                                      False)

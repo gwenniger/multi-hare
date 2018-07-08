@@ -104,7 +104,7 @@ class KeepAllActivationsResizer(ActivationsResizer):
 # of dimension: batch_size * number_of_output_channels * number_of_classes
 class NetworkToSoftMaxNetwork(torch.nn.Module):
 
-    LINEAR_LAYER_GRADIENT_CLAMPING_BOUND = 100
+    LINEAR_LAYER_GRADIENT_CLAMPING_BOUND = 10
 
     def __init__(self, network,
                  number_of_classes_excluding_blank: int,
@@ -377,7 +377,8 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
             # print("NetworkToSoftMaxNetwork - register gradient clamping...")
             class_activations = InsideModelGradientClamping.\
                 register_gradient_clamping(class_activations,
-                                           NetworkToSoftMaxNetwork.LINEAR_LAYER_GRADIENT_CLAMPING_BOUND)
+                                           NetworkToSoftMaxNetwork.LINEAR_LAYER_GRADIENT_CLAMPING_BOUND,
+                                           False)
 
         # print("class_activations: " + str(class_activations))
         if self.input_is_list and self.use_block_mdlstm:
@@ -408,7 +409,8 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
             # print("class_activations.size(): " + str(class_activations.size()))
             class_activations = NetworkToSoftMaxNetwork.\
                 get_class_activations_summed_over_height_from_2d_activations_tensor(class_activations,
-                                                                                    number_of_activation_rows)
+                                                                                    number_of_activation_rows,
+                                                                                    self.clamp_gradients)
             class_activations_resized = class_activations.view(batch_size, -1,
                                                                self.get_number_of_classes_including_blank())
 
@@ -449,7 +451,9 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
     # tensor, that is, the class activations have been computed from padded activation
     # tensors
     @staticmethod
-    def get_class_activations_summed_over_height_from_2d_activations_tensor(class_activations, number_of_activation_rows):
+    def get_class_activations_summed_over_height_from_2d_activations_tensor(class_activations,
+                                                                            number_of_activation_rows,
+                                                                            clamp_gradients):
         # print("get_class_activations_summed_over_height - number_of_activation_rows: "
         # + str(number_of_activation_rows))
         # print("get_class_activations_summed_over_height - input.size(): " + str(class_activations.size()))
@@ -457,6 +461,11 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         class_activations_with_height = class_activations.view(columns_after_height_extraction,
                                                                number_of_activation_rows, -1)
         result = torch.sum(class_activations_with_height, 1)
+        if clamp_gradients:
+            InsideModelGradientClamping.\
+                register_gradient_clamping(result,
+                                           NetworkToSoftMaxNetwork.LINEAR_LAYER_GRADIENT_CLAMPING_BOUND,
+                                           False)
         # print("get_class_activations_summed_over_height - result.size(): " + str(result.size()))
         return result
 

@@ -11,6 +11,8 @@ from modules.gradient_clipping import GradientClipping
 import torch.nn
 from modules.validation_stats import ValidationStats
 from modules.optim import Optim
+import modules.find_bad_gradients
+from graphviz import render
 
 
 class ModelProperties:
@@ -179,12 +181,20 @@ class Trainer:
             else:
                 loss_value = loss.item()
 
-            # print("loss: " + str(loss))
+            print("loss: " + str(loss))
             # loss = criterion(outputs, labels)
 
             time_start_loss_backward = util.timing.date_time_start()
+
+            # get_dot = modules.find_bad_gradients.register_hooks(outputs)
             loss.backward()
+
+            # dot = get_dot()
+            # dot.save('mdlst_find_bad_gradients.dot')
+            # render('dot', 'png', 'mdlst_find_bad_gradients.dot')
             # print("Time used for loss backward: " + str(util.timing.milliseconds_since(time_start_loss_backward)))
+
+            # raise RuntimeError("stopping after find bad gradients")
 
             # Perform step including gradient clipping
             made_gradient_norm_based_correction, total_norm = self.optimizer.step()

@@ -26,6 +26,7 @@ from modules.optim import Optim
 import os
 import opts
 
+
 parser = argparse.ArgumentParser(
     description='train.py',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -722,7 +723,7 @@ def mnist_recognition_fixed_length():
 
 
 def mnist_recognition_variable_length(model_opt, checkpoint):
-    batch_size = 128
+    batch_size = 4
     min_num_digits = 1
     max_num_digits = 3
     # In MNIST there are the digits 0-9, and we also add a symbol for blanks
@@ -841,7 +842,7 @@ def iam_word_recognition(model_opt, checkpoint):
     # With the improved padding, the height of the images is 128,
     # and memory usage is less, so batch_size 30 instead of 20 is possible,
     # but it is only slightly faster (GPU usage appears to be already maxed out)
-    batch_size = 64  #128 #32 #128
+    batch_size = 4 #  #128 #32 #128
 
     # lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
     lines_file_path = model_opt.iam_database_lines_file_path
@@ -923,7 +924,7 @@ def main():
 
     # mnist_recognition_fixed_length()
     # mnist_recognition_variable_length(model_opt, checkpoint,)
-
+    #
     if opt.iam_database_data_type == "lines":
         iam_line_recognition(model_opt, checkpoint)
     elif opt.iam_database_data_type == "words":

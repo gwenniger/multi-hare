@@ -33,6 +33,8 @@ class ParallelMultipleInputConvolutionsComputation(Module):
         self.use_dropout = use_dropout
         self.training = training
 
+        print("ParallelMultipleInputConvolutions - clamp_gradients: " + str(clamp_gradients))
+
     @staticmethod
     def create_parallel_multiple_input_convolutions_computation(input_channels: int,
                                                                 hidden_states_size: int,

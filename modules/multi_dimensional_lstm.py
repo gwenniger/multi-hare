@@ -234,9 +234,9 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
             input_and_input_gate_combined = torch.mul(input_activation_column, input_gate_activation_column)
 
-            # if self.clamp_gradients:
-            #     input_and_input_gate_combined = \
-            #         InsideModelGradientClamping.register_gradient_clamping(input_and_input_gate_combined)
+            if self.clamp_gradients:
+                input_and_input_gate_combined = \
+                    InsideModelGradientClamping.register_gradient_clamping(input_and_input_gate_combined, 10, False)
 
 
             # print("input and input gate combined: " + str(input_and_input_gate_combined))
@@ -264,10 +264,10 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                 torch.mul(forget_gate_one_activation_column,
                           memory_states_column_forget_gate_one)
 
-            # if self.clamp_gradients:
-            #     forget_gate_one_activation_multiplied_with_previous_memory_state = \
-            #         InsideModelGradientClamping.register_gradient_clamping(
-            #             forget_gate_one_activation_multiplied_with_previous_memory_state)
+            if self.clamp_gradients:
+                forget_gate_one_activation_multiplied_with_previous_memory_state = \
+                    InsideModelGradientClamping.register_gradient_clamping(
+                        forget_gate_one_activation_multiplied_with_previous_memory_state, 10, False)
 
             memory_states_column_forget_gate_two = StateUpdateBlock.\
                 get_shifted_column_fast(previous_memory_state_column)
@@ -295,10 +295,10 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             forget_gate_two_activation_multiplied_with_previous_memory_state = torch.mul(
                 forget_gate_two_activation_column, memory_states_column_forget_gate_two)
 
-            # if self.clamp_gradients:
-            #     forget_gate_two_activation_multiplied_with_previous_memory_state = \
-            #         InsideModelGradientClamping.register_gradient_clamping(
-            #             forget_gate_two_activation_multiplied_with_previous_memory_state)
+            if self.clamp_gradients:
+                forget_gate_two_activation_multiplied_with_previous_memory_state = \
+                    InsideModelGradientClamping.register_gradient_clamping(
+                        forget_gate_two_activation_multiplied_with_previous_memory_state, 10, False)
 
             # print("input_and_input_gate_combined: " + str(input_and_input_gate_combined))
 
@@ -351,6 +351,9 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # This is following the deep learning book
             activation_column = torch.mul(new_memory_state, output_gate_activation_column)
 
+            if self.clamp_gradients:
+                InsideModelGradientClamping.register_gradient_clamping(activation_column, 10, False)
+
             #activation_column = self.get_activation_function()(input_state_plus_input)
             # activation_column = new_memory_state_activation_column
             # print("output gate activation column: " + str(output_gate_activation_column))
@@ -358,6 +361,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
             previous_hidden_state_column = activation_column
             previous_memory_state_column = new_memory_state
+
             activations.append(activation_column)
 
             # In the loop the value of grad_fn becomes set, as a backwards path for
@@ -442,7 +446,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                                        previous_memory_state_column)
 
         if self.clamp_gradients:
-            output_gate_memory_state_column = InsideModelGradientClamping.register_gradient_clamping_default_clamping_bound(output_gate_memory_state_column)
+            output_gate_memory_state_column = InsideModelGradientClamping.\
+                register_gradient_clamping_default_clamping_bound(output_gate_memory_state_column)
 
         return self.compute_weighted_input_forget_gate(
                 mdlstm_parameters.get_output_gate_hidden_state_column(),
