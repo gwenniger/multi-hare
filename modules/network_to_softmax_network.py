@@ -332,6 +332,10 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
                 last_minute_padding = LastMinutePadding(self.get_height_reduction_factor(),
                                                         self.get_width_reduction_factor())
                 padded_examples_tensor, max_input_width = last_minute_padding.pad_and_cat_list_of_examples(x)
+
+                # print("x[0].device: " + str(x[0].device))
+                padded_examples_tensor = padded_examples_tensor.to(x[0].device)
+                # print("padded_examples_tensor: " + str(padded_examples_tensor))
                 activations = self.network(padded_examples_tensor)
         else:
             activations = self.network(x)
@@ -378,7 +382,7 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
             class_activations = InsideModelGradientClamping.\
                 register_gradient_clamping(class_activations,
                                            NetworkToSoftMaxNetwork.LINEAR_LAYER_GRADIENT_CLAMPING_BOUND,
-                                           False)
+                                           False, "network to softmax network - class_activations")
 
         # print("class_activations: " + str(class_activations))
         if self.input_is_list and self.use_block_mdlstm:
@@ -402,6 +406,13 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
                 # so transpose, padd, then transpose back
                 chunk_transposed = chunk.transpose(1, 2)
                 chunk_transposed_padded = torch.nn.functional.pad(chunk_transposed, p1d, "constant", 0)
+
+                # torch.nn.functional.pad has a gradient and therefore needs to be
+                # clamped to avoid that it can cause exploding gradients
+                if self.clamp_gradients:
+                    InsideModelGradientClamping.clamp_grad(chunk_transposed_padded,
+                                                           NetworkToSoftMaxNetwork.LINEAR_LAYER_GRADIENT_CLAMPING_BOUND)
+
                 chunk_padded = chunk_transposed_padded.transpose(1, 2)
                 chunks_padded.append(chunk_padded)
             class_activations_resized = torch.cat(chunks_padded, 0)
@@ -465,7 +476,8 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
             InsideModelGradientClamping.\
                 register_gradient_clamping(result,
                                            NetworkToSoftMaxNetwork.LINEAR_LAYER_GRADIENT_CLAMPING_BOUND,
-                                           False)
+                                           False,
+                                           "network_to_softmax_network - result")
         # print("get_class_activations_summed_over_height - result.size(): " + str(result.size()))
         return result
 

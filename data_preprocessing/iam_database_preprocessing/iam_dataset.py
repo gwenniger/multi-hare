@@ -139,6 +139,9 @@ class IamLinesDataset(Dataset):
     @staticmethod
     def convert_unsigned_int_image_tensor_to_float_image_tensor(image_tensor):
         result = image_tensor.type(torch.FloatTensor)
+        # Necessary to put the result on the right device (GPU), otherwise
+        # will be on CPU
+        result = result.to(image_tensor.device)
         result = torch.div(result, 255)
         return result
 
@@ -146,14 +149,18 @@ class IamLinesDataset(Dataset):
     # a float tensor with values in the range 0-1
     @staticmethod
     def convert_unsigned_int_image_tensor_or_list_to_float_image_tensor_or_list(image_tensor):
-        if not isinstance(image_tensor, (list, tuple)):
-            return IamLinesDataset.convert_unsigned_int_image_tensor_to_float_image_tensor(image_tensor)
-        else:
-            result = list([])
-            for element in image_tensor:
-                element_converted = IamLinesDataset.convert_unsigned_int_image_tensor_to_float_image_tensor(element)
-                result.append(element_converted)
-        return result
+        with torch.no_grad():
+
+            if not isinstance(image_tensor, (list, tuple)):
+                return IamLinesDataset.convert_unsigned_int_image_tensor_to_float_image_tensor(image_tensor)
+            else:
+                result = list([])
+                for element in image_tensor:
+                    # print("convert_unsigned_int_image_tensor_or_list_to_float_image_tensor_or_list" +
+                    #      " element.device: " + str(element.device))
+                    element_converted = IamLinesDataset.convert_unsigned_int_image_tensor_to_float_image_tensor(element)
+                    result.append(element_converted)
+            return result
 
     @staticmethod
     def compute_max_adjusted_by_scale_reduction_factor(max_value, scale_reduction_factor):
@@ -425,8 +432,8 @@ class IamLinesDataset(Dataset):
         return train_loader, validation_loader, test_loader
 
     def __len__(self):
-        return len(self.examples_line_information)
-        # return int(len(self.examples_line_information) / 30)  # Hack for faster training during development
+        # return len(self.examples_line_information)
+        return int(len(self.examples_line_information) / 30)  # Hack for faster training during development
 
     def __getitem__(self, idx):
         line_information = self.examples_line_information[idx]

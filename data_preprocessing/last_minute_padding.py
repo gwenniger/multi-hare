@@ -5,6 +5,7 @@ from data_preprocessing.iam_database_preprocessing.iam_dataset import IamLinesDa
 
 
 class LastMinutePadding:
+    NETWORK_INTERNAL_WHITE_VALUE = 1
 
     def __init__(self, height_required_per_network_row: int,
                  width_required_per_network_output_column: int):
@@ -50,9 +51,9 @@ class LastMinutePadding:
                    rows_padding_required_top,
                    rows_padding_required_bottom)
             # print("image.size(): " + str(image.size()))
-            # We want to pad with the value for white, which is 255 for uint8
+            # We want to pad with the internal value for white, which is 1 !!!
             image_padded = torch.nn.functional. \
-                pad(image, p2d, "constant", IamLinesDataset.UINT8_WHITE_VALUE)
+                pad(image, p2d, "constant", LastMinutePadding.NETWORK_INTERNAL_WHITE_VALUE)
             # Padded images must be unsqueezed on dimension 0 for concatenation
             # later on
             image_padded_unsqueezed = image_padded.unsqueeze(0)
@@ -80,10 +81,11 @@ class LastMinutePadding:
     # must be dividable by height_required_per_network_row and and
     # width_required_per_network_output_column respectively
     def pad_and_cat_list_of_examples(self, image_tensor_list):
-        # print("Performing last minute padding and concatenation of the provided examples for this batch...")
-        image_tensors_padded_and_unsqueezed, required_width = self.pad_and_unsqueeze_list_of_examples(image_tensor_list)
-        concatenated_padded_examples = torch.cat(image_tensors_padded_and_unsqueezed, 0)
-        return concatenated_padded_examples, required_width
+        with torch.no_grad():
+            # print("Performing last minute padding and concatenation of the provided examples for this batch...")
+            image_tensors_padded_and_unsqueezed, required_width = self.pad_and_unsqueeze_list_of_examples(image_tensor_list)
+            concatenated_padded_examples = torch.cat(image_tensors_padded_and_unsqueezed, 0)
+            return concatenated_padded_examples, required_width
 
 
 

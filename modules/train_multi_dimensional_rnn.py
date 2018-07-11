@@ -16,6 +16,9 @@ import data_preprocessing.load_cifar_ten
 from util.utils import Utils
 from modules.size_two_dimensional import SizeTwoDimensional
 import util.timing
+import modules.find_bad_gradients
+from graphviz import render
+
 
 
 def test_mdrnn_cell():
@@ -155,7 +158,9 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     # device_ids should include device!
     # device_ids lists all the gpus that may be used for parallelization
     # device is the initial device the model will be put on
-    device_ids = [0, 1]
+    #device_ids = [0, 1]
+    device_ids = [0]
+
 
     # multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(input_channels,
     #                                                                                 hidden_states_size,
@@ -285,7 +290,16 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
             # print("Time used for loss computation: " + str(util.timing.time_since(time_start_loss_computation)))
 
             time_start_loss_backward = time.time()
+
+            get_dot = modules.find_bad_gradients.register_hooks(outputs)
             loss.backward()
+            dot = get_dot()
+            dot.save('mdlstm_find_bad_gradients.dot')
+            render('dot', 'png', 'mdlstm_find_bad_gradients.dot')
+            raise RuntimeError("stopping after find bad gradients")
+
+
+
             # print("Time used for loss backward: " + str(util.timing.time_since(time_start_loss_backward)))
 
             # Perform gradient clipping

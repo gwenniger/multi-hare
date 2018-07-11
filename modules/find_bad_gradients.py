@@ -25,14 +25,14 @@ def register_hooks(var):
 
     def hook_cb(fn):
         def register_grad(grad_input, grad_output):
-            if grad_input is None:
-                print("register_grad - grad_input: " + str(grad_input))
+            # if grad_input is None:
+            #    print("register_grad - grad_input: " + str(grad_input))
             fn_dict[fn] = grad_input
         fn.register_hook(register_grad)
     iter_graph(var.grad_fn, hook_cb)
 
     def is_bad_grad(grad_output):
-        print("is_bad_grad - grad_output: " + str(grad_output))
+        # print("is_bad_grad - grad_output: " + str(grad_output))
         grad_output = grad_output.data
         return grad_output.ne(grad_output).any() or grad_output.gt(1e6).any()
 
@@ -54,12 +54,19 @@ def register_hooks(var):
                 node_name = 'Variable\n ' + size_to_str(u.size())
                 dot.node(str(id(u)), node_name, fillcolor='lightblue')
             else:
-                assert fn in fn_dict, fn
-                fillcolor = 'white'
-                print("fn_dict[fn]L " + str(fn_dict[fn]))
-                if any(is_bad_grad(gi) for gi in fn_dict[fn]):
-                    fillcolor = 'red'
-                dot.node(str(id(fn)), str(type(fn).__name__), fillcolor=fillcolor)
+                if fn in fn_dict:  # Gideon
+                    # assert fn in fn_dict, fn
+                    fillcolor = 'white'
+                    # Gideon: Some gi values are None, this crashes the code
+                    # if not checked for
+                    # print("fn_dict[fn]L " + str(fn_dict[fn]))
+                    # if any(is_bad_grad(gi) for gi in fn_dict[fn]):
+                    #     fillcolor = 'red'
+                    # Gideon: replacement code with check for None
+                    for gi in fn_dict[fn]:
+                        if not(gi is None) and is_bad_grad(gi):
+                            fillcolor = 'red'
+                    dot.node(str(id(fn)), str(type(fn).__name__), fillcolor=fillcolor)
             for next_fn, _ in fn.next_functions:
                 if next_fn is not None:
                     next_id = id(getattr(next_fn, 'variable', next_fn))

@@ -223,8 +223,11 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # Clamp before activation functions
             if self.clamp_gradients:
                 input_gate_weighted_states_plus_input = \
-                     InsideModelGradientClamping.register_gradient_clamping_default_clamping_bound(input_gate_weighted_states_plus_input)
-                input_state_plus_input = InsideModelGradientClamping.register_gradient_clamping_default_clamping_bound(input_state_plus_input)
+                     InsideModelGradientClamping.register_gradient_clamping_default_clamping_bound(
+                         input_gate_weighted_states_plus_input, "mdlstm - input_gate_weighted_states_plus_input")
+                input_state_plus_input = InsideModelGradientClamping.\
+                    register_gradient_clamping_default_clamping_bound(input_state_plus_input,
+                                                                      "mdlstm - input_states_plus_input")
 
             # Compute the input activation
             input_activation_column = F.tanh(input_state_plus_input)
@@ -236,7 +239,9 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
             if self.clamp_gradients:
                 input_and_input_gate_combined = \
-                    InsideModelGradientClamping.register_gradient_clamping(input_and_input_gate_combined, 10, False)
+                    InsideModelGradientClamping.\
+                        register_gradient_clamping(input_and_input_gate_combined, 10, False,
+                                                   "mdlstm - input_and_input_gate_combined")
 
 
             # print("input and input gate combined: " + str(input_and_input_gate_combined))
@@ -250,7 +255,9 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
             if self.clamp_gradients:
                 forget_gate_one_weighted_states_plus_input = \
-                    InsideModelGradientClamping.register_gradient_clamping_default_clamping_bound(forget_gate_one_weighted_states_plus_input)
+                    InsideModelGradientClamping.register_gradient_clamping_default_clamping_bound(
+                        forget_gate_one_weighted_states_plus_input,
+                        "mdlstm - forget_gate_one_weighted_states_plus_input")
 
 
             # print(">>> forget_gate_one_weighted_states_plus_input: " + str(forget_gate_one_weighted_states_plus_input))
@@ -267,10 +274,12 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             if self.clamp_gradients:
                 forget_gate_one_activation_multiplied_with_previous_memory_state = \
                     InsideModelGradientClamping.register_gradient_clamping(
-                        forget_gate_one_activation_multiplied_with_previous_memory_state, 10, False)
+                        forget_gate_one_activation_multiplied_with_previous_memory_state, 10, False,
+                        "mdlstm - forget_gate_one_activation_multiplied_with_previous_memory_state")
 
             memory_states_column_forget_gate_two = StateUpdateBlock.\
-                get_shifted_column_fast(previous_memory_state_column)
+                get_shifted_column_fast(previous_memory_state_column,
+                                        self.clamp_gradients)
 
             forget_gate_two_weighted_states_plus_input = self.compute_weighted_input_forget_gate(
                 mdlstm_parameters.get_forget_gate_two_hidden_state_column(),
@@ -280,7 +289,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             if self.clamp_gradients:
                 forget_gate_two_weighted_states_plus_input = \
                     InsideModelGradientClamping.register_gradient_clamping_default_clamping_bound(
-                        forget_gate_two_weighted_states_plus_input)
+                        forget_gate_two_weighted_states_plus_input,
+                        "mdlstm - forget_gate_two_weighted_states_plus_input")
 
             # Compute the forget gate two activation
             forget_gate_two_activation_column = F.sigmoid(forget_gate_two_weighted_states_plus_input)
@@ -298,7 +308,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             if self.clamp_gradients:
                 forget_gate_two_activation_multiplied_with_previous_memory_state = \
                     InsideModelGradientClamping.register_gradient_clamping(
-                        forget_gate_two_activation_multiplied_with_previous_memory_state, 10, False)
+                        forget_gate_two_activation_multiplied_with_previous_memory_state, 10, False,
+                        "mdlstm - forget_gate_two_activation_multiplied_with_previous_memory_state")
 
             # print("input_and_input_gate_combined: " + str(input_and_input_gate_combined))
 
@@ -318,7 +329,9 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
             if self.clamp_gradients:
                 new_memory_state = \
-                    InsideModelGradientClamping.register_gradient_clamping_default_clamping_bound(new_memory_state)
+                    InsideModelGradientClamping.register_gradient_clamping_default_clamping_bound(
+                        new_memory_state,
+                        "mdlstm - new_memory_state")
 
             #new_memory_state = input_and_input_gate_combined + \
             #    forget_gate_two_activation_multiplied_with_previous_memory_state
@@ -338,7 +351,9 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
             if self.clamp_gradients:
                 output_gate_weighted_states_plus_input = \
-                    InsideModelGradientClamping.register_gradient_clamping_default_clamping_bound(output_gate_weighted_states_plus_input)
+                    InsideModelGradientClamping.register_gradient_clamping_default_clamping_bound(
+                        output_gate_weighted_states_plus_input,
+                    "mdlstm - output_gate_weighted_states_plus_input")
 
             output_gate_activation_column = F.sigmoid(output_gate_weighted_states_plus_input)
 
@@ -352,7 +367,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             activation_column = torch.mul(new_memory_state, output_gate_activation_column)
 
             if self.clamp_gradients:
-                InsideModelGradientClamping.register_gradient_clamping(activation_column, 10, False)
+                InsideModelGradientClamping.register_gradient_clamping(activation_column, 10, False,
+                                                                       "mdlstm - activation_column")
 
             #activation_column = self.get_activation_function()(input_state_plus_input)
             # activation_column = new_memory_state_activation_column
@@ -447,7 +463,9 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
         if self.clamp_gradients:
             output_gate_memory_state_column = InsideModelGradientClamping.\
-                register_gradient_clamping_default_clamping_bound(output_gate_memory_state_column)
+                register_gradient_clamping_default_clamping_bound(
+                output_gate_memory_state_column,
+                "mdlstm - output_gate_memory_state_column")
 
         return self.compute_weighted_input_forget_gate(
                 mdlstm_parameters.get_output_gate_hidden_state_column(),

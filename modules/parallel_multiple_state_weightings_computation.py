@@ -71,7 +71,10 @@ class ParallelMultipleStateWeightingsComputation(Module):
         if self.clamp_gradients:
             # print("ParallelMultipleStateWeightingsComputation - register gradient clamping...")
             # Create a 1d convolution with clamping of the gradient
-            result = InsideModelGradientClamping.register_gradient_clamping_default_clamping_bound(result)
+            result = InsideModelGradientClamping.\
+                register_gradient_clamping_default_clamping_bound(result,
+                                                                  "parallel_multiple_state_weightings_Computation")
+
 
         return result
 
@@ -119,7 +122,8 @@ class ParallelMultipleStateWeightingsComputation(Module):
             # summed_values = pair_element_one + pair_two_element_shifted
 
             # Faster
-            pair_two_element_shifted = StateUpdateBlock.get_shifted_column_fast(result_pair[1])
+            pair_two_element_shifted = StateUpdateBlock.get_shifted_column_fast(result_pair[1],
+                                                                                self.clamp_gradients)
             pair = tuple((pair_element_one, pair_two_element_shifted))
             result.append(pair)
         return result

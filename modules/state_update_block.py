@@ -3,6 +3,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 from util.utils import Utils
 import torch.nn.functional as F
+from modules.inside_model_gradient_clipping import InsideModelGradientClamping
 
 
 class StateUpdateBlock():
@@ -34,15 +35,26 @@ class StateUpdateBlock():
     # This is a faster implementation of the get_shifted_column method
     # that avoids use of the torch.cat method, but instead uses F.pad
     @staticmethod
-    def get_shifted_column_fast(previous_state_column):
+    def get_shifted_column_fast(previous_state_column, clamp_gradients: bool):
         #print("previous_state_column: " + str(previous_state_column))
         previous_state_column_4_dim = previous_state_column.unsqueeze(2) # add a fake height
+
+        if clamp_gradients:
+            InsideModelGradientClamping.\
+                register_gradient_clamping_default_clamping_bound(previous_state_column_4_dim,
+                                                                  "get_shifted_column_fast - unsqueeze")
 
         # See: https://github.com/pytorch/pytorch/issues/1128
         previous_state_column_with_padding = F.pad(previous_state_column_4_dim,
                                                    (1, 0, 0, 0)).view(previous_state_column.size(0),
                                                                       previous_state_column.size(1),
                                                                       -1)[:, :, 0: previous_state_column.size(2)]
+        if clamp_gradients:
+            InsideModelGradientClamping.\
+                register_gradient_clamping_default_clamping_bound(previous_state_column_with_padding,
+                                                                  "get_shifted_column_fast - pad")
+
+
         # print("previous_state_column_with_padding: " + str(previous_state_column_with_padding))
         result = previous_state_column_with_padding[:, :, 0: previous_state_column.size(2)]
         # print("result: " + str(result))

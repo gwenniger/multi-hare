@@ -181,7 +181,7 @@ class Trainer:
             else:
                 loss_value = loss.item()
 
-            print("loss: " + str(loss))
+            # print("loss: " + str(loss))
             # loss = criterion(outputs, labels)
 
             time_start_loss_backward = util.timing.date_time_start()
@@ -189,9 +189,18 @@ class Trainer:
             # get_dot = modules.find_bad_gradients.register_hooks(outputs)
             loss.backward()
 
+            # https://discuss.pytorch.org/t/how-to-check-for-vanishing-exploding-gradients/9019/4
+            #for p, n in zip(self.model.parameters(), self.model._all_weights[0]):
+            #    if n[:6] == 'weight':
+            #        print('===========\ngradient:{}\n----------\n{}'.format(n, p.grad))
+
+            for name, p in self.model.named_parameters():
+                    print('===========\ngradient {} \n----------\n{}'.format(name, p.grad))
+
+
             # dot = get_dot()
-            # dot.save('mdlst_find_bad_gradients.dot')
-            # render('dot', 'png', 'mdlst_find_bad_gradients.dot')
+            # dot.save('mdlstm_ctc_no_data_parallel_find_bad_gradients-clamp-pad-function.dot')
+            # render('dot', 'png', 'mdlstm_ctc_mnist_find_bad_gradients.dot')
             # print("Time used for loss backward: " + str(util.timing.milliseconds_since(time_start_loss_backward)))
 
             # raise RuntimeError("stopping after find bad gradients")
