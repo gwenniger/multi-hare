@@ -194,8 +194,8 @@ class Trainer:
             #    if n[:6] == 'weight':
             #        print('===========\ngradient:{}\n----------\n{}'.format(n, p.grad))
 
-            for name, p in self.model.named_parameters():
-                    print('===========\ngradient {} \n----------\n{}'.format(name, p.grad))
+            # for name, p in self.model.named_parameters():
+            #         print('===========\ngradient {} \n----------\n{}'.format(name, p.grad))
 
 
             # dot = get_dot()

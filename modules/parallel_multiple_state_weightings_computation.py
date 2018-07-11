@@ -4,6 +4,7 @@ from modules.multi_dimensional_rnn import StateUpdateBlock
 from torch.nn.modules.module import Module
 import torch
 from modules.inside_model_gradient_clipping import InsideModelGradientClamping
+from modules.gradient_clamped_module import GradientClampedModule
 
 
 # This class optimizes the computation of multiple states computed
@@ -45,6 +46,10 @@ class ParallelMultipleStateWeightingsComputation(Module):
         # parallel_convolution = nn.Conv1d(hidden_states_size, output_states_size, 1)
 
         parallel_convolution = nn.Conv1d(hidden_states_size, output_states_size, 1)
+
+        if clamp_gradients:
+            parallel_convolution = GradientClampedModule(parallel_convolution)
+
 
         # Xavier weight initialization
         torch.nn.init.xavier_uniform_(parallel_convolution.weight)

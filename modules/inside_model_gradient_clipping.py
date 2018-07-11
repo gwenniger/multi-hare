@@ -46,11 +46,33 @@ class InsideModelGradientClamping:
     #
 
     @staticmethod
+    def is_bad_grad(grad_output):
+        grad_output = grad_output.data
+        return grad_output.ne(grad_output).any() or grad_output.gt(1e6).any()
+
+    @staticmethod
     def clamp_grad(grad_input, clamping_bound, variable_name: str):
 
         grad_output = grad_input.clamp(min=-clamping_bound,
                                        max=clamping_bound)
-        if not util.tensor_utils.TensorUtils.tensors_are_equal(grad_input, grad_output):
+
+        # if variable_name == "mdlstm - activation_column":
+        #     print("clamping gradient - " + variable_name)
+        #     print("clamp_grad_and_print - grad_input: " + str(grad_input))
+        #     print("clamp_grad_and_print - grad_output: " + str(grad_output))
+
+
+        if InsideModelGradientClamping.is_bad_grad(grad_input) :
+            print("is_bad_grad - grad_input: " + str(grad_input))
+            ##not util.tensor_utils.TensorUtils.tensors_are_equal(grad_input, grad_output):
+            # https://stackoverflow.com/questions/900392/getting-the-caller-function-name-inside-another-function-in-python
+            print("clamping gradient - " + variable_name)
+            print("clamp_grad_and_print - grad_input: " + str(grad_input))
+            print("clamp_grad_and_print - grad_output: " + str(grad_output))
+
+        if InsideModelGradientClamping.is_bad_grad(grad_output):
+            print("is_bad_grad - grad_output: " + str(grad_output))
+            ##not util.tensor_utils.TensorUtils.tensors_are_equal(grad_input, grad_output):
             # https://stackoverflow.com/questions/900392/getting-the-caller-function-name-inside-another-function-in-python
             print("clamping gradient - " + variable_name)
             print("clamp_grad_and_print - grad_input: " + str(grad_input))

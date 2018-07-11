@@ -323,6 +323,25 @@ class ImageInputTransformer:
         #print("result: " + str(result))
         return result
 
+    # Create a binary mask indicating which entries in the skewed image are valid and which not
+    @staticmethod
+    def create_skewed_images_mask_two_dim(x):
+        height = x.size(2)
+        original_image_width = x.size(3)
+        width = ImageInputTransformer.get_skewed_images_width(x)
+        mask_tensor = torch.ones((height, width), out=None, dtype=torch.float,
+                                 device=x.get_device())
+        for row_number in range(0, height):
+            first_valid_column_for_row = row_number
+            last_valid_column_for_row = first_valid_column_for_row + original_image_width
+            mask_tensor[row_number, 0:first_valid_column_for_row] = 0
+            mask_tensor[row_number, last_valid_column_for_row:width] = 0
+
+        return mask_tensor
+
+
+
+
     @staticmethod
     def create_skewed_images_variable_four_dim(x):
         # skewed_images = ImageInputTransformer.create_row_diagonal_offset_tensors(x)
@@ -440,3 +459,14 @@ class ImageInputTransformer:
         # print("activations_unskewed after: " + str(activations_unskewed.grad))
         return activations_unskewed
 
+
+def main():
+    tensor = torch.Tensor([range(1, 97)]).view(2, 2, 4, 6)
+    print("tensor: " + str(tensor))
+    mask = ImageInputTransformer.create_skewed_images_mask_two_dim(tensor)
+
+    print("mask: " + str(mask))
+
+
+if __name__ == "__main__":
+    main()

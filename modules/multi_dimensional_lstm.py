@@ -13,7 +13,7 @@ from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParame
 from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParametersCreatorFast
 from util.image_input_transformer import ImageInputTransformer
 from modules.inside_model_gradient_clipping import InsideModelGradientClamping
-
+from util.tensor_utils import TensorUtils
 
 def printgradnorm(self, grad_input, grad_output):
     print('Inside ' + self.__class__.__name__ + ' backward')
@@ -28,6 +28,39 @@ def printgradnorm(self, grad_input, grad_output):
     print('grad_output size:', grad_output[0].size())
     print('grad_input norm:', grad_input[0].norm())
     print('grad_output norm: ', grad_output[0].norm())
+
+
+class InputMatrices():
+
+    def __init__(self, input_input_matrix: torch.Tensor,
+                 input_gate_input_matrix: torch.Tensor,
+                 forget_gate_one_input_matrix: torch.Tensor,
+                 forget_gate_two_input_matrix: torch.Tensor,
+                 output_gate_input_matrix: torch.Tensor):
+        self.input_input_matrix = input_input_matrix
+        self.input_gate_input_matrix = input_gate_input_matrix
+        self.forget_gate_one_input_matrix = forget_gate_one_input_matrix
+        self.forget_gate_two_input_matrix = forget_gate_two_input_matrix
+        self.output_gate_input_matrix = output_gate_input_matrix
+
+    @staticmethod
+    def create_input_matrices(skewed_images_variable, mdlstm_parameters):
+
+        mdlstm_parameters.prepare_input_convolutions(skewed_images_variable)
+
+        # Compute the different input convolutions
+        input_input_matrix = mdlstm_parameters.get_input_input_matrix()
+        # print("input_input_matrix.size(): " + str(input_input_matrix.size()))
+        input_gate_input_matrix = mdlstm_parameters.get_input_gate_input_matrix()
+        forget_gate_one_input_matrix = mdlstm_parameters.get_forget_gate_one_input_matrix()
+        forget_gate_two_input_matrix = mdlstm_parameters.get_forget_gate_two_input_matrix()
+        output_gate_input_matrix = mdlstm_parameters.get_output_gate_input_matrix()
+        # Cleanup the temporarily stored results, so that they won't be held in
+        # memory unnecessarily
+        mdlstm_parameters.cleanup_input_convolution_results()
+
+        return InputMatrices(input_input_matrix, input_gate_input_matrix, forget_gate_one_input_matrix,
+                             forget_gate_two_input_matrix, output_gate_input_matrix)
 
 
 class MultiDimensionalLSTM(MultiDimensionalRNNBase):
@@ -134,6 +167,10 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         # Step 1: Create a skewed version of the input image
         # skewed_image = ImageInputTransformer.create_row_diagonal_offset_tensor(x)
         skewed_images_variable = ImageInputTransformer.create_skewed_images_variable_four_dim(x)
+
+        # Create a binary mask that tells which of the cell positions are valid and which are not
+        mask = ImageInputTransformer.create_skewed_images_mask_two_dim(x)
+
         # print("list(x.size()): " + str(list(x.size())))
         image_height = x.size(2)
         number_of_images = x.size(0)
@@ -163,18 +200,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         # print("mdlstm_parameters.input_input_convolution.bias: "
         # + str(mdlstm_parameters.input_input_convolution.bias))
 
-        mdlstm_parameters.prepare_input_convolutions(skewed_images_variable)
-
-        # Compute the different input convolutions
-        input_input_matrix = mdlstm_parameters.get_input_input_matrix()
-        # print("input_input_matrix.size(): " + str(input_input_matrix.size()))
-        input_gate_input_matrix = mdlstm_parameters.get_input_gate_input_matrix()
-        forget_gate_one_input_matrix = mdlstm_parameters.get_forget_gate_one_input_matrix()
-        forget_gate_two_input_matrix = mdlstm_parameters.get_forget_gate_two_input_matrix()
-        output_gate_input_matrix = mdlstm_parameters.get_output_gate_input_matrix()
-        # Cleanup the temporarily stored results, so that they won't be held in
-        # memory unnecessarily
-        mdlstm_parameters.cleanup_input_convolution_results()
+        # Create input matrices
+        input_matrices = InputMatrices.create_input_matrices(skewed_images_variable, mdlstm_parameters)
 
         # if self.clamp_gradients:
         #     # print("MultiDimensionalLSTM.compute_multi_dimensional_lstm_one_direction - register gradient clamping...")
@@ -211,13 +238,13 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             input_hidden_state_column = mdlstm_parameters.get_input_hidden_state_column()
 
             # print("state_column.size(): " + str(state_column.size()))
-            input_state_plus_input = MultiDimensionalRNNBase.compute_states_plus_input(input_input_matrix,
-                                                                                       column_number,
-                                                                                       input_hidden_state_column)
+            input_state_plus_input = MultiDimensionalRNNBase.\
+                compute_states_plus_input(input_matrices.input_input_matrix, column_number,
+                                          input_hidden_state_column)
 
             # Compute the sum of weighted inputs of the input gate
             input_gate_weighted_states_plus_input = MultiDimensionalLSTM.\
-                compute_weighted_input_input_gate(column_number, input_gate_input_matrix,
+                compute_weighted_input_input_gate(column_number, input_matrices.input_gate_input_matrix,
                                                   mdlstm_parameters)
 
             # Clamp before activation functions
@@ -237,6 +264,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
             input_and_input_gate_combined = torch.mul(input_activation_column, input_gate_activation_column)
 
+            # print("input_and_input_gate_combined.size(): " + str(input_and_input_gate_combined.size()))
+
             if self.clamp_gradients:
                 input_and_input_gate_combined = \
                     InsideModelGradientClamping.\
@@ -251,7 +280,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             forget_gate_one_weighted_states_plus_input = self.compute_weighted_input_forget_gate(
                 mdlstm_parameters.get_forget_gate_one_hidden_state_column(),
                 mdlstm_parameters.get_forget_gate_one_memory_state_column(),
-                column_number, forget_gate_one_input_matrix)
+                column_number, input_matrices.forget_gate_one_input_matrix)
 
             if self.clamp_gradients:
                 forget_gate_one_weighted_states_plus_input = \
@@ -284,7 +313,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             forget_gate_two_weighted_states_plus_input = self.compute_weighted_input_forget_gate(
                 mdlstm_parameters.get_forget_gate_two_hidden_state_column(),
                 mdlstm_parameters.get_forget_gate_two_memory_state_column(),
-                column_number, forget_gate_two_input_matrix)
+                column_number, input_matrices.forget_gate_two_input_matrix)
 
             if self.clamp_gradients:
                 forget_gate_two_weighted_states_plus_input = \
@@ -347,7 +376,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # Compute the sum of weighted inputs of the ouput gate
             output_gate_weighted_states_plus_input = self. \
                 compute_weighted_input_output_gate(mdlstm_parameters, new_memory_state,
-                                                   column_number, output_gate_input_matrix)
+                                                   column_number,
+                                                   input_matrices.output_gate_input_matrix)
 
             if self.clamp_gradients:
                 output_gate_weighted_states_plus_input = \
@@ -356,6 +386,12 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                     "mdlstm - output_gate_weighted_states_plus_input")
 
             output_gate_activation_column = F.sigmoid(output_gate_weighted_states_plus_input)
+
+            # This appears to be the first gradient component that gets nan input on the backward pass
+            if self.clamp_gradients:
+                output_gate_activation_column = InsideModelGradientClamping.register_gradient_clamping_default_clamping_bound(
+                        output_gate_activation_column,
+                    "mdlstm - output_gate_activation_column")
 
             # print("input_column: " + str(input_column))
             #print("state_plus_input: " + str(state_plus_input))
@@ -374,6 +410,14 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # activation_column = new_memory_state_activation_column
             # print("output gate activation column: " + str(output_gate_activation_column))
             #print("activation column: " + str(activation_column))
+
+            # Apply a binary mask to zero out entries in the activation_column
+            # and new_memory_state that are not corresponding to valid states,
+            # but that are an artifact of the computation by convolution using
+            # the image skewing trick
+            valid_entries_selection_mask = mask[:, column_number]
+            activation_column = TensorUtils.apply_binary_mask(activation_column, valid_entries_selection_mask)
+            new_memory_state = TensorUtils.apply_binary_mask(new_memory_state, valid_entries_selection_mask)
 
             previous_hidden_state_column = activation_column
             previous_memory_state_column = new_memory_state

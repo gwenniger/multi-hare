@@ -105,3 +105,11 @@ class TensorUtils:
             result += list_of_tensors[index]
             # print("result after addition: " + str(result))
         return result
+
+    """
+    Applies a binary mask to a tensor. The dimensions of the mask must 
+    match the last dimensions of the tensor
+    """
+    @staticmethod
+    def apply_binary_mask(tensor, mask):
+        return tensor * mask
