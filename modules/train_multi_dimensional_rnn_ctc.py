@@ -315,7 +315,7 @@ def printgradnorm(self, grad_input, grad_output):
 def create_model(checkpoint, data_height: int, input_channels: int, hidden_states_size: int,
                  compute_multi_directional: bool, use_dropout: bool, vocab_list,
                  clamp_gradients: bool, data_set_name: str, minimize_horizontal_padding: bool,
-                 device_ids: list, use_block_mdlstm: bool):
+                 device_ids: list, use_block_mdlstm: bool, perform_horizontal_batch_padding_in_data_loader):
 
     # multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(input_channels,
     #                                                                                 hidden_states_size,
@@ -407,11 +407,12 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
                                                                              use_block_mdlstm)
 
     else:
-        network = NetworkToSoftMaxNetwork.create_network_to_soft_max_network(multi_dimensional_rnn,
-                                                                             number_of_classes_excluding_blank,
-                                                                             data_height, clamp_gradients,
-                                                                             inputs_and_outputs_are_lists,
-                                                                             use_block_mdlstm)
+        network = NetworkToSoftMaxNetwork.create_network_to_soft_max_network(
+            multi_dimensional_rnn, number_of_classes_excluding_blank,
+            data_height, clamp_gradients,
+            inputs_and_outputs_are_lists,
+            perform_horizontal_batch_padding_in_data_loader,
+            use_block_mdlstm)
         network = nn.DataParallel(network, device_ids=device_ids)
 
     if checkpoint is not None:
@@ -580,7 +581,8 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
                     vocab_list: list, blank_symbol: str,
                     image_input_is_unsigned_int: bool,
                     data_set_name, minimize_horizontal_padding: bool,
-                    use_block_mdlstm: bool):
+                    use_block_mdlstm: bool,
+                    perform_horizontal_batch_padding_in_data_loader):
 
     # http://pytorch.org/docs/master/notes/cuda.html
     device = torch.device("cuda:0")
@@ -598,7 +600,7 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
     network = create_model(checkpoint, data_height, input_channels, hidden_states_size,
                            compute_multi_directional, use_dropout, vocab_list,
                            clamp_gradients, data_set_name, minimize_horizontal_padding, device_ids,
-                           use_block_mdlstm)
+                           use_block_mdlstm, perform_horizontal_batch_padding_in_data_loader)
 
     # network.register_backward_hook(printgradnorm)
 
@@ -874,6 +876,7 @@ def iam_word_recognition(model_opt, checkpoint):
     minimize_vertical_padding = True
     minimize_horizontal_padding = True
     image_input_is_unsigned_int = False
+    perform_horizontal_batch_padding_in_data_loader = False
     train_loader, validation_loader, test_loader = iam_words_dataset. \
         get_random_train_set_validation_set_test_set_data_loaders(batch_size, train_examples_fraction,
                                                                   validation_examples_fraction,
@@ -881,7 +884,8 @@ def iam_word_recognition(model_opt, checkpoint):
                                                                   permutation_save_or_load_file_path,
                                                                   minimize_vertical_padding,
                                                                   minimize_horizontal_padding,
-                                                                  image_input_is_unsigned_int)
+                                                                  image_input_is_unsigned_int,
+                                                                  perform_horizontal_batch_padding_in_data_loader)
     print("Loading IAM dataset: DONE")
 
     # test_mdrnn_cell()
@@ -911,7 +915,8 @@ def iam_word_recognition(model_opt, checkpoint):
                     hidden_states_size,
                     batch_size, compute_multi_directional, use_dropout, vocab_list, blank_symbol,
                     image_input_is_unsigned_int, "IAM", minimize_horizontal_padding,
-                    use_block_mdlstm)
+                    use_block_mdlstm,
+                    perform_horizontal_batch_padding_in_data_loader)
     # train_mdrnn_no_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
     #                 compute_multi_directional, use_dropout, vocab_list)
 

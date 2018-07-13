@@ -10,8 +10,8 @@ import sys
 import util.image_visualization
 from data_preprocessing.iam_database_preprocessing.data_permutation import DataPermutation
 import os.path
-from data_preprocessing.padding_strategy import PaddingStrategy, MinimalHorizontalPaddingStrategy, FullPaddingStrategy
-
+from data_preprocessing.padding_strategy import PaddingStrategy
+from data_preprocessing.last_minute_padding import LastMinutePadding
 
 class IamLinesDataset(Dataset):
     EXAMPLE_TYPES_OK = "ok"
@@ -238,13 +238,13 @@ class IamLinesDataset(Dataset):
         max_image_width = IamLinesDataset.compute_max_adjusted_by_scale_reduction_factor(max_image_width,
                                                                                          scale_reduction_factor)
         max_image_height = \
-            max_image_height + PaddingStrategy.get_additional_amount_required_to_make_multiple_of_value(
+            max_image_height + LastMinutePadding.get_additional_amount_required_to_make_multiple_of_value(
                 max_image_height, self.height_required_per_network_output_row)
 
         # Width that is strictly required to fit the max occurring width and also
         # be a multiple of self.width_required_per_network_output_row
 
-        max_image_width = max_image_width + PaddingStrategy.get_additional_amount_required_to_make_multiple_of_value(
+        max_image_width = max_image_width + LastMinutePadding.get_additional_amount_required_to_make_multiple_of_value(
                 max_image_width, self.width_required_per_network_output_column)
 
         print("After scaling and addition to fit into multiple of the " +
@@ -386,14 +386,12 @@ class IamLinesDataset(Dataset):
             raise RuntimeError("Error: fractions" + str(fractions) +
                                " must sum up to one")
 
-    def get_random_train_set_validation_set_test_set_data_loaders(self, batch_size: int,
-                                                                  train_examples_fraction: float,
-                                                                  validation_examples_fraction: float,
-                                                                  test_examples_fraction: float,
-                                                                  permutation_save_or_load_file_path: str,
-                                                                  minimize_vertical_padding: bool,
-                                                                  minimize_horizontal_padding: bool,
-                                                                  keep_unsigned_int_format: bool):
+    def get_random_train_set_validation_set_test_set_data_loaders(
+            self, batch_size: int, train_examples_fraction: float,
+            validation_examples_fraction: float, test_examples_fraction: float,
+            permutation_save_or_load_file_path: str, minimize_vertical_padding: bool,
+            minimize_horizontal_padding: bool, keep_unsigned_int_format: bool,
+            perform_horizontal_batch_padding_in_data_loader_: bool):
 
         print("Entered get_random_train_set_validation_set_test_set_data_loaders...")
 
@@ -415,7 +413,8 @@ class IamLinesDataset(Dataset):
         padding_strategy = PaddingStrategy.create_padding_strategy(self.height_required_per_network_output_row,
                                                                    self.width_required_per_network_output_column,
                                                                    minimize_vertical_padding,
-                                                                   minimize_horizontal_padding)
+                                                                   minimize_horizontal_padding,
+                                                                   perform_horizontal_batch_padding_in_data_loader_)
 
         print("Prepare IAM data train loader...")
         train_loader = self.get_data_loader_with_appropriate_padding(train_set, max_image_height, max_image_width,
@@ -655,10 +654,13 @@ def test_iam_lines_dataset():
 
     permutation_save_or_load_file_path = "test_permutation_file.txt"
     minimize_horizontal_padding = True
-    iam_lines_dataset.get_random_train_set_validation_set_test_set_data_loaders(16, 0.5, 0.2, 0.3,
-                                                                                permutation_save_or_load_file_path,
-                                                                                minimize_horizontal_padding, False
-                                                                                )
+    data_loader_perform_horizontal_batch_padding = False
+    iam_lines_dataset.\
+        get_random_train_set_validation_set_test_set_data_loaders(16, 0.5, 0.2, 0.3,
+                                                                  permutation_save_or_load_file_path,
+                                                                  minimize_horizontal_padding, False,
+                                                                  data_loader_perform_horizontal_batch_padding
+                                                                  )
 
 
 def test_iam_words_dataset():
@@ -687,10 +689,13 @@ def test_iam_words_dataset():
 
     permutation_save_or_load_file_path = "test_permutation_file3.txt"
     minimize_horizontal_padding = True
-    iam_lines_dataset.get_random_train_set_validation_set_test_set_data_loaders(16, 0.5, 0.2, 0.3,
-                                                                                permutation_save_or_load_file_path,
-                                                                                minimize_horizontal_padding, False
-                                                                                )
+    data_loader_perform_horizontal_batch_padding = False
+    iam_lines_dataset.\
+        get_random_train_set_validation_set_test_set_data_loaders(16, 0.5, 0.2, 0.3,
+                                                                  permutation_save_or_load_file_path,
+                                                                  minimize_horizontal_padding, False,
+                                                                  data_loader_perform_horizontal_batch_padding
+                                                                  )
 
 
 def main():
