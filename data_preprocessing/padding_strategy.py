@@ -3,6 +3,7 @@ from abc import ABC
 import torch
 from data_preprocessing.last_minute_padding import LastMinutePadding
 
+
 class PaddingStrategy(ABC):
     """
     This strategy class will determine how the padding of the training examples is
@@ -36,12 +37,15 @@ class PaddingStrategy(ABC):
             if minimize_vertical_padding:
 
                 if perform_horizontal_batch_padding_in_data_loader:
-                    raise RuntimeError("Option perform_horizontal_batch_padding_in_data_loader not supported " +
-                                       " in combination with minimize_vertical_padding")
+                    print("Performing horizontal batch-padding in dataloader...")
 
                 return MinimalHorizontalAndVerticalPaddingStrategy(height_required_per_network_row,
-                                                                   width_required_per_network_output_column)
+                                                                   width_required_per_network_output_column,
+                                                                   perform_horizontal_batch_padding_in_data_loader)
             else:
+                if perform_horizontal_batch_padding_in_data_loader:
+                    print("Performing horizontal batch-padding in dataloader...")
+
                 return MinimalHorizontalPaddingStrategy(height_required_per_network_row,
                                                         width_required_per_network_output_column,
                                                         perform_horizontal_batch_padding_in_data_loader)
@@ -75,10 +79,12 @@ class FullPaddingStrategy(PaddingStrategy):
 class MinimalHorizontalPaddingStrategyBase(PaddingStrategy):
 
     def __init__(self, height_required_per_network_row,
-                 width_required_per_network_output_column
+                 width_required_per_network_output_column,
+                 perform_horizontal_batch_padding_in_data_loader: bool
                  ):
         super(MinimalHorizontalPaddingStrategyBase, self).__init__(height_required_per_network_row,
-                                                               width_required_per_network_output_column)
+                                                                   width_required_per_network_output_column)
+        self.perform_horizontal_batch_padding_in_data_loader = perform_horizontal_batch_padding_in_data_loader
 
     @abstractmethod
     def get_rows_padding_required(self, image_width, max_image_width):
@@ -118,27 +124,9 @@ class MinimalHorizontalPaddingStrategyBase(PaddingStrategy):
             batch_size=batch_size,
             shuffle=True,
             collate_fn=self.get_collate_function(),
-            pin_memory=True)
+            pin_memory=False)
 
         return train_loader
-
-    @abstractmethod
-    def get_collate_function(self):
-        raise RuntimeError("not implemented")
-
-
-class MinimalHorizontalPaddingStrategy(MinimalHorizontalPaddingStrategyBase):
-
-    def __init__(self, height_required_per_network_row,
-                 width_required_per_network_output_column,
-                 perform_horizontal_batch_padding_in_data_loader: bool):
-        super(MinimalHorizontalPaddingStrategyBase, self).__init__(height_required_per_network_row,
-                                                                   width_required_per_network_output_column)
-
-        self.perform_horizontal_batch_padding_in_data_loader = perform_horizontal_batch_padding_in_data_loader
-
-    def get_rows_padding_required(self, image_height, max_image_height):
-        return max_image_height - image_height
 
     def get_collate_function(self):
         if self.perform_horizontal_batch_padding_in_data_loader:
@@ -157,7 +145,7 @@ class MinimalHorizontalPaddingStrategy(MinimalHorizontalPaddingStrategyBase):
         # print("my_collate - batch: " + str(batch))
         data = [item[0] for item in batch]
 
-        data_padded_and_concatenated = last_minute_padding.pad_and_cat_list_of_examples(data)
+        data_padded_and_concatenated, required_width = last_minute_padding.pad_and_cat_list_of_examples(data)
 
         # print("my_collate - data: " + str(data))
         target_list = [item[1].unsqueeze(0) for item in batch]
@@ -167,19 +155,31 @@ class MinimalHorizontalPaddingStrategy(MinimalHorizontalPaddingStrategyBase):
         return [data_padded_and_concatenated, target]
 
 
+class MinimalHorizontalPaddingStrategy(MinimalHorizontalPaddingStrategyBase):
+
+    def __init__(self, height_required_per_network_row,
+                 width_required_per_network_output_column,
+                 perform_horizontal_batch_padding_in_data_loader: bool):
+        super(MinimalHorizontalPaddingStrategyBase, self).__init__(height_required_per_network_row,
+                                                                   width_required_per_network_output_column,
+                                                                   perform_horizontal_batch_padding_in_data_loader)
+
+    def get_rows_padding_required(self, image_height, max_image_height):
+        return max_image_height - image_height
+
+
 class MinimalHorizontalAndVerticalPaddingStrategy(MinimalHorizontalPaddingStrategyBase):
 
     def __init__(self, height_required_per_network_row,
-                 width_required_per_network_output_column):
-        super(MinimalHorizontalPaddingStrategyBase, self).__init__(height_required_per_network_row,
-                                                                   width_required_per_network_output_column)
+                 width_required_per_network_output_column,
+                 perform_horizontal_batch_padding_in_data_loader: bool):
+        super(MinimalHorizontalAndVerticalPaddingStrategy, self).\
+            __init__(height_required_per_network_row,
+                     width_required_per_network_output_column,
+                     perform_horizontal_batch_padding_in_data_loader)
 
     def get_rows_padding_required(self, image_height, max_image_height):
         return LastMinutePadding.\
             get_additional_amount_required_to_make_multiple_of_value(image_height,
                                                                  self.height_required_per_network_row)
-
-    def get_collate_function(self):
-            return MinimalHorizontalPaddingStrategyBase.simple_collate_no_data_padding
-
 

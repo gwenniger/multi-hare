@@ -6,9 +6,11 @@ import torch.nn as nn
 from torch.nn.modules.module import Module
 import torch
 
+
 class MultiDimensionalLSTMParametersOneDirectionBase(Module):
     # https://github.com/pytorch/pytorch/issues/750
-    FORGET_GATE_BIAS_INIT = 1
+    # FORGET_GATE_BIAS_INIT = 1  # Good for normal LSTM
+    FORGET_GATE_BIAS_INIT = 0    # For stable learning in MDLSTM
 
     def __init__(self, hidden_states_size,
                  input_channels: int, use_dropout: bool):

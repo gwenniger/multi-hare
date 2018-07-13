@@ -72,7 +72,7 @@ class Trainer:
                                " not allowed, since 0 is reserved for blanks")
 
     def train_one_epoch(self, train_loader, epoch: int, start: int, batch_size,
-                        device, inputs_is_list: bool, report_func=None):
+                        device, inputs_is_list: bool,  report_func=None):
         """ Train next epoch.
         Args:
             train_iter: training data iterator

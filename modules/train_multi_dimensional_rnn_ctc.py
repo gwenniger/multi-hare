@@ -140,8 +140,6 @@ def train_mdrnn_no_ctc(train_loader, test_loader, input_channels: int, input_siz
     number_of_classes_excluding_blank = len(vocab_list) - 1
     # number_of_classes_excluding_blank = 10
 
-
-
     network = NetworkToSoftMaxNetwork.create_network_to_soft_max_network(multi_dimensional_rnn,
                                                                          input_size, number_of_classes_excluding_blank)
     if Utils.use_cuda():
@@ -314,8 +312,8 @@ def printgradnorm(self, grad_input, grad_output):
 
 def create_model(checkpoint, data_height: int, input_channels: int, hidden_states_size: int,
                  compute_multi_directional: bool, use_dropout: bool, vocab_list,
-                 clamp_gradients: bool, data_set_name: str, minimize_horizontal_padding: bool,
-                 device_ids: list, use_block_mdlstm: bool, perform_horizontal_batch_padding_in_data_loader):
+                 clamp_gradients: bool, data_set_name: str, inputs_and_outputs_are_lists: bool,
+                 device_ids: list, use_block_mdlstm: bool):
 
     # multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(input_channels,
     #                                                                                 hidden_states_size,
@@ -364,8 +362,6 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
     # mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
     block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
 
-    inputs_and_outputs_are_lists = minimize_horizontal_padding
-
     if data_set_name == "MNIST":
         multi_dimensional_rnn = MultiDimensionalLSTMLayerPairStacking.\
             create_two_layer_pair_network(hidden_states_size, mdlstm_block_size,
@@ -397,7 +393,7 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
     print("create_model - number_of_classes_excluding_blank: " +
           str(number_of_classes_excluding_blank))
 
-    if minimize_horizontal_padding:
+    if inputs_and_outputs_are_lists:
         multi_dimensional_rnn = nn.DataParallel(multi_dimensional_rnn, device_ids=device_ids)
         multi_dimensional_rnn.to(torch.device("cuda:0"))
         network = NetworkToSoftMaxNetwork.create_network_to_soft_max_network(multi_dimensional_rnn,
@@ -411,7 +407,6 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
             multi_dimensional_rnn, number_of_classes_excluding_blank,
             data_height, clamp_gradients,
             inputs_and_outputs_are_lists,
-            perform_horizontal_batch_padding_in_data_loader,
             use_block_mdlstm)
         network = nn.DataParallel(network, device_ids=device_ids)
 
@@ -597,10 +592,11 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
 
     data_height = get_data_height(train_loader)
     clamp_gradients = False
+    inputs_and_outputs_are_lists = minimize_horizontal_padding and not perform_horizontal_batch_padding_in_data_loader
     network = create_model(checkpoint, data_height, input_channels, hidden_states_size,
                            compute_multi_directional, use_dropout, vocab_list,
-                           clamp_gradients, data_set_name, minimize_horizontal_padding, device_ids,
-                           use_block_mdlstm, perform_horizontal_batch_padding_in_data_loader)
+                           clamp_gradients, data_set_name, inputs_and_outputs_are_lists, device_ids,
+                           use_block_mdlstm)
 
     # network.register_backward_hook(printgradnorm)
 
@@ -657,8 +653,9 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
 
         # print("Time used for this batch: " + str(util.timing.time_since(time_start_batch)))
 
+        input_is_list = minimize_horizontal_padding and not perform_horizontal_batch_padding_in_data_loader
         trainer.train_one_epoch(train_loader, epoch, start, batch_size, device,
-                                minimize_horizontal_padding)
+                                input_is_list)
 
         # Update the iteration / minibatch number
         iteration += 1

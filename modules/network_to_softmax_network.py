@@ -111,13 +111,11 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
                  activations_resizer: ActivationsResizer,
                  clamp_gradients: bool,
                  input_is_list: bool,
-                 perform_horizontal_batch_padding_in_data_loader: bool,
                  use_block_mdlstm: bool
                  ):
         super(NetworkToSoftMaxNetwork, self).__init__()
         self.clamp_gradients = clamp_gradients
         self.input_is_list = input_is_list
-        self.perform_horizontal_batch_padding_in_data_loader = perform_horizontal_batch_padding_in_data_loader
         self.use_block_mdlstm = use_block_mdlstm
         self.network = network
         self.activations_resizer = activations_resizer
@@ -129,7 +127,6 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
 
         print("NetworkToSoftMaxNetwork - number of classes: " + str(self.get_number_of_classes_including_blank()))
         self.fc3 = nn.Linear(self.number_of_output_channels, self.get_number_of_classes_including_blank())
-
 
 
         # It is not totally clear actually whether "xavier_normal" or "xavier_uniform" initialization
@@ -157,14 +154,12 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
                                            number_of_classes_excluding_blank: int,
                                            data_height: int, clamp_gradients: bool,
                                            input_is_list: bool,
-                                           perform_horizontal_batch_padding_in_data_loader,
                                            use_block_mdlstm: bool=False):
         activations_resizer = KeepAllActivationsResizer(network, data_height)
         # activations_resizer = SumActivationsResizer(network)
         return NetworkToSoftMaxNetwork(network, number_of_classes_excluding_blank,
                                        activations_resizer,
                                        clamp_gradients, input_is_list,
-                                       perform_horizontal_batch_padding_in_data_loader,
                                        use_block_mdlstm
                                        )
 
@@ -332,9 +327,6 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
                 for example in x:
                     # print("example.size(): " + str(example.size()))
                     max_input_width = max(max_input_width, example.size(2))
-            elif self.perform_horizontal_batch_padding_in_data_loader:
-                # Padding is already done by the data loader (specific to the batch)
-                activations = self.network(x)
             else:
                 last_minute_padding = LastMinutePadding(self.get_height_reduction_factor(),
                                                         self.get_width_reduction_factor())

@@ -7,6 +7,7 @@ from modules.inside_model_gradient_clipping import InsideModelGradientClamping
 from modules.gradient_clamped_module import GradientClampedModule
 from util.tensor_utils import TensorUtils
 
+
 # This class optimizes the computation of multiple states computed
 # using 1D convolutions that are computed from the same input, by
 # computing them as a single convolution with more outputs, and then

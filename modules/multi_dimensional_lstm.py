@@ -372,10 +372,16 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # is a hack to avoid that the new_memory_state cannot grow unbounded
             # Since the gate activations can be up to 1, summing two functions of previous memory state
             # without this normalization leads to a memory state that can keep growing
+            # new_memory_state = input_and_input_gate_combined + \
+            #     0.5 * forget_gate_two_activation_multiplied_with_previous_memory_state + \
+            #     0.5 * forget_gate_one_activation_multiplied_with_previous_memory_state # + \
+            #     # forget_gates_combined_activation_multiplied_with_previous_memory_state \
+
+            # As an alternative, with the bias of the forget gates initialized to 0, it could probably also work
             new_memory_state = input_and_input_gate_combined + \
-                0.5 * forget_gate_two_activation_multiplied_with_previous_memory_state + \
-                0.5 * forget_gate_one_activation_multiplied_with_previous_memory_state # + \
-                # forget_gates_combined_activation_multiplied_with_previous_memory_state \
+                               forget_gate_two_activation_multiplied_with_previous_memory_state + \
+                               forget_gate_one_activation_multiplied_with_previous_memory_state  # + \
+            # forget_gates_combined_activation_multiplied_with_previous_memory_state \
 
             # print("new_memory_state.requires_grad: " + str(new_memory_state.requires_grad))
 
