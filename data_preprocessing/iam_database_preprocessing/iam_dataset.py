@@ -204,7 +204,8 @@ class IamLinesDataset(Dataset):
 
     def get_data_loader_with_appropriate_padding(self, data_set, max_image_height,
                                                  max_image_width, max_labels_length,
-                                                 batch_size: int, padding_strategy: PaddingStrategy):
+                                                 batch_size: int, padding_strategy: PaddingStrategy,
+                                                 keep_unsigned_int_format: bool):
         to_tensor = ToTensor()
 
         train_set_pairs = list([])
@@ -345,7 +346,8 @@ class IamLinesDataset(Dataset):
             # print("after padding: image_padded.size(): " + str(image_padded.size()))
             # print("after padding: image_padded: " + str(image_padded))
 
-            # image_padded = IamLinesDataset.convert_unsigned_int_image_tensor_to_float_image_tensor(image_padded)
+            if not keep_unsigned_int_format:
+                image_padded = IamLinesDataset.convert_unsigned_int_image_tensor_to_float_image_tensor(image_padded)
             # print("after padding and type conversion: image_padded: " + str(image_padded))
 
             digits_padding_required = max_labels_length - labels_length
@@ -390,7 +392,8 @@ class IamLinesDataset(Dataset):
                                                                   test_examples_fraction: float,
                                                                   permutation_save_or_load_file_path: str,
                                                                   minimize_vertical_padding: bool,
-                                                                  minimize_horizontal_padding: bool):
+                                                                  minimize_horizontal_padding: bool,
+                                                                  keep_unsigned_int_format: bool):
 
         print("Entered get_random_train_set_validation_set_test_set_data_loaders...")
 
@@ -416,18 +419,19 @@ class IamLinesDataset(Dataset):
 
         print("Prepare IAM data train loader...")
         train_loader = self.get_data_loader_with_appropriate_padding(train_set, max_image_height, max_image_width,
-                                                                     max_labels_length, batch_size, padding_strategy)
+                                                                     max_labels_length, batch_size, padding_strategy,
+                                                                     keep_unsigned_int_format)
 
         print("Prepare IAM data validation loader...")
         validation_loader = self.get_data_loader_with_appropriate_padding(validation_set, max_image_height,
                                                                           max_image_width,
                                                                           max_labels_length, batch_size,
-                                                                          padding_strategy)
+                                                                          padding_strategy, keep_unsigned_int_format)
 
         print("Prepare IAM data test loader...")
         test_loader = self.get_data_loader_with_appropriate_padding(test_set, max_image_height, max_image_width,
                                                                     max_labels_length, batch_size,
-                                                                    padding_strategy)
+                                                                    padding_strategy, keep_unsigned_int_format)
 
         return train_loader, validation_loader, test_loader
 
@@ -653,7 +657,8 @@ def test_iam_lines_dataset():
     minimize_horizontal_padding = True
     iam_lines_dataset.get_random_train_set_validation_set_test_set_data_loaders(16, 0.5, 0.2, 0.3,
                                                                                 permutation_save_or_load_file_path,
-                                                                                minimize_horizontal_padding)
+                                                                                minimize_horizontal_padding, False
+                                                                                )
 
 
 def test_iam_words_dataset():
@@ -684,7 +689,8 @@ def test_iam_words_dataset():
     minimize_horizontal_padding = True
     iam_lines_dataset.get_random_train_set_validation_set_test_set_data_loaders(16, 0.5, 0.2, 0.3,
                                                                                 permutation_save_or_load_file_path,
-                                                                                minimize_horizontal_padding)
+                                                                                minimize_horizontal_padding, False
+                                                                                )
 
 
 def main():

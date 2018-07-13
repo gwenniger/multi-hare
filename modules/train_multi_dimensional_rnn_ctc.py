@@ -804,11 +804,13 @@ def iam_line_recognition(model_opt, checkpoint):
 
         permutation_save_or_load_file_path = opt.data_permutation_file_path
 
+        image_input_is_unsigned_int = False
         train_loader, validation_loader, test_loader = iam_lines_dataset.\
             get_random_train_set_validation_set_test_set_data_loaders(batch_size, train_examples_fraction,
                                                                       validation_examples_fraction,
                                                                       test_examples_fraction,
-                                                                      permutation_save_or_load_file_path)
+                                                                      permutation_save_or_load_file_path,
+                                                                      image_input_is_unsigned_int)
         print("Loading IAM dataset: DONE")
 
         # test_mdrnn_cell()
@@ -835,7 +837,6 @@ def iam_line_recognition(model_opt, checkpoint):
 
         input_size = SizeTwoDimensional.create_size_two_dimensional(input_height, input_width)
         #with torch.autograd.profiler.profile(use_cuda=False) as prof:
-        image_input_is_unsigned_int = True
         train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels, input_size, hidden_states_size,
                         batch_size, compute_multi_directional, use_dropout, vocab_list, blank_symbol,
                         image_input_is_unsigned_int, "IAM")
@@ -845,7 +846,7 @@ def iam_word_recognition(model_opt, checkpoint):
     # With the improved padding, the height of the images is 128,
     # and memory usage is less, so batch_size 30 instead of 20 is possible,
     # but it is only slightly faster (GPU usage appears to be already maxed out)
-    batch_size = 48 #  #128 #32 #128
+    batch_size = 64 #  #128 #32 #128
 
     # lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
     lines_file_path = model_opt.iam_database_lines_file_path
@@ -872,13 +873,15 @@ def iam_word_recognition(model_opt, checkpoint):
 
     minimize_vertical_padding = True
     minimize_horizontal_padding = True
+    image_input_is_unsigned_int = False
     train_loader, validation_loader, test_loader = iam_words_dataset. \
         get_random_train_set_validation_set_test_set_data_loaders(batch_size, train_examples_fraction,
                                                                   validation_examples_fraction,
                                                                   test_examples_fraction,
                                                                   permutation_save_or_load_file_path,
                                                                   minimize_vertical_padding,
-                                                                  minimize_horizontal_padding)
+                                                                  minimize_horizontal_padding,
+                                                                  image_input_is_unsigned_int)
     print("Loading IAM dataset: DONE")
 
     # test_mdrnn_cell()
@@ -902,7 +905,7 @@ def iam_word_recognition(model_opt, checkpoint):
     # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191
 
     # with torch.autograd.profiler.profile(use_cuda=False) as prof:
-    image_input_is_unsigned_int = True
+
     use_block_mdlstm = opt.use_block_mdlstm
     train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels,
                     hidden_states_size,

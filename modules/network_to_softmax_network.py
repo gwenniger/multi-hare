@@ -315,8 +315,6 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
 
         if self.input_is_list:
 
-
-
             if not isinstance(x, list):
                 raise RuntimeError("Error: was expecting input to forward function "
                                    + "to be a list")
@@ -344,8 +342,6 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
                 #     util.image_visualization.imshow_tensor_2d(element_without_channel_dimension)
 
                 # print("x[0].device: " + str(x[0].device))
-                padded_examples_tensor.requires_grad_(True)
-                padded_examples_tensor = padded_examples_tensor.to(x[0].device)
                 # print("padded_examples_tensor.size(): " + str(padded_examples_tensor.size()))
                 # print("padded_examples_tensor.requires_grad:" + str(padded_examples_tensor.requires_grad))
                 # raise RuntimeError("stopping")
