@@ -398,8 +398,8 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
           str(number_of_classes_excluding_blank))
 
     if minimize_horizontal_padding:
-        # multi_dimensional_rnn = nn.DataParallel(multi_dimensional_rnn, device_ids=device_ids)
-        #multi_dimensional_rnn.to(torch.device("cuda:0"))
+        multi_dimensional_rnn = nn.DataParallel(multi_dimensional_rnn, device_ids=device_ids)
+        multi_dimensional_rnn.to(torch.device("cuda:0"))
         network = NetworkToSoftMaxNetwork.create_network_to_soft_max_network(multi_dimensional_rnn,
                                                                              number_of_classes_excluding_blank,
                                                                              data_height, clamp_gradients,
@@ -689,7 +689,7 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
 
 
 def mnist_recognition_fixed_length():
-    batch_size = 128
+    batch_size = 64
     number_of_digits_per_example = 2
     # In MNIST there are the digits 0-9, and we also add a symbol for blanks
     # This vocab_list will be used by the decoder
@@ -926,14 +926,14 @@ def main():
         model_opt = opt
 
     # mnist_recognition_fixed_length()
-    mnist_recognition_variable_length(model_opt, checkpoint,)
+    # mnist_recognition_variable_length(model_opt, checkpoint,)
 
-    # if opt.iam_database_data_type == "lines":
-    #     iam_line_recognition(model_opt, checkpoint)
-    # elif opt.iam_database_data_type == "words":
-    #     iam_word_recognition(model_opt, checkpoint)
-    # else:
-    #     raise RuntimeError("Unrecognized data type")
+    if opt.iam_database_data_type == "lines":
+        iam_line_recognition(model_opt, checkpoint)
+    elif opt.iam_database_data_type == "words":
+        iam_word_recognition(model_opt, checkpoint)
+    else:
+        raise RuntimeError("Unrecognized data type")
     # cifar_ten_basic_recognition()
 
 

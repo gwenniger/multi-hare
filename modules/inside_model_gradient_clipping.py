@@ -111,9 +111,10 @@ class InsideModelGradientClamping:
         # print("zero element indices: " + str(zero_element_indices))
         # grad_output.view(-1)[zero_element_indices] = 0
 
-        # https://stackoverflow.com/questions/45384684/replace-all-nonzero-values-by-zero-and-all-zero-values-by-a-specific-value/45386834
+        # https://stackoverflow.com/questions/45384684/
+        # replace-all-nonzero-values-by-zero-and-all-zero-values-by-a-specific-value/45386834
         grad_output = grad_input.clone()
-        grad_output[grad_input.abs() < 0.0000000001] = 1
+        grad_output[grad_input.abs() < 0.0000000001] = 0
         # print("grad_output: " + str(grad_output))
         # print("grad_output.size(): " + str(grad_output.size()))
         # print("number of non-zeros after: " + str(TensorUtils.number_of_non_zeros(grad_output)))
