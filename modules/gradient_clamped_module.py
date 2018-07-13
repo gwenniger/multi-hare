@@ -25,9 +25,11 @@ class GradientClampedModule(Module):
     def __init__(self, module):
         super(GradientClampedModule, self).__init__()
         self.module = module
+
+        # https://github.com/pytorch/pytorch/issues/7040
+        # https://github.com/pytorch/pytorch/issues/598
         # self.module.register_backward_hook(lambda module,
-        #                                           grad_i,
-        #                                           grad_o: GradientClampedModule.clamp_gradient_tuples(grad_i))
+        #                                           grad_i: GradientClampedModule.clamp_gradient_tuples(grad_i))
         self.weight = module.weight
         self.bias = module.bias
         self.gradient_clamping_function = GradientClampingFunction()

@@ -76,6 +76,15 @@ class TensorUtils:
         return number_of_zeros
 
     @staticmethod
+    def number_of_non_zeros(tensor):
+        mask = tensor.eq(0)
+        zero_elements = torch.masked_select(tensor, mask).view(-1)
+        number_of_zeros = zero_elements.size(0)
+        number_of_elements = tensor.view(-1).size(0)
+        return number_of_elements - number_of_zeros
+
+
+    @staticmethod
     def number_of_ones(tensor):
         mask = tensor.eq(1)
         one_elements = torch.masked_select(tensor, mask).view(-1)
@@ -113,3 +122,24 @@ class TensorUtils:
     @staticmethod
     def apply_binary_mask(tensor, mask):
         return tensor * mask
+
+    @staticmethod
+    def print_max(tensor, variable_name):
+        print("max element in " + variable_name + " :" + str(torch.max(tensor)))
+
+
+def test_number_of_non_zeros():
+
+    tensor = torch.zeros(3, 3)
+    print("tensor: " + str(tensor))
+    print("number of non-zeros: " + str(TensorUtils.number_of_non_zeros(tensor)))
+
+
+
+
+def main():
+    test_number_of_non_zeros()
+
+
+if __name__ == "__main__":
+    main()

@@ -4,7 +4,7 @@ from modules.parallel_multiple_input_convolutions_computation import ParallelMul
 from abc import abstractmethod
 import torch.nn as nn
 from torch.nn.modules.module import Module
-
+import torch
 
 class MultiDimensionalLSTMParametersOneDirectionBase(Module):
     # https://github.com/pytorch/pytorch/issues/750
@@ -395,17 +395,18 @@ class MultiDimensionalLSTMParametersOneDirectionFast(MultiDimensionalLSTMParamet
         self.input_matrices = None
 
     def prepare_computation_next_column_functions(self, previous_hidden_state_column,
-                                                  previous_memory_state_column):
+                                                  previous_memory_state_column,  mask: torch.Tensor):
         # The hidden state columns for the different computational nodes:
         # 1) the input, 2) the input gate, 3) forget gate one,
         # 4) forget gate two, 5) the output gate
         self.node_hidden_state_columns = \
-            self.parallel_hidden_state_column_computation.compute_summed_outputs_every_pair(previous_hidden_state_column)
+            self.parallel_hidden_state_column_computation.\
+                compute_summed_outputs_every_pair(previous_hidden_state_column, mask)
         self.previous_memory_state_column = previous_memory_state_column
 
         self.node_memory_state_columns = self.\
             parallel_memory_state_column_computation.\
-            compute_result_and_split_into_pairs_with_second_pair_element_shifted(previous_memory_state_column)
+            compute_result_and_split_into_pairs_with_second_pair_element_shifted(previous_memory_state_column, mask)
 
     def get_input_input_matrix(self):
         return self.input_matrices[0]

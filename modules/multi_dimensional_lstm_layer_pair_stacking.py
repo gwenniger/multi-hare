@@ -64,15 +64,18 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
                                                           nonlinearity="tanh"
                                                           ):
         block_multi_dimensional_lstm_layer_pairs = list([])
+        layer_pair_index = 0
         for layer_pair_specific_parameters in layer_pair_specific_parameters_list:
             layer_pair = MultiDimensionalLSTMLayerPairStacking.\
-                create_block_multi_dimensional_lstm_layer_pair(layer_pair_specific_parameters,
+                create_block_multi_dimensional_lstm_layer_pair(layer_pair_index,
+                                                               layer_pair_specific_parameters,
                                                                compute_multi_directional,
                                                                clamp_gradients,
                                                                use_dropout,
                                                                use_bias_with_block_strided_convolution,
                                                                nonlinearity)
             block_multi_dimensional_lstm_layer_pairs.append(layer_pair)
+            layer_pair_index += 1
         return MultiDimensionalLSTMLayerPairStacking(block_multi_dimensional_lstm_layer_pairs)
 
     @staticmethod
@@ -84,16 +87,18 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
                                                     nonlinearity="tanh"
                                                     ):
         multi_dimensional_lstm_layer_pairs = list([])
+        layer_pair_index = 0
         for layer_pair_specific_parameters in layer_pair_specific_parameters_list:
             print("layer_pair_specific_parameters: " + str(layer_pair_specific_parameters))
             layer_pair = MultiDimensionalLSTMLayerPairStacking. \
-                create_multi_dimensional_lstm_layer_pair(layer_pair_specific_parameters,
+                create_multi_dimensional_lstm_layer_pair(layer_pair_index, layer_pair_specific_parameters,
                                                          compute_multi_directional,
                                                          clamp_gradients,
                                                          use_dropout,
                                                          use_bias_with_block_strided_convolution,
                                                          nonlinearity)
             multi_dimensional_lstm_layer_pairs.append(layer_pair)
+            layer_pair_index += 1
         return MultiDimensionalLSTMLayerPairStacking(multi_dimensional_lstm_layer_pairs)
 
     @staticmethod
@@ -116,6 +121,7 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
 
     @staticmethod
     def create_multi_dimensional_lstm_layer_pair(
+            layer_index,
             layer_pair_specific_parameters: MDLSTMLayerPairSpecificParameters,
             compute_multi_directional: bool,
             clamp_gradients: bool,
@@ -124,6 +130,7 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
             nonlinearity="tanh"):
 
         return MDLSTMLayerBlockStridedConvolutionLayerPair.create_mdlstm_block_strided_convolution_layer_pair(
+            layer_index,
             layer_pair_specific_parameters.input_channels, layer_pair_specific_parameters.mdlstm_hidden_states_size,
             layer_pair_specific_parameters.output_channels,
             layer_pair_specific_parameters.block_strided_convolution_block_size, compute_multi_directional,
@@ -169,7 +176,7 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
 
         layer_pairs_specific_parameters_list = list([pair_one_specific_parameters, pair_two_specific_parameters])
         return MultiDimensionalLSTMLayerPairStacking.\
-            create_block_multi_dimensional_lstm_pair_stacking(layer_pairs_specific_parameters_list,
+            create_multi_dimensional_lstm_pair_stacking(layer_pairs_specific_parameters_list,
                                                               compute_multi_directional, clamp_gradients, use_dropout,
                                                               nonlinearity)
 

@@ -65,12 +65,13 @@ class InputMatrices():
 
 class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
-    def __init__(self, input_channels: int, hidden_states_size: int, compute_multi_directional: bool,
+    def __init__(self, layer_index: int, input_channels: int, hidden_states_size: int, compute_multi_directional: bool,
                  clamp_gradients: bool,
                  use_dropout: bool, training: bool,
                  multi_dimensional_lstm_parameter_creator:MultiDimensionalLSTMParametersCreator,
                  nonlinearity="tanh"):
-        super(MultiDimensionalLSTM, self).__init__(input_channels, hidden_states_size, compute_multi_directional,
+        super(MultiDimensionalLSTM, self).__init__(layer_index, input_channels, hidden_states_size,
+                                                   compute_multi_directional,
                                                    nonlinearity)
 
         self.clamp_gradients = clamp_gradients
@@ -124,23 +125,23 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             self.state_convolutions.extend(self.mdlstm_direction_four_parameters.get_all_parameters_as_list())
 
     @staticmethod
-    def create_multi_dimensional_lstm(input_channels: int, hidden_states_size: int, compute_multi_directional: bool,
+    def create_multi_dimensional_lstm(layer_index: int, input_channels: int, hidden_states_size: int, compute_multi_directional: bool,
                                       clamp_gradients: bool,
                                       use_dropout: bool,
                                       nonlinearity="tanh"):
-        return MultiDimensionalLSTM(input_channels, hidden_states_size, compute_multi_directional,
+        return MultiDimensionalLSTM(layer_index, input_channels, hidden_states_size, compute_multi_directional,
                                     clamp_gradients, use_dropout,
                                     True,
                                     MultiDimensionalLSTMParametersCreatorSlow(),
                                     nonlinearity)
 
     @staticmethod
-    def create_multi_dimensional_lstm_fast(input_channels: int, hidden_states_size: int,
+    def create_multi_dimensional_lstm_fast(layer_index: int, input_channels: int, hidden_states_size: int,
                                            compute_multi_directional: bool,
                                            clamp_gradients: bool,
                                            use_dropout: bool,
                                            nonlinearity="tanh"):
-        return MultiDimensionalLSTM(input_channels, hidden_states_size, compute_multi_directional,
+        return MultiDimensionalLSTM(layer_index, input_channels, hidden_states_size, compute_multi_directional,
                                     clamp_gradients, use_dropout,
                                     True,
                                     MultiDimensionalLSTMParametersCreatorFast(),
@@ -215,8 +216,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
         # print("skewed image columns: " + str(skewed_image_columns))
 
-        for column_number in range(0, skewed_image_columns):
-            #print("column_number: " + str(column_number))
+        for column_index in range(0, skewed_image_columns):
+            #print("column_index: " + str(column_index))
             #print("previous_hidden_state_column.is_leaf: " + str(previous_hidden_state_column.is_leaf))
             #print("previous_hidden_state_column.grad_fn: " + str(previous_hidden_state_column.grad_fn))
             #print("previous_memory_state_column.is_leaf: " + str(previous_memory_state_column.is_leaf))
@@ -229,22 +230,33 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
             # print("previous hidden state column: " + str(previous_hidden_state_column))
             # print("previous memory state column: " + str(previous_memory_state_column))
+
+            # Apply a binary mask to zero out entries in the activation_column
+            # and new_memory_state that are not corresponding to valid states,
+            # but that are an artifact of the computation by convolution using
+            # the image skewing trick
+            valid_entries_selection_mask = mask[:, column_index]
+            # print("valid_entries_selection_mask: " + str(valid_entries_selection_mask))
+
             mdlstm_parameters.prepare_computation_next_column_functions(previous_hidden_state_column,
-                                                                        previous_memory_state_column)
+                                                                        previous_memory_state_column,
+                                                                        valid_entries_selection_mask)
 
 
             # Compute convolution on previous state column vector padded with zeros
             # Compute convolution on previous state column vector padded with zeros
             input_hidden_state_column = mdlstm_parameters.get_input_hidden_state_column()
 
-            # print("state_column.size(): " + str(state_column.size()))
+            # print("input_hidden_state_column.size(): " + str(input_hidden_state_column.size()))
+
+
             input_state_plus_input = MultiDimensionalRNNBase.\
-                compute_states_plus_input(input_matrices.input_input_matrix, column_number,
+                compute_states_plus_input(input_matrices.input_input_matrix, column_index,
                                           input_hidden_state_column)
 
             # Compute the sum of weighted inputs of the input gate
             input_gate_weighted_states_plus_input = MultiDimensionalLSTM.\
-                compute_weighted_input_input_gate(column_number, input_matrices.input_gate_input_matrix,
+                compute_weighted_input_input_gate(column_index, input_matrices.input_gate_input_matrix,
                                                   mdlstm_parameters)
 
             # Clamp before activation functions
@@ -280,7 +292,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             forget_gate_one_weighted_states_plus_input = self.compute_weighted_input_forget_gate(
                 mdlstm_parameters.get_forget_gate_one_hidden_state_column(),
                 mdlstm_parameters.get_forget_gate_one_memory_state_column(),
-                column_number, input_matrices.forget_gate_one_input_matrix)
+                column_index, input_matrices.forget_gate_one_input_matrix)
 
             if self.clamp_gradients:
                 forget_gate_one_weighted_states_plus_input = \
@@ -313,7 +325,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             forget_gate_two_weighted_states_plus_input = self.compute_weighted_input_forget_gate(
                 mdlstm_parameters.get_forget_gate_two_hidden_state_column(),
                 mdlstm_parameters.get_forget_gate_two_memory_state_column(),
-                column_number, input_matrices.forget_gate_two_input_matrix)
+                column_index, input_matrices.forget_gate_two_input_matrix)
 
             if self.clamp_gradients:
                 forget_gate_two_weighted_states_plus_input = \
@@ -323,6 +335,9 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
             # Compute the forget gate two activation
             forget_gate_two_activation_column = F.sigmoid(forget_gate_two_weighted_states_plus_input)
+
+            # TensorUtils.print_max(forget_gate_one_activation_column, "forget_gate_one_activation_column")
+            # TensorUtils.print_max(forget_gate_two_activation_column, "forget_gate_two_activation_column")
 
 
             # forget_gate_weighted_states_combined =  forget_gate_one_weighted_stated_plus_input + forget_gate_two_weighted_stated_plus_input
@@ -351,10 +366,18 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             #print("forget_gate_two_activation_multiplied_with_previous_memory_state: " +
             #      str(forget_gate_two_activation_multiplied_with_previous_memory_state))
 
+
+            # Multiplying the values of forget_gate_two_activation_multiplied_with_previous_memory_state
+            # and forget_gate_one_activation_multiplied_with_previous_memory_state with factor 0.5
+            # is a hack to avoid that the new_memory_state cannot grow unbounded
+            # Since the gate activations can be up to 1, summing two functions of previous memory state
+            # without this normalization leads to a memory state that can keep growing
             new_memory_state = input_and_input_gate_combined + \
-                forget_gate_two_activation_multiplied_with_previous_memory_state + \
-                forget_gate_one_activation_multiplied_with_previous_memory_state # + \
+                0.5 * forget_gate_two_activation_multiplied_with_previous_memory_state + \
+                0.5 * forget_gate_one_activation_multiplied_with_previous_memory_state # + \
                 # forget_gates_combined_activation_multiplied_with_previous_memory_state \
+
+            # print("new_memory_state.requires_grad: " + str(new_memory_state.requires_grad))
 
             if self.clamp_gradients:
                 new_memory_state = \
@@ -371,12 +394,27 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # This additional tanh activation function taken from the NVIDIA diagram
             # was not in the deep learning book diagram, and does not seem to help
             # really ?
-            # new_memory_state_activation_column = F.tanh(new_memory_state)
+            new_memory_state_activation_column = F.tanh(new_memory_state)
+
+            # This appears to be the first gradient component that gets nan input on the backward pass
+            variable_identification_string = "layer: " + str(self.layer_index) + " column_index: " \
+                                             + str(column_index) + " (max index = " + str(skewed_image_columns - 1) \
+                                             + ") - mdlstm - new_memory_state_activation_column"
+            if self.clamp_gradients:
+                new_memory_state_activation_column = InsideModelGradientClamping.\
+                    register_gradient_clamping(
+                        new_memory_state_activation_column, 10, True, variable_identification_string
+                    )
+
+            # This grows too much in the forward pass unless new_memory_state computation
+            # multiplies contributions of memory states each by factor 0.5
+            # TensorUtils.print_max(new_memory_state, "new_memory_state")
+
 
             # Compute the sum of weighted inputs of the ouput gate
             output_gate_weighted_states_plus_input = self. \
                 compute_weighted_input_output_gate(mdlstm_parameters, new_memory_state,
-                                                   column_number,
+                                                   column_index,
                                                    input_matrices.output_gate_input_matrix)
 
             if self.clamp_gradients:
@@ -385,13 +423,31 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                         output_gate_weighted_states_plus_input,
                     "mdlstm - output_gate_weighted_states_plus_input")
 
-            output_gate_activation_column = F.sigmoid(output_gate_weighted_states_plus_input)
+            # This grows too much in the forward pass unless new_memory_state computation
+            # multiplies contributions of memory states each by factor 0.5
+            # e.g. without correction:
+            # max element in output_gate_weighted_states_plus_input :tensor(1.4322e+10, device='cuda:0')
+            # TensorUtils.print_max(output_gate_weighted_states_plus_input, "output_gate_weighted_states_plus_input")
+
+            # output_gate_activation_column = F.sigmoid(output_gate_weighted_states_plus_input)
+            output_gate_activation_column = torch.sigmoid(output_gate_weighted_states_plus_input)
+
+
+            # print("output_gate_activation_column.requires_grad:" + str(output_gate_activation_column.requires_grad))
 
             # This appears to be the first gradient component that gets nan input on the backward pass
+            # Could one of the gradients be None? https://discuss.pytorch.org/t/zero-grad-optimizer-or-net/1887/5
+            # https://github.com/pytorch/pytorch/issues/4132
+            variable_identification_string = "layer: " + str(self.layer_index) + " column_index: " \
+                                             + str(column_index) + " (max index = " + str(skewed_image_columns - 1) \
+                                             + ") - mdlstm - output_gate_activation_column"
             if self.clamp_gradients:
-                output_gate_activation_column = InsideModelGradientClamping.register_gradient_clamping_default_clamping_bound(
-                        output_gate_activation_column,
-                    "mdlstm - output_gate_activation_column")
+                output_gate_activation_column = InsideModelGradientClamping.\
+                    register_gradient_clamping_default_clamping_bound(
+                        output_gate_activation_column, variable_identification_string
+                    )
+
+            # TensorUtils.print_max(output_gate_activation_column, "output_gate_activation_column")
 
             # print("input_column: " + str(input_column))
             #print("state_plus_input: " + str(state_plus_input))
@@ -399,11 +455,11 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # This is according to the NVIDIA LSTM diagram
             # activation_column = torch.mul(new_memory_state_activation_column, output_gate_activation_column)
 
-            # This is following the deep learning book
+            # # This is following the deep learning book
             activation_column = torch.mul(new_memory_state, output_gate_activation_column)
 
             if self.clamp_gradients:
-                InsideModelGradientClamping.register_gradient_clamping(activation_column, 10, False,
+                InsideModelGradientClamping.register_gradient_clamping(activation_column, 10, True,
                                                                        "mdlstm - activation_column")
 
             #activation_column = self.get_activation_function()(input_state_plus_input)
@@ -411,16 +467,22 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # print("output gate activation column: " + str(output_gate_activation_column))
             #print("activation column: " + str(activation_column))
 
-            # Apply a binary mask to zero out entries in the activation_column
-            # and new_memory_state that are not corresponding to valid states,
-            # but that are an artifact of the computation by convolution using
-            # the image skewing trick
-            valid_entries_selection_mask = mask[:, column_number]
-            activation_column = TensorUtils.apply_binary_mask(activation_column, valid_entries_selection_mask)
-            new_memory_state = TensorUtils.apply_binary_mask(new_memory_state, valid_entries_selection_mask)
+
+            # activation_column = TensorUtils.apply_binary_mask(activation_column, valid_entries_selection_mask)
+            # new_memory_state = TensorUtils.apply_binary_mask(new_memory_state, valid_entries_selection_mask)
+            #
+            # if self.clamp_gradients:
+            #     InsideModelGradientClamping.register_gradient_clamping(activation_column, 10, True,
+            #                                                            "mdlstm - apply binary mask")
+            #     InsideModelGradientClamping.register_gradient_clamping(new_memory_state, 10, True,
+            #                                                            "mdlstm - apply binary mask")
 
             previous_hidden_state_column = activation_column
             previous_memory_state_column = new_memory_state
+
+            # Does not seem to help either: https://github.com/pytorch/pytorch/issues/4649
+            # previous_hidden_state_column.retain_grad()
+            # previous_memory_state_column.retain_grad()
 
             activations.append(activation_column)
 

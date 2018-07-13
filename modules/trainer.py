@@ -128,9 +128,6 @@ class Trainer:
             # Labels must remain on CPU for warp-ctc loss
             # labels = labels.to(device)
 
-            # zero the parameter gradients
-            self.optimizer.zero_grad()
-
             # print("inputs: " + str(inputs))
 
             # forward + backward + optimize
@@ -185,6 +182,10 @@ class Trainer:
             # loss = criterion(outputs, labels)
 
             time_start_loss_backward = util.timing.date_time_start()
+
+            # zero the parameter gradients
+            self.optimizer.zero_grad()
+            self.model.zero_grad()
 
             # get_dot = modules.find_bad_gradients.register_hooks(outputs)
             loss.backward()

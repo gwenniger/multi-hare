@@ -43,6 +43,7 @@ class MDLSTMLayerBlockStridedConvolutionLayerPair(Module):
 
     @staticmethod
     def create_mdlstm_block_strided_convolution_layer_pair(
+            layer_index,
             input_channels: int, mdlstm_hidden_states_size: int,
             output_channels: int,
             block_strided_convolution_block_size: SizeTwoDimensional,
@@ -53,7 +54,7 @@ class MDLSTMLayerBlockStridedConvolutionLayerPair(Module):
 
         print("Create {mdlstm,_block-strided_convolution} layer_pair...")
         multi_dimensional_lstm = MultiDimensionalLSTM.\
-            create_multi_dimensional_lstm_fast(input_channels, mdlstm_hidden_states_size,
+            create_multi_dimensional_lstm_fast(layer_index, input_channels, mdlstm_hidden_states_size,
                                                compute_multi_directional,
                                                clamp_gradients,
                                                use_dropout,

@@ -5,7 +5,7 @@ from torch.nn.modules.module import Module
 import torch
 from modules.inside_model_gradient_clipping import InsideModelGradientClamping
 from modules.gradient_clamped_module import GradientClampedModule
-
+from util.tensor_utils import TensorUtils
 
 # This class optimizes the computation of multiple states computed
 # using 1D convolutions that are computed from the same input, by
@@ -65,7 +65,7 @@ class ParallelMultipleStateWeightingsComputation(Module):
     # https://github.com/pytorch/examples/blob/master/mnist/main.py
     # Where to apply dropout:
     # https://stats.stackexchange.com/questions/240305/where-should-i-place-dropout-layers-in-a-neural-network
-    def compute_convolution_result(self, previous_state_column):
+    def compute_convolution_result(self, previous_state_column: torch.Tensor, mask: torch.Tensor):
         if self.use_dropout:
                 # print("Applying dropout...")
                 # TODO: which probability to use for dropout?
@@ -78,8 +78,13 @@ class ParallelMultipleStateWeightingsComputation(Module):
             # Create a 1d convolution with clamping of the gradient
             result = InsideModelGradientClamping.\
                 register_gradient_clamping_default_clamping_bound(result,
-                                                                  "parallel_multiple_state_weightings_Computation")
+                                                                  "parallel_multiple_state_weightings_Computation",
+                                                                  mask)
 
+        if not(mask is None):
+            result = TensorUtils.apply_binary_mask(result, mask)
+
+        # print("compute_convolution_result - result.size():" + str(result.size()))
 
         return result
 
@@ -89,10 +94,10 @@ class ParallelMultipleStateWeightingsComputation(Module):
     def get_result_range_end_index(self, result_element_index):
         return self.hidden_states_size * (result_element_index + 1)
 
-    def compute_result_and_split_into_output_pairs(self, previous_state_column):
+    def compute_result_and_split_into_output_pairs(self, previous_state_column, mask: torch.Tensor):
         result = list([])
 
-        convolution_result = self.compute_convolution_result(previous_state_column)
+        convolution_result = self.compute_convolution_result(previous_state_column, mask)
         # print("convolution result: " + str(convolution_result))
 
         # print(">>> parallel_multiple_state_weightings_computation."
@@ -112,9 +117,10 @@ class ParallelMultipleStateWeightingsComputation(Module):
             result.append(pair)
         return result
 
-    def compute_result_and_split_into_pairs_with_second_pair_element_shifted(self, previous_state_column):
+    def compute_result_and_split_into_pairs_with_second_pair_element_shifted(self, previous_state_column,
+                                                                             mask: torch.Tensor=None):
         result = list([])
-        convolution_result_pairs = self.compute_result_and_split_into_output_pairs(previous_state_column)
+        convolution_result_pairs = self.compute_result_and_split_into_output_pairs(previous_state_column, mask)
         for result_pair in convolution_result_pairs:
             pair_element_one = result_pair[0]
             # pair_element_two = result_pair[1]
@@ -145,10 +151,10 @@ class ParallelMultipleStateWeightingsComputation(Module):
     # 3. Shift the second element of each pair one row down, and sum it with the first
     #    element to get the final output for each pair. Return the list of these
     #    results, which has number_of_paired_input_weightings elements
-    def compute_summed_outputs_every_pair(self, previous_state_column):
+    def compute_summed_outputs_every_pair(self, previous_state_column,  mask: torch.Tensor):
         result = list([])
         convolution_result_pairs = self.\
-            compute_result_and_split_into_pairs_with_second_pair_element_shifted(previous_state_column)
+            compute_result_and_split_into_pairs_with_second_pair_element_shifted(previous_state_column, mask)
         for result_pair in convolution_result_pairs:
             pair_element_one = result_pair[0]
             pair_two_element_shifted = result_pair[1]

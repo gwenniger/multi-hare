@@ -594,7 +594,7 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
     # multi_dimensional_rnn.register_backward_hook(printgradnorm)
 
     data_height = get_data_height(train_loader)
-    clamp_gradients = True
+    clamp_gradients = False
     network = create_model(checkpoint, data_height, input_channels, hidden_states_size,
                            compute_multi_directional, use_dropout, vocab_list,
                            clamp_gradients, data_set_name, minimize_horizontal_padding, device_ids,
@@ -845,7 +845,7 @@ def iam_word_recognition(model_opt, checkpoint):
     # With the improved padding, the height of the images is 128,
     # and memory usage is less, so batch_size 30 instead of 20 is possible,
     # but it is only slightly faster (GPU usage appears to be already maxed out)
-    batch_size = 64 #  #128 #32 #128
+    batch_size = 48 #  #128 #32 #128
 
     # lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
     lines_file_path = model_opt.iam_database_lines_file_path

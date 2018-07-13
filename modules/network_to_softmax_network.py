@@ -315,6 +315,8 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
 
         if self.input_is_list:
 
+
+
             if not isinstance(x, list):
                 raise RuntimeError("Error: was expecting input to forward function "
                                    + "to be a list")
@@ -333,9 +335,20 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
                                                         self.get_width_reduction_factor())
                 padded_examples_tensor, max_input_width = last_minute_padding.pad_and_cat_list_of_examples(x)
 
+                # for index in range(0, padded_examples_tensor.size(0)):
+                #     # if element.size(1) > 64:
+                #     element = padded_examples_tensor[index, :, :, :]
+                #     print("image to be plotted size: " + str(element.size()))
+                #     element_without_channel_dimension = element.squeeze(0)
+                #     element_without_channel_dimension = element_without_channel_dimension.cpu()
+                #     util.image_visualization.imshow_tensor_2d(element_without_channel_dimension)
+
                 # print("x[0].device: " + str(x[0].device))
+                padded_examples_tensor.requires_grad_(True)
                 padded_examples_tensor = padded_examples_tensor.to(x[0].device)
-                # print("padded_examples_tensor: " + str(padded_examples_tensor))
+                # print("padded_examples_tensor.size(): " + str(padded_examples_tensor.size()))
+                # print("padded_examples_tensor.requires_grad:" + str(padded_examples_tensor.requires_grad))
+                # raise RuntimeError("stopping")
                 activations = self.network(padded_examples_tensor)
         else:
             activations = self.network(x)

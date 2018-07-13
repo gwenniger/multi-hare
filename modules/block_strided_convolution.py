@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from util.tensor_chunking import TensorChunking
 from util.tensor_list_chunking import TensorListChunking
 from modules.inside_model_gradient_clipping import InsideModelGradientClamping
-
+from util.tensor_utils import TensorUtils
 
 class BlockStridedConvolution(Module):
 
@@ -85,11 +85,15 @@ class BlockStridedConvolution(Module):
         x_chunked = x
 
         convolution_output = self.convolution(x_chunked)
+        # TensorUtils.print_max(convolution_output, "block_strided_convolution - convolution_output")
         if self.clamp_gradients:
-            convolution_output = InsideModelGradientClamping.register_gradient_clamping_default_clamping_bound(
-                convolution_output, "block_strided_convolution - convolution_output")
+            # convolution_output = InsideModelGradientClamping.register_gradient_clamping_default_clamping_bound(
+            #     convolution_output, "block_strided_convolution - convolution_output")
+            convolution_output = InsideModelGradientClamping.register_gradient_clamping(
+                convolution_output, 10, True, "block_strided_convolution - convolution_output")
         # print("convolution output: " + str(convolution_output))
         result = self.get_activation_function()(convolution_output)
+        # TensorUtils.print_max(result, "block_strided_convolution - result")
 
         # Tanh and sigmoid have a derivative that is not higher than 1,
         # so they should not give large gradients in the backward pass
