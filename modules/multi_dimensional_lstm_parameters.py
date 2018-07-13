@@ -9,8 +9,8 @@ import torch
 
 class MultiDimensionalLSTMParametersOneDirectionBase(Module):
     # https://github.com/pytorch/pytorch/issues/750
-    # FORGET_GATE_BIAS_INIT = 1  # Good for normal LSTM
-    FORGET_GATE_BIAS_INIT = 0    # For stable learning in MDLSTM
+    FORGET_GATE_BIAS_INIT = 1  # Good for normal LSTM
+    # FORGET_GATE_BIAS_INIT = 0    # For stable learning in MDLSTM ? Doesn't really seem to help to avoid nans
 
     def __init__(self, hidden_states_size,
                  input_channels: int, use_dropout: bool):
