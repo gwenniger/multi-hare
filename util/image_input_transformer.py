@@ -65,12 +65,20 @@ class ImageInputTransformer:
         return result
 
     @staticmethod
-    def get_skewed_images_width(original_image_tensors):
-        height = original_image_tensors.size(2)
-        width = original_image_tensors.size(3)
+    def get_skewed_images_width(height: int, width: int):
         transformed_images_width = height + width - 1
         return transformed_images_width
 
+    @staticmethod
+    def get_original_width_yielding_skewed_image_width(height: int,
+                                                       skewed_image_width: int):
+        return skewed_image_width - height + 1
+
+    @staticmethod
+    def get_skewed_images_width_four_dimensional_tensor(original_image_tensors):
+        height = original_image_tensors.size(2)
+        width = original_image_tensors.size(3)
+        return ImageInputTransformer.get_skewed_images_width(height, width)
 
     # Optimized method computes the complete set of skewed images all in one go
     # using pytorch tensor indexing to select slices of rows from multiple images
@@ -92,7 +100,7 @@ class ImageInputTransformer:
         number_of_image_tensors  = image_tensors.size(0)
 
         transformed_images = torch.zeros(number_of_image_tensors, number_of_channels, height,
-                                         ImageInputTransformer.get_skewed_images_width(image_tensors))
+                                         ImageInputTransformer.get_skewed_images_width_four_dimensional_tensor(image_tensors))
 
         for y in range(image_tensors.size(2)):
             leading_zeros = y
@@ -221,7 +229,7 @@ class ImageInputTransformer:
         # print("transformed_im   age.size(): " + str(transformed_image.size()))
 
         # The width of the transformed images is width+height-1 (important for unequal sized input_
-        transformed_images_width = ImageInputTransformer.get_skewed_images_width(image_tensors)
+        transformed_images_width = ImageInputTransformer.get_skewed_images_width_four_dimensional_tensor(image_tensors)
 
         transformed_images = ImageInputTransformer. \
             create_transformed_images_row(0, number_of_image_tensors,
@@ -267,7 +275,7 @@ class ImageInputTransformer:
         # print("list(image_tensor.size()): " + str(list(image_tensors.size())))
         # See: https://discuss.pytorch.org/t/indexing-a-2d-tensor/1667/2
         number_of_channels = image_tensors.size(1)
-        height = image_tensors.size(2)
+        # height = image_tensors.size(2)
         width = image_tensors.size(3)
         # print("height: " + str(height))
         # print("width: " + str(width))
@@ -280,7 +288,7 @@ class ImageInputTransformer:
         # print("transformed_im   age.size(): " + str(transformed_image.size()))
 
         # The width of the transformed images is width+height-1 (important for unequal sized input_
-        transformed_images_width = ImageInputTransformer.get_skewed_images_width(image_tensors)
+        transformed_images_width = ImageInputTransformer.get_skewed_images_width_four_dimensional_tensor(image_tensors)
 
         # In one go with split and cat on entire list
 
@@ -328,7 +336,7 @@ class ImageInputTransformer:
     def create_skewed_images_mask_two_dim(x):
         height = x.size(2)
         original_image_width = x.size(3)
-        width = ImageInputTransformer.get_skewed_images_width(x)
+        width = ImageInputTransformer.get_skewed_images_width_four_dimensional_tensor(x)
         mask_tensor = torch.ones((height, width), out=None, dtype=torch.float,
                                  device=x.get_device())
         for row_number in range(0, height):
@@ -365,8 +373,7 @@ class ImageInputTransformer:
         return skewed_images
 
     @staticmethod
-    def convert_activation_columns_list_to_tensor(activation_columns,
-                                                  skewed_image_columns: int, ):
+    def convert_activation_columns_list_to_tensor(activation_columns: list):
 
         # How to unskew the activation matrix, and retrieve an activation
         # matrix of the original image size?
@@ -375,6 +382,7 @@ class ImageInputTransformer:
         activations_column_unsqueezed = torch.unsqueeze(activations_column, 3)
         activations_as_tensor = activations_column_unsqueezed
         # print("activations_as_tensor.requires_grad: " + str(activations_as_tensor.requires_grad))
+        skewed_image_columns = len(activation_columns)
         for column_number in range(1, skewed_image_columns):
             # print("activations[column_number]: " + str(activations[column_number]))
             activations_column = activation_columns[column_number]
@@ -414,11 +422,10 @@ class ImageInputTransformer:
     @staticmethod
     def extract_unskewed_activations_from_activation_columns(activation_columns,
                                                              original_image_columns: int,
-                                                             skewed_image_columns: int,
                                                              skewed_image_rows: int):
 
         activations_as_tensor = ImageInputTransformer. \
-            convert_activation_columns_list_to_tensor(activation_columns, skewed_image_columns)
+            convert_activation_columns_list_to_tensor(activation_columns)
         return ImageInputTransformer. \
             extract_unskewed_activations_from_activation_tensor(activations_as_tensor,
                                                                 original_image_columns,

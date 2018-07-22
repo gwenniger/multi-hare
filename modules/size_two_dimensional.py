@@ -13,3 +13,6 @@ class SizeTwoDimensional:
     def __str__(self):
         result = "SizeTwoDimensional(" + str(self.height) + "," + str(self.width) + ")"
         return result
+
+    def __repr__(self):
+        return self.__str__()

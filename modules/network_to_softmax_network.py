@@ -8,6 +8,8 @@ from util.tensor_utils import TensorUtils
 import util.image_visualization
 from data_preprocessing.last_minute_padding import LastMinutePadding
 from modules.module_io_structuring import ModuleIOStructuring
+from modules.mdlstm_examples_packing import MDLSTMExamplesPacking
+
 
 class ActivationsResizer:
 
@@ -111,11 +113,13 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
                  activations_resizer: ActivationsResizer,
                  clamp_gradients: bool,
                  input_is_list: bool,
+                 use_examples_packing: bool,
                  use_block_mdlstm: bool
                  ):
         super(NetworkToSoftMaxNetwork, self).__init__()
         self.clamp_gradients = clamp_gradients
         self.input_is_list = input_is_list
+        self.use_example_packing = use_examples_packing
         self.use_block_mdlstm = use_block_mdlstm
         self.network = network
         self.activations_resizer = activations_resizer
@@ -128,6 +132,11 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         print("NetworkToSoftMaxNetwork - number of classes: " + str(self.get_number_of_classes_including_blank()))
         self.fc3 = nn.Linear(self.number_of_output_channels, self.get_number_of_classes_including_blank())
 
+
+        # MDLSTMExamplesPacking for the to-be-processed batch of examples
+        # When example-packing is used, this must be computed at the beginning of the
+        # forward function
+        self.mdlstmn_examples_packing = None
 
         # It is not totally clear actually whether "xavier_normal" or "xavier_uniform" initialization
         # is to be preferred
@@ -154,12 +163,14 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
                                            number_of_classes_excluding_blank: int,
                                            data_height: int, clamp_gradients: bool,
                                            input_is_list: bool,
+                                           use_examples_packing: bool,
                                            use_block_mdlstm: bool=False):
         activations_resizer = KeepAllActivationsResizer(network, data_height)
         # activations_resizer = SumActivationsResizer(network)
         return NetworkToSoftMaxNetwork(network, number_of_classes_excluding_blank,
                                        activations_resizer,
                                        clamp_gradients, input_is_list,
+                                       use_examples_packing,
                                        use_block_mdlstm
                                        )
 
@@ -235,6 +246,20 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
             dechunk_block_tensor_concatenated_along_batch_dimension_changed_block_size(activations_chunked,
                                                                                        SizeTwoDimensional(1, 1))
 
+    @staticmethod
+    def get_activations_single_tensor_and_activation_heights_and_widths(activations):
+        # From the de-chunked activations, collect the examples activation heights and widths
+        # for later use when recovering the class activations belonging to each example
+        # after computing all the class activations in one go from one long concatenated tensor
+        examples_activation_heights = NetworkToSoftMaxNetwork.collect_examples_activation_heights(activations)
+        examples_activation_widths = NetworkToSoftMaxNetwork.collect_examples_activation_widths(activations)
+
+        # Concatenate the activations of the examples
+        activations_single_tensor = NetworkToSoftMaxNetwork. \
+            extract_concatenated_height_one_activations_from_block_activations(activations)
+
+        return activations_single_tensor, examples_activation_heights, examples_activation_widths
+
     def compute_activations_with_block_mdlstm(self, x):
         # print("network_to_softmax_network - network input x sizes: " )
         # for element in x:
@@ -271,17 +296,7 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         # de-chunk the chunked activations
         activations = NetworkToSoftMaxNetwork.dechunk_activations(activations_chunked, tensor_list_chunking)
 
-        # From the de-chunked activations, collect the examples activation heights and widths
-        # for later use when recovering the class activations belonging to each example
-        # after computing all the class activations in one go from one long concatenated tensor
-        examples_activation_heights = NetworkToSoftMaxNetwork.collect_examples_activation_heights(activations)
-        examples_activation_widths = NetworkToSoftMaxNetwork.collect_examples_activation_widths(activations)
-
-        # Concatenate the activations of the examples
-        activations_single_tensor = NetworkToSoftMaxNetwork.\
-            extract_concatenated_height_one_activations_from_block_activations(activations)
-
-        return activations_single_tensor, examples_activation_heights, examples_activation_widths
+        return NetworkToSoftMaxNetwork.get_activations_single_tensor_and_activation_heights_and_widths(activations)
 
     @staticmethod
     def resize_activations_block_mdlstm_minimal_padding(activations):
@@ -327,6 +342,18 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
                 for example in x:
                     # print("example.size(): " + str(example.size()))
                     max_input_width = max(max_input_width, example.size(2))
+
+            elif self.use_example_packing:
+                # print("network_to_softmax_network - use_examples_packing")
+                activations = self.network(x)
+                activations, examples_activation_heights, examples_activation_widths = \
+                    NetworkToSoftMaxNetwork.get_activations_single_tensor_and_activation_heights_and_widths(activations)
+
+                max_input_width = 0
+                for example in x:
+                    # print("example.size(): " + str(example.size()))
+                    max_input_width = max(max_input_width, example.size(2))
+
             else:
                 last_minute_padding = LastMinutePadding(self.get_height_reduction_factor(),
                                                         self.get_width_reduction_factor())
@@ -338,7 +365,7 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
                 #     print("image to be plotted size: " + str(element.size()))
                 #     element_without_channel_dimension = element.squeeze(0)
                 #     element_without_channel_dimension = element_without_channel_dimension.cpu()
-                #     util.image_visualization.imshow_tensor_2d(element_without_channel_dimension)
+                #     /util.image_visualization.imshow_tensor_2d(element_without_channel_dimension)
 
                 # print("x[0].device: " + str(x[0].device))
                 # print("padded_examples_tensor.size(): " + str(padded_examples_tensor.size()))
@@ -374,12 +401,11 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
 
         # Restructure the activations to be 2-dimensional, with the first dimension
         # the number of activations and the second dimension the number of channels
-        if self.use_block_mdlstm and self.input_is_list:
+        if (self.use_block_mdlstm or  self.use_example_packing) and self.input_is_list:
             activations_resized_two_dimensional = \
                 NetworkToSoftMaxNetwork.resize_activations_block_mdlstm_minimal_padding(activations)
         else:
             activations_resized_two_dimensional = self.resize_activations_padded_batch(activations)
-
 
 
         # print("activations_resized_no_height: " + str(activations_resized_no_height))
@@ -393,7 +419,7 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
                                            False, "network to softmax network - class_activations")
 
         # print("class_activations: " + str(class_activations))
-        if self.input_is_list and self.use_block_mdlstm:
+        if self.input_is_list and (self.use_block_mdlstm or self.use_example_packing):
             # print("class_activations.size(): " + str(class_activations.size()))
 
             class_activations_resized_temp = class_activations.view(1, -1, self.get_number_of_classes_including_blank())
@@ -489,7 +515,6 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         # print("get_class_activations_summed_over_height - result.size(): " + str(result.size()))
         return result
 
-
     def get_real_network(self):
         return self.activations_resizer.get_real_network()
 
@@ -502,6 +527,10 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
     # of the network
     def get_height_reduction_factor(self):
         return self.get_real_network().get_height_reduction_factor()
+
+    def compute_mdlstm_examples_packing(self, examples):
+        return MDLSTMExamplesPacking.created_mdlstm_examples_packing(examples, self.get_width_reduction_factor())
+
 
 
 

@@ -13,6 +13,7 @@ def imshow_tensor_2d(img):
     plt.imshow(npimg)
     plt.show()
 
+
 def imshow(img):
     img = img / 2 + 0.5     # unnormalize
     npimg = img.numpy()

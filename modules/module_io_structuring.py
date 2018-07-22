@@ -81,12 +81,13 @@ class ModuleIOStructuring:
     @ staticmethod
     def check_activation_rows_are_not_equal(activation_rows):
         # For debugging
-        print("activation rows sizes after splitting: ")
+        # print("activation rows sizes after splitting: ")
         last_activation_row = activation_rows[0]
-        for activation_row in activation_rows:
-            print(str(activation_row.size()))
+        for activation_row in activation_rows[1:]:
+            # print(str(activation_row.size()))
             if TensorUtils.tensors_are_equal(last_activation_row, activation_row):
                 print(">>> WARNING: activation rows are equal")
+
 
     @staticmethod
     def compute_non_padding_activation_widths(input_examples_list, width_required_per_network_column):

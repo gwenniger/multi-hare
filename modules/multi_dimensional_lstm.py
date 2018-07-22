@@ -14,6 +14,7 @@ from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParame
 from util.image_input_transformer import ImageInputTransformer
 from modules.inside_model_gradient_clipping import InsideModelGradientClamping
 from util.tensor_utils import TensorUtils
+from modules.mdlstm_examples_packing import MDLSTMExamplesPacking
 
 def printgradnorm(self, grad_input, grad_output):
     print('Inside ' + self.__class__.__name__ + ' backward')
@@ -68,7 +69,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
     def __init__(self, layer_index: int, input_channels: int, hidden_states_size: int, compute_multi_directional: bool,
                  clamp_gradients: bool,
                  use_dropout: bool, training: bool,
-                 multi_dimensional_lstm_parameter_creator:MultiDimensionalLSTMParametersCreator,
+                 multi_dimensional_lstm_parameter_creator: MultiDimensionalLSTMParametersCreator,
+                 use_example_packing: bool,
                  nonlinearity="tanh"):
         super(MultiDimensionalLSTM, self).__init__(layer_index, input_channels, hidden_states_size,
                                                    compute_multi_directional,
@@ -86,6 +88,9 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         self.mdlstm_direction_one_parameters = \
             multi_dimensional_lstm_parameter_creator.create_multi_dimensional_lstm_parameters_one_direction(
                 self.hidden_states_size, self.input_channels, self.clamp_gradients, use_dropout)
+
+
+        self.use_example_packing = use_example_packing
 
         # Set initial bias for the forget gates to one, since it is known to give better results
         self.mdlstm_direction_one_parameters.set_bias_forget_gates_to_one()
@@ -128,11 +133,13 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
     def create_multi_dimensional_lstm(layer_index: int, input_channels: int, hidden_states_size: int, compute_multi_directional: bool,
                                       clamp_gradients: bool,
                                       use_dropout: bool,
+                                      use_example_packing: bool,
                                       nonlinearity="tanh"):
         return MultiDimensionalLSTM(layer_index, input_channels, hidden_states_size, compute_multi_directional,
                                     clamp_gradients, use_dropout,
                                     True,
                                     MultiDimensionalLSTMParametersCreatorSlow(),
+                                    use_example_packing,
                                     nonlinearity)
 
     @staticmethod
@@ -140,11 +147,13 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                            compute_multi_directional: bool,
                                            clamp_gradients: bool,
                                            use_dropout: bool,
+                                           use_example_packing: bool,
                                            nonlinearity="tanh"):
         return MultiDimensionalLSTM(layer_index, input_channels, hidden_states_size, compute_multi_directional,
                                     clamp_gradients, use_dropout,
                                     True,
                                     MultiDimensionalLSTMParametersCreatorFast(),
+                                    use_example_packing,
                                     nonlinearity)
 
     def set_training(self, training):
@@ -157,24 +166,39 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
         self.training = training
 
-    def compute_multi_dimensional_lstm_one_direction(self, mdlstm_parameters, x):
+    def compute_multi_dimensional_lstm_one_direction(self, mdlstm_parameters, examples):
+
+        if self.use_example_packing:
+            mdlstm_examples_packing = \
+                MDLSTMExamplesPacking.created_mdlstm_examples_packing(examples, 1)
+            skewed_images_variable, mask = mdlstm_examples_packing.\
+                create_vertically_and_horizontally_packed_examples(examples)
+            number_of_images = 1
+        else:
+            x = examples
+            # Create a binary mask that tells which of the cell positions are valid and which are not
+            mask = ImageInputTransformer.create_skewed_images_mask_two_dim(x)
+            skewed_images_variable = ImageInputTransformer.create_skewed_images_variable_four_dim(x)
+            number_of_images = x.size(0)
+
+        # # Add a column of padding zeros to mask, so that mask[:, column_index]
+        # # will return the padding for the previous column
+        # p2d = (1, 0, 0, 0)
+        # mask = torch.nn.functional.pad(mask, p2d, "constant", 0)
+
         if MultiDimensionalRNNBase.use_cuda():
             # https://discuss.pytorch.org/t/which-device-is-model-tensor-stored-on/4908/7
-            device = x.get_device()
+            device = skewed_images_variable.get_device()
 
         # print("compute_multi_dimensional_lstm_one_direction - x.size(): " + str(x.size()))
         # print("compute_multi_dimensional_lstm_one_direction - self.hidden_states_size: " + str(self.hidden_states_size))
 
         # Step 1: Create a skewed version of the input image
         # skewed_image = ImageInputTransformer.create_row_diagonal_offset_tensor(x)
-        skewed_images_variable = ImageInputTransformer.create_skewed_images_variable_four_dim(x)
-
-        # Create a binary mask that tells which of the cell positions are valid and which are not
-        mask = ImageInputTransformer.create_skewed_images_mask_two_dim(x)
 
         # print("list(x.size()): " + str(list(x.size())))
-        image_height = x.size(2)
-        number_of_images = x.size(0)
+        image_height = skewed_images_variable.size(2)
+
         # print("image height: " + str(image_height))
         previous_hidden_state_column = torch.zeros(number_of_images,
                                                    self.hidden_states_size,
@@ -235,8 +259,10 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # and new_memory_state that are not corresponding to valid states,
             # but that are an artifact of the computation by convolution using
             # the image skewing trick
+
             valid_entries_selection_mask = mask[:, column_index]
-            # print("valid_entries_selection_mask: " + str(valid_entries_selection_mask))
+            # print("valid_entries_selection_mask: " +
+            # str(valid_entries_selection_mask))
 
             mdlstm_parameters.prepare_computation_next_column_functions(previous_hidden_state_column,
                                                                         previous_memory_state_column,
@@ -474,15 +500,13 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # print("output gate activation column: " + str(output_gate_activation_column))
             #print("activation column: " + str(activation_column))
 
-
-            # activation_column = TensorUtils.apply_binary_mask(activation_column, valid_entries_selection_mask)
-            # new_memory_state = TensorUtils.apply_binary_mask(new_memory_state, valid_entries_selection_mask)
-            #
-            # if self.clamp_gradients:
-            #     InsideModelGradientClamping.register_gradient_clamping(activation_column, 10, True,
-            #                                                            "mdlstm - apply binary mask")
-            #     InsideModelGradientClamping.register_gradient_clamping(new_memory_state, 10, True,
-            #                                                            "mdlstm - apply binary mask")
+            # Apply the selection mask to the activation column and new_memory_state
+            # This will set to zero the activation and memory states of masked
+            # (non-valid) cells, effectively resetting them for the computation
+            # in the next column cells that will use them as memory and hidden state
+            # inputs
+            activation_column = TensorUtils.apply_binary_mask(activation_column, valid_entries_selection_mask)
+            new_memory_state = TensorUtils.apply_binary_mask(new_memory_state, valid_entries_selection_mask)
 
             previous_hidden_state_column = activation_column
             previous_memory_state_column = new_memory_state
@@ -498,14 +522,20 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # print("in loop: previous_memory_state_column.grad_fn: " + str(previous_memory_state_column.grad_fn))
             # print("in loop: previous_hidden_state_column.grad_fn: " + str(previous_hidden_state_column.grad_fn))
 
-        # print(">>> x.size(): " + str(x.size()))
-        original_image_columns = x.size(3)
-        skewed_image_rows = skewed_images_variable.size(2)
+        if self.use_example_packing:
+            activations_unskewed = mdlstm_examples_packing.\
+                extract_unskewed_examples_activations_from_activation_columns(activations)
+            # print("len(activations_unskewed: " + str(len(activations_unskewed)))
+            # for tensor in activations_unskewed:
+            #     print("MDLSTM with packing output activations tensor size: " + str(tensor.size()))
+        else:
+            # print(">>> x.size(): " + str(x.size()))
+            original_image_columns = x.size(3)
+            skewed_image_rows = skewed_images_variable.size(2)
 
-        activations_unskewed = ImageInputTransformer.extract_unskewed_activations_from_activation_columns(activations,
-                                                                                                            original_image_columns,
-                                                                                                            skewed_image_columns,
-                                                                                                            skewed_image_rows)
+            activations_unskewed = ImageInputTransformer.\
+                extract_unskewed_activations_from_activation_columns(activations, original_image_columns,
+                                                                     skewed_image_rows)
 
         # print("activations_unskewed: " + str(activations_unskewed))
         return activations_unskewed

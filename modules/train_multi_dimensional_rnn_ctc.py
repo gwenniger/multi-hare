@@ -140,6 +140,7 @@ def train_mdrnn_no_ctc(train_loader, test_loader, input_channels: int, input_siz
     number_of_classes_excluding_blank = len(vocab_list) - 1
     # number_of_classes_excluding_blank = 10
 
+    # FIXME : Required arguments to create_network_to_soft_max_network are missing
     network = NetworkToSoftMaxNetwork.create_network_to_soft_max_network(multi_dimensional_rnn,
                                                                          input_size, number_of_classes_excluding_blank)
     if Utils.use_cuda():
@@ -313,7 +314,7 @@ def printgradnorm(self, grad_input, grad_output):
 def create_model(checkpoint, data_height: int, input_channels: int, hidden_states_size: int,
                  compute_multi_directional: bool, use_dropout: bool, vocab_list,
                  clamp_gradients: bool, data_set_name: str, inputs_and_outputs_are_lists: bool,
-                 device_ids: list, use_block_mdlstm: bool):
+                 use_example_packing: bool, device_ids: list, use_block_mdlstm: bool):
 
     # multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(input_channels,
     #                                                                                 hidden_states_size,
@@ -366,7 +367,10 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
         multi_dimensional_rnn = MultiDimensionalLSTMLayerPairStacking.\
             create_two_layer_pair_network(hidden_states_size, mdlstm_block_size,
                                           block_strided_convolution_block_size,
-                                          clamp_gradients)
+                                          clamp_gradients,
+                                          opt.use_bias_in_block_strided_convolution,
+                                          use_example_packing
+                                          )
     # multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
     #    create_three_layer_pair_network(hidden_states_size, mdlstm_block_size,
     #                                 block_strided_convolution_block_size)
@@ -400,6 +404,7 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
                                                                              number_of_classes_excluding_blank,
                                                                              data_height, clamp_gradients,
                                                                              inputs_and_outputs_are_lists,
+                                                                             use_example_packing,
                                                                              use_block_mdlstm)
 
     else:
@@ -407,6 +412,7 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
             multi_dimensional_rnn, number_of_classes_excluding_blank,
             data_height, clamp_gradients,
             inputs_and_outputs_are_lists,
+            use_example_packing,
             use_block_mdlstm)
         network = nn.DataParallel(network, device_ids=device_ids)
 
@@ -575,7 +581,8 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
                     compute_multi_directional: bool, use_dropout: bool,
                     vocab_list: list, blank_symbol: str,
                     image_input_is_unsigned_int: bool,
-                    data_set_name, minimize_horizontal_padding: bool,
+                    data_set_name, perform_horizontal_batch_padding: bool,
+                    use_example_packing: bool,
                     use_block_mdlstm: bool,
                     perform_horizontal_batch_padding_in_data_loader):
 
@@ -592,10 +599,12 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
 
     data_height = get_data_height(train_loader)
     clamp_gradients = False
-    inputs_and_outputs_are_lists = minimize_horizontal_padding and not perform_horizontal_batch_padding_in_data_loader
+    inputs_and_outputs_are_lists = perform_horizontal_batch_padding and not perform_horizontal_batch_padding_in_data_loader
     network = create_model(checkpoint, data_height, input_channels, hidden_states_size,
                            compute_multi_directional, use_dropout, vocab_list,
-                           clamp_gradients, data_set_name, inputs_and_outputs_are_lists, device_ids,
+                           clamp_gradients, data_set_name, inputs_and_outputs_are_lists,
+                           use_example_packing,
+                           device_ids,
                            use_block_mdlstm)
 
     # network.register_backward_hook(printgradnorm)
@@ -653,7 +662,7 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
 
         # print("Time used for this batch: " + str(util.timing.time_since(time_start_batch)))
 
-        input_is_list = minimize_horizontal_padding and not perform_horizontal_batch_padding_in_data_loader
+        input_is_list = perform_horizontal_batch_padding and not perform_horizontal_batch_padding_in_data_loader
         trainer.train_one_epoch(train_loader, epoch, start, batch_size, device,
                                 input_is_list)
 
@@ -666,7 +675,7 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
         real_model.set_training(False)  # When using DataParallel
         validation_stats = Evaluator.evaluate_mdrnn(validation_loader, network, device, vocab_list, blank_symbol,
                                                     width_reduction_factor, image_input_is_unsigned_int,
-                                                    minimize_horizontal_padding
+                                                    perform_horizontal_batch_padding
                                                     )
         real_model.set_training(True)  # When using DataParallel
         print("</validation evaluation epoch " + str(epoch) + " >")
@@ -744,12 +753,12 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     input_height = 16
     input_width = 16
     input_channels = 1
-    hidden_states_size = 32
+    hidden_states_size = 8
     # https://stackoverflow.com/questions/45027234/strange-loss-curve-while-training-lstm-with-keras
     # Possibly a batch size of 128 leads to more instability in training?
     #batch_size = 128
 
-    compute_multi_directional = False
+    compute_multi_directional = True
     # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
     use_dropout = False
 
@@ -764,12 +773,16 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     blank_symbol = "_"
     image_input_is_unsigned_int = False
     use_block_mdlstm = False
+    perform_horizontal_batch_padding_in_data_loader = False
+    use_example_packing = True
     train_mdrnn_ctc(model_opt, checkpoint, train_loader, test_loader,
                     test_loader, input_channels,
                     hidden_states_size, batch_size,
                     compute_multi_directional, use_dropout, vocab_list, blank_symbol,
                     image_input_is_unsigned_int, "MNIST", minimize_horizontal_padding,
-                    use_block_mdlstm)
+                    use_example_packing,
+                    use_block_mdlstm,
+                    perform_horizontal_batch_padding_in_data_loader)
 
     #print(prof)
 
@@ -874,6 +887,7 @@ def iam_word_recognition(model_opt, checkpoint):
     minimize_horizontal_padding = True
     image_input_is_unsigned_int = False
     perform_horizontal_batch_padding_in_data_loader = False
+    use_example_packing = True
     train_loader, validation_loader, test_loader = iam_words_dataset. \
         get_random_train_set_validation_set_test_set_data_loaders(batch_size, train_examples_fraction,
                                                                   validation_examples_fraction,
@@ -912,6 +926,7 @@ def iam_word_recognition(model_opt, checkpoint):
                     hidden_states_size,
                     batch_size, compute_multi_directional, use_dropout, vocab_list, blank_symbol,
                     image_input_is_unsigned_int, "IAM", minimize_horizontal_padding,
+                    use_example_packing,
                     use_block_mdlstm,
                     perform_horizontal_batch_padding_in_data_loader)
     # train_mdrnn_no_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
@@ -931,14 +946,14 @@ def main():
         model_opt = opt
 
     # mnist_recognition_fixed_length()
-    # mnist_recognition_variable_length(model_opt, checkpoint,)
-
-    if opt.iam_database_data_type == "lines":
-        iam_line_recognition(model_opt, checkpoint)
-    elif opt.iam_database_data_type == "words":
-        iam_word_recognition(model_opt, checkpoint)
-    else:
-        raise RuntimeError("Unrecognized data type")
+    mnist_recognition_variable_length(model_opt, checkpoint,)
+    #
+    # if opt.iam_database_data_type == "lines":
+    #     iam_line_recognition(model_opt, checkpoint)
+    # elif opt.iam_database_data_type == "words":
+    #     iam_word_recognition(model_opt, checkpoint)
+    # else:
+    #     raise RuntimeError("Unrecognized data type")
     # cifar_ten_basic_recognition()
 
 

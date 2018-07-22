@@ -210,7 +210,8 @@ def get_multi_digit_train_loader_random_length(batch_size, min_num_digits, max_n
                                                minimize_horizontal_padding: bool):
     padding_strategy = PaddingStrategy.create_padding_strategy(HEIGHT_REQUIRED_PER_NETWORK_OUTPUT_COLUMN,
                                                                WIDTH_REQUIRED_PER_NETWORK_OUTPUT_COLUMN,
-                                                               True, minimize_horizontal_padding)
+                                                               True, minimize_horizontal_padding,
+                                                               False)
 
     return get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_digits,
                                                 get_train_set(), padding_strategy)
@@ -221,7 +222,8 @@ def get_multi_digit_test_loader_random_length(batch_size, min_num_digits, max_nu
     padding_strategy = PaddingStrategy.create_padding_strategy(HEIGHT_REQUIRED_PER_NETWORK_OUTPUT_COLUMN,
                                                                WIDTH_REQUIRED_PER_NETWORK_OUTPUT_COLUMN,
                                                                True,
-                                                               minimize_horizontal_padding)
+                                                               minimize_horizontal_padding,
+                                                               False)
 
     return get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_digits,
                                                 get_test_set(), padding_strategy)

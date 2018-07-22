@@ -7,11 +7,13 @@ from util.tensor_list_chunking import TensorListChunking
 from modules.inside_model_gradient_clipping import InsideModelGradientClamping
 from util.tensor_utils import TensorUtils
 
+
 class BlockStridedConvolution(Module):
 
     def __init__(self, input_channels: int, output_channels: int, block_size: SizeTwoDimensional,
                  clamp_gradients: bool,
                  use_bias: bool,
+                 use_example_packing: bool,
                  nonlinearity="tanh"):
         super(BlockStridedConvolution, self).__init__()
         self.input_channels = input_channels
@@ -19,6 +21,7 @@ class BlockStridedConvolution(Module):
         self.block_size = block_size
         self.nonlinearity = nonlinearity
         self.clamp_gradients = clamp_gradients
+        self.use_example_packing = use_example_packing
         # What types of convolutions are there:
         # https://github.com/vdumoulin/conv_arithmetic/blob/master/README.md
         # https://towardsdatascience.com/types-of-convolutions-in-deep-learning-717013397f4d
@@ -42,10 +45,10 @@ class BlockStridedConvolution(Module):
 
     @staticmethod
     def create_block_strided_convolution(input_channels: int, output_channels: int, block_size: SizeTwoDimensional,
-                                         clamp_gradients: bool, use_bias: bool,
+                                         clamp_gradients: bool, use_bias: bool, use_example_packing: bool,
                  nonlinearity="tanh"):
         return BlockStridedConvolution(input_channels, output_channels, block_size,
-                                       clamp_gradients, use_bias, nonlinearity)
+                                       clamp_gradients, use_bias, use_example_packing, nonlinearity)
 
     def get_activation_function(self):
         if self.nonlinearity == "tanh":
@@ -78,11 +81,18 @@ class BlockStridedConvolution(Module):
         return
 
     def forward(self, x):
-        # if self.input_and_output_are_list:
-        #     tensor_list_chunking = TensorListChunking.create_tensor_list_chunking(x, self.block_size)
-        #     x_chunked = tensor_list_chunking.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension(x, True)
-        # else:
-        x_chunked = x
+
+        if self.use_example_packing:
+            # Tensor list chunking expects a list of 3-D tensors as input, but x
+            # obtained from MDLSTM is a list of 4-D tensors, so must convert
+            x_three_dim = list([])
+            for tensor in x:
+                x_three_dim.append(tensor.squeeze(0))
+            tensor_list_chunking = TensorListChunking.create_tensor_list_chunking(x_three_dim, self.block_size)
+            x_chunked = \
+                tensor_list_chunking.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension(x_three_dim, False)
+        else:
+            x_chunked = x
 
         convolution_output = self.convolution(x_chunked)
         # TensorUtils.print_max(convolution_output, "block_strided_convolution - convolution_output")
@@ -110,6 +120,13 @@ class BlockStridedConvolution(Module):
         #         dechunk_block_tensor_concatenated_along_batch_dimension_changed_block_size(result,
         #                                                                                    convolution_output_size)
         #     return output_ordered_back_to_input_format
+
+        if self.use_example_packing:
+            # print("block_strided_convolution - use example packing")
+            result = tensor_list_chunking.\
+                dechunk_block_tensor_concatenated_along_batch_dimension_changed_block_size(result,
+                                                                                           SizeTwoDimensional(1, 1)
+                                                                                           )
 
         return result
 

@@ -6,6 +6,10 @@ from sortedcontainers.sortedlist import SortedList
 # Sorted containers will be used to efficiently find the closest elements that
 # that are smaller than some value
 import torch
+from util.image_input_transformer import ImageInputTransformer
+from util.tensor_utils import TensorUtils
+from util.utils import Utils
+import util.image_visualization
 
 
 class IndexedExampleSize:
@@ -20,6 +24,10 @@ class IndexedExampleSize:
 
         return IndexedExampleSize(original_example_index, size)
 
+    def get_mdlstm_skewed_image_width(self):
+        return ImageInputTransformer.get_skewed_images_width(self.example_size.height,
+                                                             self.example_size.width)
+
     # We need to implement the comparable operators in order to be able
     # to make use of sortedcontainers
     # http://gerg.ca/blog/post/2012/python-comparison/
@@ -31,24 +39,16 @@ class IndexedExampleSize:
         return not self == other
 
     def __gt__(self, other):
-        if self.example_size.width > other.example_size.width:
-            return True
-        elif self.example_size.height > other.example_size.height:
-            return True
-        return False
+        return self.example_size.width > other.example_size.width
 
     def __lt__(self, other):
-        if self.example_size.width < other.example_size.width:
-            return True
-        elif self.example_size.height < other.example_size.height:
-            return True
-        return False
+        return self.example_size.width < other.example_size.width
 
     def __ge__(self, other):
-        return (self > other) or (self == other)
+        return (self > other) or (self.example_size.width == other.example_size.width)
 
     def __le__(self, other):
-        return (self < other) or (self == other)
+        return (self < other) or (self.example_size.width == other.example_size.width)
 
    #http://gerg.ca/blog/post/2012/python-comparison/
 
@@ -56,6 +56,7 @@ class IndexedExampleSize:
         result = "<I.E.Size> "
         result += "original_example_index: " + str(self.original_example_index) + " "
         result += "example_size: " + str(self.example_size) + " "
+        result += "mdlstm-width: " + str(self.get_mdlstm_skewed_image_width()) + " "
         result += "</I.E.Size>"
         return result
 
@@ -63,18 +64,25 @@ class IndexedExampleSize:
         return self.__str__()
 
 
-
-
 class MDLSTMExamplesPacking:
 
-    def __init__(self, packed_examples, max_example_width: int):
+    def __init__(self, packed_examples,
+                 original_example_index_to_packed_index_table,
+                 max_example_width: int,
+                 example_separator_width: int):
         self.packed_examples = packed_examples
+        self.original_example_index_to_packed_index_table = original_example_index_to_packed_index_table
         self.max_example_width = max_example_width
+        self.example_separator_width = example_separator_width
 
     @staticmethod
     def created_mdlstm_examples_packing(examples_list: list, example_separator_width: int):
         packed_examples, max_example_width = MDLSTMExamplesPacking.get_packed_examples(examples_list, example_separator_width)
-        return MDLSTMExamplesPacking(packed_examples, max_example_width)
+        original_example_index_to_packed_index_table = \
+            MDLSTMExamplesPacking.create_original_example_index_to_packed_index_table(packed_examples, examples_list)
+        return MDLSTMExamplesPacking(packed_examples,
+                                     original_example_index_to_packed_index_table,
+                                     max_example_width, example_separator_width)
 
     @staticmethod
     def get_packed_examples(examples_list: list, example_separator_width: int):
@@ -96,11 +104,51 @@ class MDLSTMExamplesPacking:
         return result, max_example_width
 
     @staticmethod
-    def get_summed_example_widths(packed_examples_row: list):
+    def create_original_example_index_to_packed_index_table(packed_examples, examples_list):
+        original_index_to_reordered_index_table = [None] * len(examples_list)
+
+        reordered_index = 0
+        for packed_examples_row in packed_examples:
+            for indexed_example_size in packed_examples_row:
+                original_index = indexed_example_size.original_example_index
+                original_index_to_reordered_index_table[original_index] = reordered_index
+                reordered_index += 1
+        return original_index_to_reordered_index_table
+
+
+    @staticmethod
+    def get_mdlstm_computation_rows_skewing_overhead(examples_height):
+        skewing_overhead = examples_height - 1
+        return skewing_overhead
+
+    @staticmethod
+    def get_packed_example_widths(packed_examples_row: list):
         result = 0
         for indexed_example_size in packed_examples_row:
             result += indexed_example_size.example_size.width
+        return  result
+
+    @staticmethod
+    def get_packed_example_widths_plus_skewing_overhead(packed_examples_row: list):
+        result = MDLSTMExamplesPacking.get_packed_example_widths(packed_examples_row)
+        examples_height = packed_examples_row[0].example_size.height
+        skewing_overhead = MDLSTMExamplesPacking.get_mdlstm_computation_rows_skewing_overhead(examples_height)
+        result += skewing_overhead
         return result
+
+    def get_packed_example_widths_plus_separator_overhead(self, packed_examples_row: list):
+        result = MDLSTMExamplesPacking.get_packed_example_widths(packed_examples_row)
+        result += (len(packed_examples_row) - 1) * self.example_separator_width
+        return result
+
+    """
+    Compute the total width of a packed examples row, including the overhead of 
+    skewing the rows for computation, and the overhead of one pixel in-between 
+    example separators
+    """
+    def get_packed_example_widths_total(self, packed_examples_row: list):
+        return MDLSTMExamplesPacking.get_packed_example_widths_plus_skewing_overhead(packed_examples_row) + \
+               (len(packed_examples_row) - 1) * self.example_separator_width
 
     @staticmethod
     def get_packed_examples_row_height(packed_examples_row: list):
@@ -108,7 +156,7 @@ class MDLSTMExamplesPacking:
 
     @staticmethod
     def print_packed_examples_row(packed_examples_row: list):
-        summed_example_widths = MDLSTMExamplesPacking.get_summed_example_widths(packed_examples_row)
+        summed_example_widths = MDLSTMExamplesPacking.get_summed_example_widths_including_skewing_overhead(packed_examples_row)
         print("packed examples row - height: " +
               str(MDLSTMExamplesPacking.get_packed_examples_row_height(packed_examples_row)) +
               " summed_example_widths: "
@@ -141,35 +189,53 @@ class MDLSTMExamplesPacking:
                                             example_separator_width: int):
         sorted_list = SortedList(examples_list)
 
-        print("sorted_list: " + str(sorted_list))
+        # print("sorted_list: " + str(sorted_list))
 
         examples_height = examples_list[0].example_size.height
 
+        # Already subtract the width used for horizontally skewing the rows for
+        # MDLSTM computation, when calculating the effective horizontal space
+        # available given the height of the examples
+        horizontal_space_per_row = maximum_example_width - \
+            MDLSTMExamplesPacking.get_mdlstm_computation_rows_skewing_overhead(examples_height)
+
         result = list([])
         result_row = list([])
-        space_remaining_current_row = maximum_example_width
+        space_remaining_current_row = horizontal_space_per_row
 
         while len(sorted_list) > 0:
-            print("len(sorted_list): " + str(len(sorted_list)))
-            print("sorted_list: " + str(sorted_list))
-            print("space_remaining_current_row: " + str(space_remaining_current_row))
+            # print("len(sorted_list): " + str(len(sorted_list)))
+            # print("sorted_list: " + str(sorted_list))
+            # print("space_remaining_current_row: " + str(space_remaining_current_row))
+
             query_example = IndexedExampleSize.create_indexed_example_size(-1, examples_height,
                                                                            space_remaining_current_row)
-            largest_element_smaller_than_max_width_index = sorted_list.bisect_right(query_example) - 1
+            # print("query_example: " + str(query_example))
+            #
+            # print("query_example.get_mdlstm_skewed_image_width(): " +
+            #       str(query_example.get_mdlstm_skewed_image_width()))
 
-            print("largest_element_smaller_than_max_width_index: " + str(largest_element_smaller_than_max_width_index))
+            largest_element_smaller_than_max_width_index = sorted_list.bisect_right(query_example) - 1
+            # print("largest_element_smaller_than_max_width_index: " + str(largest_element_smaller_than_max_width_index))
 
             # No suitable smaller example is left
             if largest_element_smaller_than_max_width_index < 0:
                 result.append(result_row)
                 result_row = list([])
-                space_remaining_current_row = maximum_example_width
-                print("Starting new result_row...")
+                space_remaining_current_row = horizontal_space_per_row
+                # print("Starting new result_row...")
             else:
                 largest_element_smaller_than_max_width = sorted_list.pop(largest_element_smaller_than_max_width_index)
+                # print("largest_element_smaller_than_max_width: " + str(largest_element_smaller_than_max_width))
                 result_row.append(largest_element_smaller_than_max_width)
                 space_remaining_current_row -= largest_element_smaller_than_max_width.example_size.width
+                # Reserve space for required separator if additional example is added
                 space_remaining_current_row -= example_separator_width
+
+                if space_remaining_current_row + example_separator_width < 0:
+                    raise RuntimeError("Error space remaining current row " +
+                                       str(space_remaining_current_row) +
+                                       " has become negative")
 
         # Add the last result row
         result.append(result_row)
@@ -180,7 +246,7 @@ class MDLSTMExamplesPacking:
     def get_maximum_example_width(example_sizes_list: list):
         result = 0
         for indexed_example_size in example_sizes_list:
-            result = max(result, indexed_example_size.example_size.width)
+            result = max(result, indexed_example_size. get_mdlstm_skewed_image_width())
         return result
 
     @staticmethod
@@ -226,7 +292,7 @@ class MDLSTMExamplesPacking:
 
         for packed_examples_row in self.packed_examples:
             height = MDLSTMExamplesPacking.get_packed_examples_row_height(packed_examples_row)
-            summed_widths = MDLSTMExamplesPacking.get_summed_example_widths(packed_examples_row)
+            summed_widths = MDLSTMExamplesPacking.get_summed_example_widths_including_skewing_overhead(packed_examples_row)
             row_non_padding_pixels = height * summed_widths
             total_row_pixels = height * self.max_example_width
 
@@ -238,6 +304,292 @@ class MDLSTMExamplesPacking:
     def print_packed_examples_rows(self):
         for packed_examples_row in self.packed_examples:
             MDLSTMExamplesPacking.print_packed_examples_row(packed_examples_row)
+
+    def create_horizontal_separator(self, example):
+        channels = example.size(0)
+        example_height = example.size(1)
+        device = example.get_device()
+
+        # print("create_horizontal_separator - device: " + str(device))
+        # https://discuss.pytorch.org/t/creating-tensors-on-gpu-directly/2714
+        with torch.cuda.device(device):
+            result = torch.cuda.FloatTensor(1, channels,  example_height, self.example_separator_width).fill_(0)
+        # print("create_horizontal_separator - result: " + str(result))
+        return result
+
+    def create_vertical_separator(self, example):
+        device = example.get_device()
+        with torch.cuda.device(device):
+            # print("create_vertical_separator - device: " + str(device))
+            return torch.cuda.FloatTensor(1, example.size(0), 1, self.max_example_width).fill_(0)
+
+    def create_vertical_mask_separator(self, example):
+        device = example.get_device()
+        with torch.cuda.device(device):
+            # print("create_vertical_separator - device: " + str(device))
+            return torch.cuda.FloatTensor(1, self.max_example_width).fill_(0)
+
+    def create_extra_padding(self, row_cat_list, packed_examples_row):
+        # Create and add extra padding needed to fill up the remaining columns
+        # of the row up to self.max_example_width
+        current_width = self.get_packed_example_widths_total(packed_examples_row)
+        # print("current_width: " + str(current_width))
+        # print("max_example_width: " + str(self.max_example_width))
+
+        # Sanity check
+        if current_width > self.max_example_width:
+            raise RuntimeError("Error: current width " + str(current_width)
+                               + " is greater than max_example_width "
+                               + str(self.max_example_width))
+
+        columns_extra_padding_required = self.max_example_width - current_width
+
+        if columns_extra_padding_required == 0:
+            return None
+
+        channels = row_cat_list[0].size(1)
+        height = row_cat_list[0].size(2)
+
+        # print("create_extra_padding - channels: " + str(channels))
+        # print("create_extra_padding - height: " + str(height))
+        # print("create_extra_padding - columns_extra_padding_required: " + str(columns_extra_padding_required))
+        device = row_cat_list[0].get_device()
+        # print("device example 0: " + str(device))
+        with torch.cuda.device(device):
+            extra_padding = torch.cuda. \
+                FloatTensor(1, channels, height,
+
+                            columns_extra_padding_required).fill_(0)
+        return extra_padding
+
+    def create_mask_extra_padding(self, row_cat_list, packed_examples_row):
+        # Create and add extra padding needed to fill up the remaining columns
+        # of the row up to self.max_example_width
+        current_width = self.get_packed_example_widths_plus_skewing_overhead(packed_examples_row) + \
+                        (len(packed_examples_row) - 1) * self.example_separator_width
+        # print("current_width: " + str(current_width))
+        # print("max_example_width: " + str(self.max_example_width))
+
+        columns_extra_padding_required = self.max_example_width - current_width
+
+        if columns_extra_padding_required == 0:
+            return None
+
+        height = row_cat_list[0].size(2)
+
+        # print("create_mask_extra_padding - height: " + str(height))
+        # print("create_mask_extra_padding - columns_extra_padding_required: " + str(columns_extra_padding_required))
+        device = row_cat_list[0].get_device()
+        # print("device example 0: " + str(device))
+        with torch.cuda.device(device):
+            extra_padding = torch.cuda. \
+                FloatTensor(height, columns_extra_padding_required).fill_(0)
+        return extra_padding
+
+    def create_row_mask_packed_mdlstm_computation(self, packed_examples_row, device):
+
+        height = packed_examples_row[0].example_size.height
+        width = self.get_packed_example_widths_total(packed_examples_row)
+        mask_tensor = torch.ones((height, width), out=None, dtype=torch.float,
+                                 device=device)
+
+        unskewed_image_width = width - height + 1
+
+        # Take care of the image skewing at the beginning and end
+        for row_number in range(0, height):
+            first_valid_column_for_row = row_number
+            last_valid_column_for_row = first_valid_column_for_row + unskewed_image_width
+            mask_tensor[row_number, 0:first_valid_column_for_row] = 0
+            mask_tensor[row_number, last_valid_column_for_row:width] = 0
+
+        # Create diagonal example separators, that are parallel to the skewing
+        # at the beginning and the end
+        example_separator_index = -1
+        for example_index in range(0, len(packed_examples_row) - 1):
+
+            # Update the index for the next separator
+            indexed_example_size = packed_examples_row[example_index]
+            example_separator_index += indexed_example_size.example_size.width + 1
+
+            for row_number in range(0, height):
+                mask_tensor[row_number, example_separator_index + row_number] = 0
+
+        return mask_tensor
+
+    def create_vertically_and_horizontally_packed_examples(self, examples: list):
+
+        number_of_dimensions = TensorUtils.number_of_dimensions(examples[0])
+        if number_of_dimensions != 3:
+            raise RuntimeError("Error: expected an examples tensor with 3 "
+                               "dimensions but got: " + str(number_of_dimensions))
+
+        result_cat_list = list([])
+        mask_result_cat_list = list([])
+
+        for packed_examples_row in self.packed_examples:
+            # print("create_vertically_and_horizontally_packed_examples - packed_examples_row: "
+            #      + str(packed_examples_row))
+
+            row_cat_list = list([])
+            mask_row_cat_list = list([])
+            for indexed_example_size in packed_examples_row:
+                example_index = indexed_example_size.original_example_index
+                example = examples[example_index]
+                example_unsqueezed = example.unsqueeze(0)
+
+                if len(row_cat_list) > 0:
+                    row_cat_list.append(self.create_horizontal_separator(example))
+
+                row_cat_list.append(example_unsqueezed)
+
+            catted_row_unskewed = torch.cat(row_cat_list, 3)
+            # Compute the skewed version of the concatenated examples plus
+            # separators
+            catted_row_no_extra_padding = ImageInputTransformer.\
+                create_skewed_images_variable_four_dim(catted_row_unskewed)
+            row_cat_list = list([catted_row_no_extra_padding])
+
+            extra_padding = self.create_extra_padding(row_cat_list, packed_examples_row)
+            if extra_padding is not None:
+                # print("extra_padding: " + str(extra_padding))
+                row_cat_list.append(extra_padding)
+
+            device = examples[0].get_device()
+            mask_row_cat_list.append(self.create_row_mask_packed_mdlstm_computation(packed_examples_row, device))
+            mask_extra_padding = self.create_mask_extra_padding(row_cat_list, packed_examples_row)
+            if mask_extra_padding is not None:
+                mask_row_cat_list.append(mask_extra_padding)
+
+            # print("len(row_cat_list): " + str(len(row_cat_list)))
+            # print("row_cat_list: " + str(row_cat_list))
+            # for element in row_cat_list:
+            #    print("row_cat_list element.size(): " + str(element.size()))
+
+            catted_row = torch.cat(row_cat_list, 3)
+            catted_mask_row = torch.cat(mask_row_cat_list, 1)
+
+            # print("catted_row: " + str(catted_row))
+
+            if len(result_cat_list) > 0:
+                result_cat_list.append(self.create_vertical_separator(example))
+                mask_result_cat_list.append(self.create_vertical_mask_separator(example))
+
+            result_cat_list.append(catted_row)
+            mask_result_cat_list.append(catted_mask_row)
+
+        # print("result_cat_list: " + str(result_cat_list))
+        result = torch.cat(result_cat_list, 2)
+        mask_result = torch.cat(mask_result_cat_list, 0)
+        #
+        # print("mask_result: " + str(mask_result))
+        # print("result: " + str(result))
+
+        # util.image_visualization.imshow_tensor_2d(mask_result.cpu())
+
+        return result, mask_result
+
+    def extract_unskewed_activations_packed_examples_row(self, activations_as_tensor,
+                                                         packed_examples_row: list,
+                                                         first_row_index: int):
+
+        # print("activations_as_tensor.size(): " + str(activations_as_tensor.size()))
+
+        skewed_image_rows = packed_examples_row[0].example_size.height
+        original_image_columns = self.get_packed_example_widths_plus_separator_overhead(packed_examples_row)
+
+        # print("row_number: (original_image_columns + row_number: " +
+        #       str(first_row_index) + ":" + str(original_image_columns + first_row_index))
+
+        activations_unskewed = activations_as_tensor[:, :, 0, 0:original_image_columns]
+        activations_unskewed = torch.unsqueeze(activations_unskewed, 2)
+
+        for relative_row_number in range(1, skewed_image_rows):
+            # print("row_number: (original_image_columns + row_number: " +
+            #      str(relative_row_number) + ":" + str(original_image_columns + relative_row_number))
+            absolute_row_number = first_row_index + relative_row_number
+            activation_columns = \
+                activations_as_tensor[:, :, absolute_row_number,
+                                      relative_row_number: (relative_row_number + original_image_columns)]
+            activation_columns = torch.unsqueeze(activation_columns, 2)
+            # print("activations_columns.size():" + str(activation_columns.size()))
+            # print("activations_unskewed.size():" + str(activations_unskewed.size()))
+            activations_unskewed = torch.cat((activations_unskewed, activation_columns), 2)
+
+        activations_unskewed_split_list = list([])
+        activations_unskewed_split_list.append(packed_examples_row[0].example_size.width)
+        for indexed_example_size in packed_examples_row[1:]:
+            activations_unskewed_split_list.append(self.example_separator_width)
+            activations_unskewed_split_list.append(indexed_example_size.example_size.width)
+
+        example_activations_list_with_padding = torch.split(activations_unskewed,
+                                                            activations_unskewed_split_list,
+                                                            3)
+        example_activations_list = list([])
+
+        # Extract the data and discard the padding
+        for i in range(0, len(example_activations_list_with_padding), 2):
+            example_activations_list.append(example_activations_list_with_padding[i])
+
+        return example_activations_list
+
+    def get_num_examples(self):
+        return len(self.original_example_index_to_packed_index_table)
+
+    def reorder_result_tensors_to_original_order(self, result_tensors_packed_order_list):
+        result = list([])
+        for original_example_index in range(0, self.get_num_examples()):
+            packed_index = self.original_example_index_to_packed_index_table[original_example_index]
+            result.append(result_tensors_packed_order_list[packed_index])
+        return result
+
+    def extract_unskewed_activations_from_activation_tensor(self, activations_as_tensor):
+
+        result_tensors_packed_order = list([])
+
+        first_row_index = 0
+        for packed_examples_row in self.packed_examples:
+            example_activations_list = self.extract_unskewed_activations_packed_examples_row(activations_as_tensor,
+                                                                  packed_examples_row,
+                                                                  first_row_index)
+            skewed_image_rows = packed_examples_row[0].example_size.height
+            # Update first row index by height of packed_examples_row plus one
+            # for vertical separator row
+            first_row_index += skewed_image_rows + 1
+
+            result_tensors_packed_order.extend(example_activations_list)
+
+        # The result tensors are first in the order of the packing, we must
+        # restore the original example order before returning the result
+        return self.reorder_result_tensors_to_original_order(result_tensors_packed_order)
+
+    def extract_unskewed_examples_activations_from_activation_columns(self, activation_columns):
+
+        activations_as_tensor = ImageInputTransformer. \
+            convert_activation_columns_list_to_tensor(activation_columns)
+        return self.extract_unskewed_activations_from_activation_tensor(activations_as_tensor)
+
+
+def test_create_vertically_and_horizontally_packed_examples():
+    print("test_create_vertically_and_horizontally_packed_examples...")
+    examples_list = list([])
+    examples_list.append(torch.ones(1, 4, 16) * 1)
+    examples_list.append(torch.ones(1, 4, 8) * 2)
+    examples_list.append(torch.ones(1, 2, 2) * 3)
+    examples_list.append(torch.ones(1, 2, 2) * 4)
+    examples_list.append(torch.ones(1, 2, 12) * 5)
+    examples_list = Utils.move_tensor_list_to_device(examples_list, 0)
+
+    mdlstm_examples_packing = MDLSTMExamplesPacking.created_mdlstm_examples_packing(examples_list, 1)
+    packed_examples, packed_examples_mask = mdlstm_examples_packing.create_vertically_and_horizontally_packed_examples(examples_list)
+
+    # Visualize the packed_examples and the packed_examples_mask to check
+    # that they are as expected
+    packed_examples_2d = packed_examples.squeeze(1)
+    packed_examples_2d = packed_examples_2d.squeeze(0)
+    print("Visualizing packed examples...")
+    util.image_visualization.imshow_tensor_2d(packed_examples_2d.cpu())
+    print("Visualizing packed examples mask...")
+    util.image_visualization.imshow_tensor_2d(packed_examples_mask.cpu())
 
 
 def test_pack_examples():
@@ -278,10 +630,10 @@ def test_pack_examples_of_same_height():
         print("\n")
 
 
-
 def main():
-    test_pack_examples_of_same_height()
-    test_pack_examples()
+    #test_pack_examples_of_same_height()
+    #test_pack_examples()
+    test_create_vertically_and_horizontally_packed_examples()
 
 
 if __name__ == "__main__":

@@ -82,8 +82,8 @@ class ParallelMultipleStateWeightingsComputation(Module):
                                                                   "parallel_multiple_state_weightings_Computation",
                                                                   mask)
 
-        if not(mask is None):
-            result = TensorUtils.apply_binary_mask(result, mask)
+        # if not(mask is None):
+        #     result = TensorUtils.apply_binary_mask(result, mask)
 
         # print("compute_convolution_result - result.size():" + str(result.size()))
 

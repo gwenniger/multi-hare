@@ -3,6 +3,7 @@ from util.utils import Utils
 from modules.size_two_dimensional import SizeTwoDimensional
 from util.tensor_chunking import TensorChunking
 import util.timing
+from util.tensor_utils import TensorUtils
 # This class takes care of chunking a list of four-dimensional image tensors with
 # list elements of the dimensions
 # 1: channels, 2: height, 3: width
@@ -41,10 +42,16 @@ class TensorListChunking:
     def get_original_sizes_from_tensor_list(tensor_list: list):
         result = list([])
         for x in tensor_list:
-            original_size = SizeTwoDimensional.create_size_two_dimensional(x.size(1), x.size(2))
-            result.append(original_size)
-        return result
+            if TensorUtils.number_of_dimensions(x) != 3:
+                raise RuntimeError("Error: tenor x with size " + str(x.size()) +
+                                   " does not have 3 dimensions, as required")
 
+            # print("x.size(): " + str(x.size()))
+            original_size = SizeTwoDimensional.create_size_two_dimensional(x.size(1), x.size(2))
+            # print("original_size: " + str(original_size))
+            result.append(original_size)
+        # print(" get_original_sizes_from_tensor_list - result: " + str(result))
+        return result
 
     @staticmethod
     def create_indices_list(number_of_examples: int, number_of_feature_blocks_per_example: int):
@@ -68,9 +75,11 @@ class TensorListChunking:
         list_for_cat = list([])
 
         for tensor in tensor_list:
+
             # A dimension 0 must be added with unsqueeze,
             # for concatenation along the batch dimension later on
             tensor = tensor.unsqueeze(0)
+
             tensor_split_on_height = torch.split(tensor, self.block_size.height, 2)
 
             for row_block in tensor_split_on_height:
@@ -120,7 +129,8 @@ class TensorListChunking:
         if tensors_all_have_same_height:
             result = self.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once_fast(tensor_list)
         else:
-            result = self.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once(tensor_list)
+            result = self.\
+                chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once(tensor_list)
 
         # print("chunk_tensor_list_into_blocks_concatenate_along_batch_dimension - time used: \n" +
         #      str(util.timing.milliseconds_since(time_start)) + " milliseconds.")
@@ -204,6 +214,8 @@ class TensorListChunking:
         blocks_per_column_list, blocks_per_row_list, blocks_for_examples_list = \
             self.get_number_of_blocks_for_examples()
 
+        # print("Total blocks for examples: " + str(sum(blocks_for_examples_list)))
+        # print("tensor.size(): " + str(tensor.size()))
         example_sub_tensors = torch.split(tensor, blocks_for_examples_list, 0)
 
         blocks_start_index = 0

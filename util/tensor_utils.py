@@ -127,6 +127,10 @@ class TensorUtils:
     def print_max(tensor, variable_name):
         print("max element in " + variable_name + " :" + str(torch.max(tensor)))
 
+    @staticmethod
+    def number_of_dimensions(tensor):
+        return len(tensor.size())
+
 
 def test_number_of_non_zeros():
 
