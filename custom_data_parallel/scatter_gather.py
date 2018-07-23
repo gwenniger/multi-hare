@@ -16,16 +16,16 @@ def scatter(inputs, target_gpus, dim=0):
         if isinstance(obj, torch.Tensor):
             return Scatter.apply(target_gpus, None, dim, obj)
         if isinstance(obj, tuple) and len(obj) > 0:
-            print("scatter_gather - len(tuple) : " + str(len(obj)))
+            # print("scatter_gather - len(tuple) : " + str(len(obj)))
             # for element in obj:
             #     print("scatter_gather - tuple element: " + str(element))
             return list(zip(*map(scatter_map, obj)))
         if isinstance(obj, list) and len(obj) > 0:
-            print("scatter_gather - len(obj) : " + str(len(obj)))
+            # print("scatter_gather - len(obj) : " + str(len(obj)))
             # return list(map(list, zip(*map(scatter_map, obj))))
             # result = ScatterList.apply(target_gpus, None, obj)
             result = custom_data_parallel.comm_list.scatter_list(obj, target_gpus)
-            print("scatter_gather - scatter_map len(result): " + str(len(result)))
+            # print("scatter_gather - scatter_map len(result): " + str(len(result)))
             return result
         if isinstance(obj, dict) and len(obj) > 0:
             return list(map(type(obj), zip(*map(scatter_map, obj.items()))))
@@ -83,13 +83,13 @@ def gather(outputs, target_device, dim=0):
 
         # https://discuss.pytorch.org/t/training-network-with-multiple-outputs-with-multi-gpus/6344/4
         if isinstance(out, list):
-            print("scatter_gather - gather_map  - len(out): " + str(len(out)))
+            # print("scatter_gather - gather_map  - len(out): " + str(len(out)))
             # result = list(
             #     [(k, Gather.apply(target_device, dim, *[each[k] for each in outputs])) for k in out])
             # #return GatherList.apply(target_device, dim, *outputs)
             result = custom_data_parallel.comm_list.gather_list(out)
 
-            print("scatter_gather - gather_map  - len(result): " + str(len(result)))
+            # print("scatter_gather - gather_map  - len(result): " + str(len(result)))
             return result
 
         return type(out)(map(gather_map, zip(*outputs)))
@@ -97,7 +97,7 @@ def gather(outputs, target_device, dim=0):
     # Recursive function calls like this create reference cycles.
     # Setting the function to None clears the refcycle.
     try:
-        print("gather - len(outputs): " + str(len(outputs)))
+        # print("gather - len(outputs): " + str(len(outputs)))
         return gather_map(outputs)
     finally:
         gather_map = None

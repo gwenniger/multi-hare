@@ -113,9 +113,9 @@ class DataParallel(Module):
             return self.module(*inputs[0], **kwargs[0])
         replicas = self.replicate(self.module, self.device_ids[:len(inputs)])
         outputs = self.parallel_apply(replicas, inputs, kwargs)
-        print("data_parallel - forward - len(outputs): " + str(len(outputs)))
-        for element in outputs:
-            print("data_parallel - forward - len(element): " + str(len(element)))
+        # print("data_parallel - forward - len(outputs): " + str(len(outputs)))
+        # for element in outputs:
+        #    print("data_parallel - forward - len(element): " + str(len(element)))
         return self.gather(outputs, self.output_device)
 
     def replicate(self, module, device_ids):
@@ -130,7 +130,7 @@ class DataParallel(Module):
     def gather(self, outputs, output_device):
         gather_result = gather(outputs, output_device, dim=self.dim)
         # gather_result = gather(list(outputs), output_device, dim=self.dim)
-        print("data_parallel - gather - len(gather_result): " + str(len(gather_result)))
+        # print("data_parallel - gather - len(gather_result): " + str(len(gather_result)))
         return gather_result
 
 
