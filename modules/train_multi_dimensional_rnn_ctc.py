@@ -2,6 +2,7 @@ import argparse
 import torch
 import torch.nn
 import torch.nn as nn
+import custom_data_parallel.data_parallel
 import time
 from modules.multi_dimensional_rnn import MDRNNCell
 from modules.network_to_softmax_network import NetworkToSoftMaxNetwork
@@ -145,7 +146,7 @@ def train_mdrnn_no_ctc(train_loader, test_loader, input_channels: int, input_siz
                                                                          input_size, number_of_classes_excluding_blank)
     if Utils.use_cuda():
 
-        network = nn.DataParallel(network, device_ids=device_ids)
+        network = custom_data_parallel.data_parallel.DataParallel(network, device_ids=device_ids)
 
         network.to(device)
     else:
@@ -385,7 +386,8 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
         multi_dimensional_rnn = MultiDimensionalLSTMLayerPairStacking. \
             create_mdlstm_three_layer_pair_network_linear_parameter_size_increase(
                 input_channels, hidden_states_size, block_strided_convolution_block_size,
-                compute_multi_directional, clamp_gradients, use_dropout, opt.use_bias_in_block_strided_convolution)
+                compute_multi_directional, clamp_gradients, use_dropout, opt.use_bias_in_block_strided_convolution,
+                use_example_packing)
 
     else:
         raise RuntimeError("Error: \"" + str(data_set_name) + "\" is an unrecognized dataset name")
@@ -398,7 +400,7 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
           str(number_of_classes_excluding_blank))
 
     if inputs_and_outputs_are_lists:
-        multi_dimensional_rnn = nn.DataParallel(multi_dimensional_rnn, device_ids=device_ids)
+        multi_dimensional_rnn = custom_data_parallel.data_parallel.DataParallel(multi_dimensional_rnn, device_ids=device_ids)
         multi_dimensional_rnn.to(torch.device("cuda:0"))
         network = NetworkToSoftMaxNetwork.create_network_to_soft_max_network(multi_dimensional_rnn,
                                                                              number_of_classes_excluding_blank,
@@ -414,7 +416,7 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
             inputs_and_outputs_are_lists,
             use_example_packing,
             use_block_mdlstm)
-        network = nn.DataParallel(network, device_ids=device_ids)
+        network = custom_data_parallel.data_parallel.DataParallel(network, device_ids=device_ids)
 
     if checkpoint is not None:
         print("before loading checkpoint: network.module.fc3" + str(network.fc3.weight))
@@ -643,7 +645,8 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
     # Get the width reduction factor which will be needed to compute the real widths
     # in the output from the real input width information in the warp_ctc_loss function
 
-    real_model = (network.module if isinstance(network, torch.nn.DataParallel) else network)
+    real_model = custom_data_parallel.data_parallel.get_real_network(network)
+
     width_reduction_factor = real_model.get_width_reduction_factor()
 
     model_properties = ModelProperties(image_input_is_unsigned_int, width_reduction_factor)
@@ -734,7 +737,10 @@ def mnist_recognition_fixed_length():
 
 
 def mnist_recognition_variable_length(model_opt, checkpoint):
-    batch_size = 128
+    # batch_size = 128
+    batch_size = 256
+    # batch_size = 512
+    # batch_size = 1024
     min_num_digits = 1
     max_num_digits = 3
     # In MNIST there are the digits 0-9, and we also add a symbol for blanks
@@ -758,7 +764,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     # Possibly a batch size of 128 leads to more instability in training?
     #batch_size = 128
 
-    compute_multi_directional = True
+    compute_multi_directional = False
     # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
     use_dropout = False
 
@@ -858,7 +864,9 @@ def iam_word_recognition(model_opt, checkpoint):
     # With the improved padding, the height of the images is 128,
     # and memory usage is less, so batch_size 30 instead of 20 is possible,
     # but it is only slightly faster (GPU usage appears to be already maxed out)
-    batch_size = 64 #  #128 #32 #128
+    # batch_size = 64 #  #128 #32 #128
+    # batch_size = 128
+    batch_size = 256
 
     # lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
     lines_file_path = model_opt.iam_database_lines_file_path
@@ -946,14 +954,14 @@ def main():
         model_opt = opt
 
     # mnist_recognition_fixed_length()
-    mnist_recognition_variable_length(model_opt, checkpoint,)
-    #
-    # if opt.iam_database_data_type == "lines":
-    #     iam_line_recognition(model_opt, checkpoint)
-    # elif opt.iam_database_data_type == "words":
-    #     iam_word_recognition(model_opt, checkpoint)
-    # else:
-    #     raise RuntimeError("Unrecognized data type")
+    # mnist_recognition_variable_length(model_opt, checkpoint,)
+
+    if opt.iam_database_data_type == "lines":
+        iam_line_recognition(model_opt, checkpoint)
+    elif opt.iam_database_data_type == "words":
+        iam_word_recognition(model_opt, checkpoint)
+    else:
+        raise RuntimeError("Unrecognized data type")
     # cifar_ten_basic_recognition()
 
 

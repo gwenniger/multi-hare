@@ -9,6 +9,7 @@ import util.image_visualization
 from data_preprocessing.last_minute_padding import LastMinutePadding
 from modules.module_io_structuring import ModuleIOStructuring
 from modules.mdlstm_examples_packing import MDLSTMExamplesPacking
+import custom_data_parallel.data_parallel
 
 
 class ActivationsResizer:
@@ -25,8 +26,7 @@ class ActivationsResizer:
         raise RuntimeError("not implemented")
 
     def get_real_network(self):
-        real_network = (self.network.module if isinstance(self.network, torch.nn.DataParallel) else self.network)
-        return real_network
+        return custom_data_parallel.data_parallel.get_real_network(self.network)
 
 
 class SumActivationsResizer(ActivationsResizer):
