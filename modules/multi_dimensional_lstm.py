@@ -552,6 +552,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         activations_unskewed_direction_one = self.\
             compute_multi_dimensional_lstm_one_direction(self.mdlstm_direction_one_parameters, x)
 
+        # Fixme: This does not work with example packing
+
         # Flipping 2nd dimension
         height_flipping = util.tensor_flipping.TensorFlipping.create_tensor_flipping(True, False)
         activations_unskewed_direction_two_flipped = self.compute_multi_dimensional_lstm_one_direction(
@@ -675,6 +677,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # With same paramters for every direction
             #return self.forward_multi_directional_multi_dimensional_function_fast(x)
         else:
+            # print(">>> Execute forward_one_directional_multi_dimensional_lstm")
             return self.forward_one_directional_multi_dimensional_lstm(x)
             #return self.\
             #    forward_one_directional_multi_dimensional_lstm_with_additional_skewing_unskewing_step(x)

@@ -368,6 +368,7 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
         multi_dimensional_rnn = MultiDimensionalLSTMLayerPairStacking.\
             create_two_layer_pair_network(hidden_states_size, mdlstm_block_size,
                                           block_strided_convolution_block_size,
+                                          compute_multi_directional,
                                           clamp_gradients,
                                           opt.use_bias_in_block_strided_convolution,
                                           use_example_packing
@@ -596,6 +597,8 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
     device_ids = [0, 1]
     # device_ids = [0]
 
+    # assert compute_multi_directional
+
     # See: https://pytorch.org/tutorials/beginner/former_torchies/nn_tutorial.html
     # multi_dimensional_rnn.register_backward_hook(printgradnorm)
 
@@ -764,7 +767,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     # Possibly a batch size of 128 leads to more instability in training?
     #batch_size = 128
 
-    compute_multi_directional = False
+    compute_multi_directional = True
     # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
     use_dropout = False
 
@@ -780,7 +783,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     image_input_is_unsigned_int = False
     use_block_mdlstm = False
     perform_horizontal_batch_padding_in_data_loader = False
-    use_example_packing = True
+    use_example_packing = False
     train_mdrnn_ctc(model_opt, checkpoint, train_loader, test_loader,
                     test_loader, input_channels,
                     hidden_states_size, batch_size,

@@ -150,10 +150,10 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
     def create_two_layer_pair_network(first_mdlstm_hidden_states_size: int,
                                       mdlstm_block_size: SizeTwoDimensional,
                                       block_strided_convolution_block_size: SizeTwoDimensional,
+                                      compute_multi_directional,
                                       clamp_gradients: bool,
                                       use_bias_with_block_strided_convolution: bool,
                                       use_example_packing: bool):
-        compute_multi_directional = False
         use_dropout = False
         nonlinearity = "tanh"
 
