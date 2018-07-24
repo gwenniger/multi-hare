@@ -156,7 +156,7 @@ class MDLSTMExamplesPacking:
 
     @staticmethod
     def print_packed_examples_row(packed_examples_row: list):
-        summed_example_widths = MDLSTMExamplesPacking.get_summed_example_widths_including_skewing_overhead(packed_examples_row)
+        summed_example_widths = MDLSTMExamplesPacking.get_packed_example_widths(packed_examples_row)
         print("packed examples row - height: " +
               str(MDLSTMExamplesPacking.get_packed_examples_row_height(packed_examples_row)) +
               " summed_example_widths: "
@@ -292,7 +292,7 @@ class MDLSTMExamplesPacking:
 
         for packed_examples_row in self.packed_examples:
             height = MDLSTMExamplesPacking.get_packed_examples_row_height(packed_examples_row)
-            summed_widths = MDLSTMExamplesPacking.get_summed_example_widths_including_skewing_overhead(packed_examples_row)
+            summed_widths = MDLSTMExamplesPacking.get_packed_example_widths(packed_examples_row)
             row_non_padding_pixels = height * summed_widths
             total_row_pixels = height * self.max_example_width
 
@@ -317,11 +317,11 @@ class MDLSTMExamplesPacking:
         # print("create_horizontal_separator - result: " + str(result))
         return result
 
-    def create_vertical_separator(self, example):
-        device = example.get_device()
+    def create_vertical_separator(self, skewed_packed_example_row_tensor):
+        device = skewed_packed_example_row_tensor.get_device()
         with torch.cuda.device(device):
             # print("create_vertical_separator - device: " + str(device))
-            return torch.cuda.FloatTensor(1, example.size(0), 1, self.max_example_width).fill_(0)
+            return torch.cuda.FloatTensor(1, skewed_packed_example_row_tensor.size(1), 1, self.max_example_width).fill_(0)
 
     def create_vertical_mask_separator(self, example):
         device = example.get_device()
@@ -362,7 +362,7 @@ class MDLSTMExamplesPacking:
                             columns_extra_padding_required).fill_(0)
         return extra_padding
 
-    def create_mask_extra_padding(self, row_cat_list, packed_examples_row):
+    def create_mask_extra_padding(self, mask_row_cat_list, packed_examples_row):
         # Create and add extra padding needed to fill up the remaining columns
         # of the row up to self.max_example_width
         current_width = self.get_packed_example_widths_plus_skewing_overhead(packed_examples_row) + \
@@ -375,11 +375,11 @@ class MDLSTMExamplesPacking:
         if columns_extra_padding_required == 0:
             return None
 
-        height = row_cat_list[0].size(2)
+        height = mask_row_cat_list[0].size(0)
 
         # print("create_mask_extra_padding - height: " + str(height))
         # print("create_mask_extra_padding - columns_extra_padding_required: " + str(columns_extra_padding_required))
-        device = row_cat_list[0].get_device()
+        device = mask_row_cat_list[0].get_device()
         # print("device example 0: " + str(device))
         with torch.cuda.device(device):
             extra_padding = torch.cuda. \
@@ -416,6 +416,34 @@ class MDLSTMExamplesPacking:
 
         return mask_tensor
 
+    """
+    This method efficiently skews all the packed row tensors of the same height 
+    in one go, in parallel. This exploits the fact that adding the required amount
+    of padding on the right of the un-skewed tensors, and then skewing them gives
+    the same result as first adding the padding and then performing the skewing.
+    Because of this, is tis possible to first pad all the un-skewed tensors of 
+    the same height to the same width, then skew them all at once. This saves 
+    out running the somewhat expensive skewing function for each of the packed rows 
+    separately. 
+    """
+    def skew_parallel_vertically_pad_and_add_packed_row_tensors(self, same_height_packed_row_tensors,
+                                                                result_cat_list):
+        # print("skew_parallel_vertically_pad_and_add_packed_row_tensors...")
+        stacked_same_height_packed_tensors = torch.cat(same_height_packed_row_tensors, 0)
+        stacked_same_height_packed_tensors_skewed = ImageInputTransformer. \
+            create_skewed_images_variable_four_dim(stacked_same_height_packed_tensors)
+        # print("stacked_same_height_packed_tensors_skewed.size(): "
+        #      + str(stacked_same_height_packed_tensors_skewed.size()))
+        same_height_packed_tensors_skewed_list = torch.split(stacked_same_height_packed_tensors_skewed, 1, 0)
+        # print("len(same_height_packed_tensors_skewed_list): " + str(len(same_height_packed_tensors_skewed_list)))
+        for skewed_packed_example_row_tensor in same_height_packed_tensors_skewed_list:
+            if len(result_cat_list) > 0:
+                vertical_separator = self.create_vertical_separator(skewed_packed_example_row_tensor)
+                # print("vertical_separator.size(): " + str(vertical_separator.size()))
+                result_cat_list.append(vertical_separator)
+            # print("skewed_packed_example_row_tensor.size(): " + str(skewed_packed_example_row_tensor.size()))
+            result_cat_list.append(skewed_packed_example_row_tensor)
+
     def create_vertically_and_horizontally_packed_examples(self, examples: list):
 
         number_of_dimensions = TensorUtils.number_of_dimensions(examples[0])
@@ -426,9 +454,21 @@ class MDLSTMExamplesPacking:
         result_cat_list = list([])
         mask_result_cat_list = list([])
 
+        current_height = self.packed_examples[0][0].example_size.height
+        same_height_packed_row_tensors = list([])
+
         for packed_examples_row in self.packed_examples:
             # print("create_vertically_and_horizontally_packed_examples - packed_examples_row: "
-            #      + str(packed_examples_row))
+            #     + str(packed_examples_row))
+
+            packed_row_height = packed_examples_row[0].example_size.height
+
+            if packed_row_height != current_height:
+                # Finished the rows of the previous height
+
+                self.skew_parallel_vertically_pad_and_add_packed_row_tensors(same_height_packed_row_tensors,
+                                                                             result_cat_list)
+                same_height_packed_row_tensors = list([])
 
             row_cat_list = list([])
             mask_row_cat_list = list([])
@@ -442,21 +482,17 @@ class MDLSTMExamplesPacking:
 
                 row_cat_list.append(example_unsqueezed)
 
-            catted_row_unskewed = torch.cat(row_cat_list, 3)
-            # Compute the skewed version of the concatenated examples plus
-            # separators
-            catted_row_no_extra_padding = ImageInputTransformer.\
-                create_skewed_images_variable_four_dim(catted_row_unskewed)
-            row_cat_list = list([catted_row_no_extra_padding])
-
             extra_padding = self.create_extra_padding(row_cat_list, packed_examples_row)
             if extra_padding is not None:
                 # print("extra_padding: " + str(extra_padding))
                 row_cat_list.append(extra_padding)
 
+            catted_row_unskewed = torch.cat(row_cat_list, 3)
+            same_height_packed_row_tensors.append(catted_row_unskewed)
+
             device = examples[0].get_device()
             mask_row_cat_list.append(self.create_row_mask_packed_mdlstm_computation(packed_examples_row, device))
-            mask_extra_padding = self.create_mask_extra_padding(row_cat_list, packed_examples_row)
+            mask_extra_padding = self.create_mask_extra_padding(mask_row_cat_list, packed_examples_row)
             if mask_extra_padding is not None:
                 mask_row_cat_list.append(mask_extra_padding)
 
@@ -465,26 +501,38 @@ class MDLSTMExamplesPacking:
             # for element in row_cat_list:
             #    print("row_cat_list element.size(): " + str(element.size()))
 
-            catted_row = torch.cat(row_cat_list, 3)
             catted_mask_row = torch.cat(mask_row_cat_list, 1)
 
             # print("catted_row: " + str(catted_row))
 
-            if len(result_cat_list) > 0:
-                result_cat_list.append(self.create_vertical_separator(example))
+            if len(mask_result_cat_list) > 0:
                 mask_result_cat_list.append(self.create_vertical_mask_separator(example))
 
-            result_cat_list.append(catted_row)
             mask_result_cat_list.append(catted_mask_row)
+
+        # Add final same height tensors
+        self.skew_parallel_vertically_pad_and_add_packed_row_tensors(same_height_packed_row_tensors,
+                                                                     result_cat_list)
 
         # print("result_cat_list: " + str(result_cat_list))
         result = torch.cat(result_cat_list, 2)
         mask_result = torch.cat(mask_result_cat_list, 0)
+
         #
         # print("mask_result: " + str(mask_result))
         # print("result: " + str(result))
-
+        #
+        # packed_examples_2d = result.squeeze(1)
+        # packed_examples_2d = packed_examples_2d.squeeze(0)
+        # util.image_visualization.imshow_tensor_2d(packed_examples_2d.cpu())
         # util.image_visualization.imshow_tensor_2d(mask_result.cpu())
+
+        if (result.size(2) != mask_result.size(0)) or (result.size(3) != mask_result.size(1)):
+            raise RuntimeError("Error: size of result " + str(result.size()) +
+                               " and generated mask " + str(mask_result.size()) +
+                               " are not compatible")
+
+        print("Percentage of real (non-padding) cells: " + str(100 * self.get_non_padding_fraction()) + "%")
 
         return result, mask_result
 
