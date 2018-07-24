@@ -21,6 +21,7 @@ def chunk_list(list_of_tensors: list, number_of_chunks: int):
 
         result.append(list_of_tensors[start_index:start_index+chunk_size_current_chunk])
         elements_remaining -= 1
+        start_index += chunk_size_current_chunk
 
     return result
 
