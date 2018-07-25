@@ -617,6 +617,8 @@ class MDLSTMExamplesPacking:
 
         activations_as_tensor = ImageInputTransformer. \
             convert_activation_columns_list_to_tensor(activation_columns)
+        print("mdlstm_examples_packing - activations as tensor (including padding activations): "
+              + str(activations_as_tensor))
         return self.extract_unskewed_activations_from_activation_tensor(activations_as_tensor)
 
 
