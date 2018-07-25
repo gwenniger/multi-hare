@@ -181,10 +181,12 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             skewed_images_variable = ImageInputTransformer.create_skewed_images_variable_four_dim(x)
             number_of_images = x.size(0)
 
-        # # Add a column of padding zeros to mask, so that mask[:, column_index]
-        # # will return the padding for the previous column
-        # p2d = (1, 0, 0, 0)
-        # mask = torch.nn.functional.pad(mask, p2d, "constant", 0)
+        print("skewed_images_variable: " + str(skewed_images_variable))
+
+        # Add a column of padding zeros to mask, so that mask[:, column_index]
+        # will return the padding for the previous column
+        p2d = (1, 0, 0, 0)
+        mask = torch.nn.functional.pad(mask, p2d, "constant", 0)
 
         if MultiDimensionalRNNBase.use_cuda():
             # https://discuss.pytorch.org/t/which-device-is-model-tensor-stored-on/4908/7
@@ -241,7 +243,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         # print("skewed image columns: " + str(skewed_image_columns))
 
         for column_index in range(0, skewed_image_columns):
-            #print("column_index: " + str(column_index))
+            # print("column_index: " + str(column_index))
             #print("previous_hidden_state_column.is_leaf: " + str(previous_hidden_state_column.is_leaf))
             #print("previous_hidden_state_column.grad_fn: " + str(previous_hidden_state_column.grad_fn))
             #print("previous_memory_state_column.is_leaf: " + str(previous_memory_state_column.is_leaf))
@@ -260,13 +262,14 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # but that are an artifact of the computation by convolution using
             # the image skewing trick
 
-            valid_entries_selection_mask = mask[:, column_index]
+            valid_entries_selection_mask_previous_column = mask[:, column_index]
+            valid_entries_selection_mask = mask[:, column_index + 1]
             # print("valid_entries_selection_mask: " +
             # str(valid_entries_selection_mask))
 
             mdlstm_parameters.prepare_computation_next_column_functions(previous_hidden_state_column,
                                                                         previous_memory_state_column,
-                                                                        valid_entries_selection_mask)
+                                                                        valid_entries_selection_mask_previous_column)
 
 
             # Compute convolution on previous state column vector padded with zeros
@@ -274,7 +277,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             input_hidden_state_column = mdlstm_parameters.get_input_hidden_state_column()
 
             # print("input_hidden_state_column.size(): " + str(input_hidden_state_column.size()))
-
+            # print("input_hidden_state_column: " + str(input_hidden_state_column))
 
             input_state_plus_input = MultiDimensionalRNNBase.\
                 compute_states_plus_input(input_matrices.input_input_matrix, column_index,

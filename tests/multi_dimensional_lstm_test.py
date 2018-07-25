@@ -50,6 +50,7 @@ class MultiDimensionalLSTMTest:
             get_mdlstm_activations_with_and_without_packing(input_tensor,
                                                             input_tensor_list)
 
+        print("activations_without_examples_packing: " + str(activations))
         print("activations_with_examples_packing: " + str(activations_with_examples_packing))
 
         if not TensorUtils.tensors_are_equal(activations, activations_with_examples_packing[0]):
@@ -61,17 +62,21 @@ class MultiDimensionalLSTMTest:
         mdlstm_test = MultiDimensionalLSTMTest.create_multi_dimensional_lstm_test()
         input_tensor = torch.ones(2, 1, 2, 2).cuda()
         input_tensor_list = list([torch.ones(1, 2, 2).cuda(), torch.ones(1, 2, 2).cuda()])
-        activations, activations_with_examples_packing = mdlstm_test. \
+        activations_without_example_packing, activations_with_examples_packing = mdlstm_test. \
             get_mdlstm_activations_with_and_without_packing(input_tensor,
                                                             input_tensor_list)
 
-        activations_example_without_packing = activations[0]
+        activations_example_without_packing = activations_without_example_packing[0]
+        print("activations_without_examples_packing[0]:" + str(activations_without_example_packing[0]))
         activations_example_with_packing = activations_with_examples_packing[0]
+        print("activations_with_examples_packing[0]:" + str(activations_with_examples_packing[0]))
         MultiDimensionalLSTMTest.assert_results_are_same_with_and_without_packing(activations_example_without_packing,
                                                                                   activations_example_with_packing)
 
-        activations_example_without_packing = activations[1]
+        activations_example_without_packing = activations_without_example_packing[1]
+        print("activations_without_examples_packing1]:" + str(activations_without_example_packing[1]))
         activations_example_with_packing = activations_with_examples_packing[1]
+        print("activations_with_examples_packing[1]:" + str(activations_with_examples_packing[1]))
         MultiDimensionalLSTMTest.assert_results_are_same_with_and_without_packing(activations_example_without_packing,
                                                                                   activations_example_with_packing)
 
@@ -98,7 +103,7 @@ class MultiDimensionalLSTMTest:
             get_mdlstm_activations_with_and_without_packing(input_tensor,
                                                             input_tensor_list)
 
-        print("activations_with_examples_packing: " + str(activations_with_examples_packing))
+        # print("activations_with_examples_packing: " + str(activations_with_examples_packing))
 
         activations_example_without_packing = activations[0, :, :, :]
         activations_example_with_packing = activations_with_examples_packing[1]
@@ -112,9 +117,10 @@ class MultiDimensionalLSTMTest:
 
 
 def main():
-    # MultiDimensionalLSTMTest.test_simple_normal_and_packed_mdlstm_computation_produce_same_results()
+    MultiDimensionalLSTMTest.test_simple_normal_and_packed_mdlstm_computation_produce_same_results()
     MultiDimensionalLSTMTest.test_simple_normal_and_packed_mdlstm_computation_multiple_examples_produce_same_results()
-    # MultiDimensionalLSTMTest.test_normal_and_packing_incorporated_mdlstm_computation_produce_same_results_two()
+    MultiDimensionalLSTMTest.test_normal_and_packing_incorporated_mdlstm_computation_produce_same_results_two()
+
 
 if __name__ == "__main__":
     main()

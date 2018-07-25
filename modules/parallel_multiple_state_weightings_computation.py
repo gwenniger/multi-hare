@@ -82,8 +82,15 @@ class ParallelMultipleStateWeightingsComputation(Module):
                                                                   "parallel_multiple_state_weightings_Computation",
                                                                   mask)
 
-        # if not(mask is None):
-        #     result = TensorUtils.apply_binary_mask(result, mask)
+        # It is necessary to mask the non-valid entries in the convolution result. If this
+        # is not done, then the results will be "incorrect" and also when using examples packing,
+        # the first row in the packed matrix will be treated differently from the first rows
+        # of other examples under vertical row separators.
+        # For this reason, we must mask not only the states computed for the next iteration
+        # during MDLSTM computation but also for the convolution computation the entries that
+        # are not valid
+        if not(mask is None):
+            result = TensorUtils.apply_binary_mask(result, mask)
 
         # print("compute_convolution_result - result.size():" + str(result.size()))
 
@@ -97,6 +104,8 @@ class ParallelMultipleStateWeightingsComputation(Module):
 
     def compute_result_and_split_into_output_pairs(self, previous_state_column, mask: torch.Tensor):
         result = list([])
+
+        # print("compute_result_and_split_into_output_pairs - previous_state_column: " + str(previous_state_column))
 
         convolution_result = self.compute_convolution_result(previous_state_column, mask)
         # print("convolution result: " + str(convolution_result))

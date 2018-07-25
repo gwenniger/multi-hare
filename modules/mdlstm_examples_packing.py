@@ -583,6 +583,8 @@ class MDLSTMExamplesPacking:
         # util.image_visualization.imshow_tensor_2d(mask_result.cpu())
         # util.image_visualization.imshow_tensor_2d(packed_examples_2d.cpu())
 
+        # Sanity check to see that the result and the mask are of the same height and
+        # width
         if (result.size(2) != mask_result.size(0)) or (result.size(3) != mask_result.size(1)):
             raise RuntimeError("Error: size of result " + str(result.size()) +
                                " and generated mask " + str(mask_result.size()) +
@@ -604,7 +606,8 @@ class MDLSTMExamplesPacking:
         # print("row_number: (original_image_columns + row_number: " +
         #       str(first_row_index) + ":" + str(original_image_columns + first_row_index))
 
-        activations_unskewed = activations_as_tensor[:, :, 0, 0:original_image_columns]
+        # The first row of this example row is at vertical index first_row_index (not 0) !!!
+        activations_unskewed = activations_as_tensor[:, :, first_row_index, 0:original_image_columns]
         activations_unskewed = torch.unsqueeze(activations_unskewed, 2)
 
         for relative_row_number in range(1, skewed_image_rows):
@@ -612,7 +615,8 @@ class MDLSTMExamplesPacking:
             #      str(relative_row_number) + ":" + str(original_image_columns + relative_row_number))
 
             absolute_row_number = first_row_index + relative_row_number
-            print("extract_unskewed_activations_packed_examples_row - absolute row number: " + str(absolute_row_number))
+            # print("extract_unskewed_activations_packed_examples_row - absolute row number: "
+            # + str(absolute_row_number))
             activation_columns = \
                 activations_as_tensor[:, :, absolute_row_number,
                                       relative_row_number: (relative_row_number + original_image_columns)]
@@ -621,8 +625,8 @@ class MDLSTMExamplesPacking:
             # print("activations_unskewed.size():" + str(activations_unskewed.size()))
             activations_unskewed = torch.cat((activations_unskewed, activation_columns), 2)
 
-        print("extract_unskewed_activations_packed_examples_row - activations_unskewed: "
-              + str(activations_unskewed))
+        # print("extract_unskewed_activations_packed_examples_row - activations_unskewed: "
+        #       + str(activations_unskewed))
 
         activations_unskewed_split_list = list([])
         activations_unskewed_split_list.append(packed_examples_row[0].example_size.width)
@@ -639,8 +643,8 @@ class MDLSTMExamplesPacking:
         for i in range(0, len(example_activations_list_with_padding), 2):
             example_activations_list.append(example_activations_list_with_padding[i])
 
-        print("extract_unskewed_activations_packed_examples_row - example_activations_list: " +
-              str(example_activations_list))
+        # print("extract_unskewed_activations_packed_examples_row - example_activations_list: " +
+        #       str(example_activations_list))
 
         return example_activations_list
 
@@ -679,8 +683,8 @@ class MDLSTMExamplesPacking:
 
         activations_as_tensor = ImageInputTransformer. \
             convert_activation_columns_list_to_tensor(activation_columns)
-        print("mdlstm_examples_packing - activations as tensor (including padding activations): "
-              + str(activations_as_tensor))
+        # print("mdlstm_examples_packing - activations as tensor (including padding activations): "
+        #       + str(activations_as_tensor))
         return self.extract_unskewed_activations_from_activation_tensor(activations_as_tensor)
 
 

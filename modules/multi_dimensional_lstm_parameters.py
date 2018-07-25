@@ -404,6 +404,7 @@ class MultiDimensionalLSTMParametersOneDirectionFast(MultiDimensionalLSTMParamet
         self.node_hidden_state_columns = \
             self.parallel_hidden_state_column_computation.\
                 compute_summed_outputs_every_pair(previous_hidden_state_column, mask)
+        # print("self.node_hidden_state_columns: " + str(self.node_hidden_state_columns))
         self.previous_memory_state_column = previous_memory_state_column
 
         self.node_memory_state_columns = self.\
