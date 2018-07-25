@@ -212,34 +212,87 @@ class MDLSTMExamplesPacking:
                                                                            space_remaining_current_row)
             # print("query_example: " + str(query_example))
             #
-            # print("query_example.get_mdlstm_skewed_image_width(): " +
-            #       str(query_example.get_mdlstm_skewed_image_width()))
+            # print("query_example: " + str(query_example))
+            # print("sorted_list: " + str(sorted_list))
 
-            largest_element_smaller_than_max_width_index = sorted_list.bisect_right(query_example) - 1
-            # print("largest_element_smaller_than_max_width_index: " + str(largest_element_smaller_than_max_width_index))
+            # bisect_rigth -1 works, but disturbs the natural order (it does not preserve the order
+            # when changing the order is not required for equal width elements)
+            # largest_element_smaller_or_equal_than_max_width_index = sorted_list.bisect_right(query_example) - 1
+
+            # With bisect_left we get the smallest element equal or larger
+            smallest_element_larger_or_equal_than_max_width_index = sorted_list.bisect_left(query_example)
+            # But we want the largest element equal or smaller
+
+            # print("smallest_element_larger_or_equal_than_max_width_index: " +
+            #       str(smallest_element_larger_or_equal_than_max_width_index))
+
+            # If the smallest_element_larger_or_equal_than_max_width_index is outside of the array
+            # (i.e. it does not exist) : take the position to the left, which will exist and be
+            # smaller
+            if MDLSTMExamplesPacking.index_outside_list_on_right(smallest_element_larger_or_equal_than_max_width_index,
+                                                                 sorted_list):
+                largest_element_smaller_or_equal_than_max_width_index = \
+                    smallest_element_larger_or_equal_than_max_width_index - 1
+            # If the index is valid but the element at the index is larger: also
+            # take the one to the left
+            elif MDLSTMExamplesPacking.index_inside_list(smallest_element_larger_or_equal_than_max_width_index,
+                                                         sorted_list) and MDLSTMExamplesPacking.\
+                    width_element_at_index_larger_than_value(sorted_list,
+                                                             smallest_element_larger_or_equal_than_max_width_index,
+                                                             space_remaining_current_row):
+                    # print("element is larger")
+                    largest_element_smaller_or_equal_than_max_width_index = \
+                        smallest_element_larger_or_equal_than_max_width_index - 1
+            # The element is the same size, use that one
+            else:
+                # print("element is same size")
+                largest_element_smaller_or_equal_than_max_width_index = \
+                    smallest_element_larger_or_equal_than_max_width_index
+
+            # print("largest_element_smaller_or_equal_than_max_width_index: " +
+            #       str(largest_element_smaller_or_equal_than_max_width_index))
 
             # No suitable smaller example is left
-            if largest_element_smaller_than_max_width_index < 0:
+            if largest_element_smaller_or_equal_than_max_width_index < 0:
                 result.append(result_row)
                 result_row = list([])
                 space_remaining_current_row = horizontal_space_per_row
                 # print("Starting new result_row...")
             else:
-                largest_element_smaller_than_max_width = sorted_list.pop(largest_element_smaller_than_max_width_index)
+                largest_element_smaller_than_max_width = sorted_list.pop(largest_element_smaller_or_equal_than_max_width_index)
                 # print("largest_element_smaller_than_max_width: " + str(largest_element_smaller_than_max_width))
                 result_row.append(largest_element_smaller_than_max_width)
                 space_remaining_current_row -= largest_element_smaller_than_max_width.example_size.width
-                # Reserve space for required separator if additional example is added
-                space_remaining_current_row -= example_separator_width
 
                 if space_remaining_current_row + example_separator_width < 0:
                     raise RuntimeError("Error space remaining current row " +
                                        str(space_remaining_current_row) +
                                        " has become negative")
+                # Reserve space for required separator if additional example is added
+                space_remaining_current_row -= example_separator_width
+
+
 
         # Add the last result row
         result.append(result_row)
 
+        return result
+
+    @staticmethod
+    def index_outside_list_on_right(index, elements_list):
+        return index >= len(elements_list)
+
+    @staticmethod
+    def index_inside_list(index, elements_list):
+        return (index >= 0) and (index < len(elements_list))
+
+    @staticmethod
+    def width_element_at_index_larger_than_value(sorted_list, index: int, value: int):
+        # print(" width_element_at_index_larger_than_value ")
+        # print("   sorted_list[index].example_size.width:  " + str(sorted_list[index].example_size.width))
+        # print("   value:  " + str(value))
+        result = sorted_list[index].example_size.width > value
+        # print("result: " + str(result))
         return result
 
     @staticmethod
@@ -557,7 +610,9 @@ class MDLSTMExamplesPacking:
         for relative_row_number in range(1, skewed_image_rows):
             # print("row_number: (original_image_columns + row_number: " +
             #      str(relative_row_number) + ":" + str(original_image_columns + relative_row_number))
+
             absolute_row_number = first_row_index + relative_row_number
+            print("extract_unskewed_activations_packed_examples_row - absolute row number: " + str(absolute_row_number))
             activation_columns = \
                 activations_as_tensor[:, :, absolute_row_number,
                                       relative_row_number: (relative_row_number + original_image_columns)]
@@ -566,9 +621,12 @@ class MDLSTMExamplesPacking:
             # print("activations_unskewed.size():" + str(activations_unskewed.size()))
             activations_unskewed = torch.cat((activations_unskewed, activation_columns), 2)
 
+        print("extract_unskewed_activations_packed_examples_row - activations_unskewed: "
+              + str(activations_unskewed))
+
         activations_unskewed_split_list = list([])
         activations_unskewed_split_list.append(packed_examples_row[0].example_size.width)
-        for indexed_example_size in packed_examples_row[1:]:
+        for indexed_example_size in packed_examples_row[1:len(packed_examples_row)]:
             activations_unskewed_split_list.append(self.example_separator_width)
             activations_unskewed_split_list.append(indexed_example_size.example_size.width)
 
@@ -580,6 +638,9 @@ class MDLSTMExamplesPacking:
         # Extract the data and discard the padding
         for i in range(0, len(example_activations_list_with_padding), 2):
             example_activations_list.append(example_activations_list_with_padding[i])
+
+        print("extract_unskewed_activations_packed_examples_row - example_activations_list: " +
+              str(example_activations_list))
 
         return example_activations_list
 
@@ -599,9 +660,10 @@ class MDLSTMExamplesPacking:
 
         first_row_index = 0
         for packed_examples_row in self.packed_examples:
-            example_activations_list = self.extract_unskewed_activations_packed_examples_row(activations_as_tensor,
-                                                                  packed_examples_row,
-                                                                  first_row_index)
+            example_activations_list = self.\
+                extract_unskewed_activations_packed_examples_row(activations_as_tensor,
+                                                                 packed_examples_row,
+                                                                 first_row_index)
             skewed_image_rows = packed_examples_row[0].example_size.height
             # Update first row index by height of packed_examples_row plus one
             # for vertical separator row
