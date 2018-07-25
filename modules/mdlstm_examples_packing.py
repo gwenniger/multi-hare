@@ -514,25 +514,28 @@ class MDLSTMExamplesPacking:
         self.skew_parallel_vertically_pad_and_add_packed_row_tensors(same_height_packed_row_tensors,
                                                                      result_cat_list)
 
-        # print("result_cat_list: " + str(result_cat_list))
+        # print("len(result_cat_list): " + str(len(result_cat_list)))
         result = torch.cat(result_cat_list, 2)
         mask_result = torch.cat(mask_result_cat_list, 0)
+
+
 
         #
         # print("mask_result: " + str(mask_result))
         # print("result: " + str(result))
-        #
+
+        # print("result.size(): " + str(result.size()))
         # packed_examples_2d = result.squeeze(1)
         # packed_examples_2d = packed_examples_2d.squeeze(0)
-        # util.image_visualization.imshow_tensor_2d(packed_examples_2d.cpu())
         # util.image_visualization.imshow_tensor_2d(mask_result.cpu())
+        # util.image_visualization.imshow_tensor_2d(packed_examples_2d.cpu())
 
         if (result.size(2) != mask_result.size(0)) or (result.size(3) != mask_result.size(1)):
             raise RuntimeError("Error: size of result " + str(result.size()) +
                                " and generated mask " + str(mask_result.size()) +
                                " are not compatible")
 
-        print("Percentage of real (non-padding) cells: " + str(100 * self.get_non_padding_fraction()) + "%")
+        # print("Percentage of real (non-padding) cells: " + str(100 * self.get_non_padding_fraction()) + "%")
 
         return result, mask_result
 
@@ -657,8 +660,8 @@ def test_pack_examples():
     #     print("packed_examples row: " + str(packed_examples_row))
     #     print("\n")
     mdlstm_examples_packing.print_packed_examples_rows()
-    print("Percentage of real (non-padding) pixels: " + str(100 * mdlstm_examples_packing.get_non_padding_fraction())
-          + "%")
+    # print("Percentage of real (non-padding) pixels: " + str(100 * mdlstm_examples_packing.get_non_padding_fraction())
+    #       + "%")
 
 
 def test_pack_examples_of_same_height():

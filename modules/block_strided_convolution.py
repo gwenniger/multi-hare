@@ -6,7 +6,7 @@ from util.tensor_chunking import TensorChunking
 from util.tensor_list_chunking import TensorListChunking
 from modules.inside_model_gradient_clipping import InsideModelGradientClamping
 from util.tensor_utils import TensorUtils
-
+from modules.module_io_structuring import ModuleIOStructuring
 
 class BlockStridedConvolution(Module):
 
@@ -91,6 +91,10 @@ class BlockStridedConvolution(Module):
             tensor_list_chunking = TensorListChunking.create_tensor_list_chunking(x_three_dim, self.block_size)
             x_chunked = \
                 tensor_list_chunking.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension(x_three_dim, False)
+
+            # # Debugging: check that the de-chunked version recovers the original
+            # ModuleIOStructuring. \
+            #     check_dechunking_chunked_tensor_list_recovers_original(tensor_list_chunking, x_three_dim, x_chunked)
         else:
             x_chunked = x
 

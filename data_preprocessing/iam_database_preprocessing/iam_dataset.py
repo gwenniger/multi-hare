@@ -185,9 +185,8 @@ class IamLinesDataset(Dataset):
         # Don't increase the scale reduction factor to save less than half the value
         # of self.height_required_per_network_output_row in terms of padding
         if (actual_number_of_rows - round(actual_number_of_rows)) < 0.5:
-            print("Minimal scaling factor requires less than half a row of extra " +
-                  " row of extra padding, therefore not increasing the scale reduction "
-                  + "factor further")
+            print("Minimal scaling factor requires less than half a row of extra padding, " +
+                  "therefore not increasing the scale reduction factor further")
             return min_scaling_factor, False
 
         closest_lower_number_of_rows = int(height_after_min_scaling / self.height_required_per_network_output_row)

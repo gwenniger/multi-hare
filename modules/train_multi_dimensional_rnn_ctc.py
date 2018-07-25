@@ -594,8 +594,8 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
     # device_ids should include device!
     # device_ids lists all the gpus that may be used for parallelization
     # device is the initial device the model will be put on
-    device_ids = [0, 1]
-    # device_ids = [0]
+    # device_ids = [0, 1]
+    device_ids = [0]
 
     # assert compute_multi_directional
 
@@ -740,8 +740,9 @@ def mnist_recognition_fixed_length():
 
 
 def mnist_recognition_variable_length(model_opt, checkpoint):
-    # batch_size = 128
-    batch_size = 256
+    batch_size = 128
+    # batch_size = 256
+    # batch_size = 4
     # batch_size = 512
     # batch_size = 1024
     min_num_digits = 1
@@ -869,7 +870,7 @@ def iam_word_recognition(model_opt, checkpoint):
     # but it is only slightly faster (GPU usage appears to be already maxed out)
     # batch_size = 64 #  #128 #32 #128
     # batch_size = 128
-    batch_size = 256
+    batch_size = 64
 
     # lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
     lines_file_path = model_opt.iam_database_lines_file_path
@@ -957,14 +958,14 @@ def main():
         model_opt = opt
 
     # mnist_recognition_fixed_length()
-    mnist_recognition_variable_length(model_opt, checkpoint,)
+    # mnist_recognition_variable_length(model_opt, checkpoint,)
 
-    # if opt.iam_database_data_type == "lines":
-    #     iam_line_recognition(model_opt, checkpoint)
-    # elif opt.iam_database_data_type == "words":
-    #     iam_word_recognition(model_opt, checkpoint)
-    # else:
-    #     raise RuntimeError("Unrecognized data type")
+    if opt.iam_database_data_type == "lines":
+        iam_line_recognition(model_opt, checkpoint)
+    elif opt.iam_database_data_type == "words":
+        iam_word_recognition(model_opt, checkpoint)
+    else:
+        raise RuntimeError("Unrecognized data type")
     # cifar_ten_basic_recognition()
 
 

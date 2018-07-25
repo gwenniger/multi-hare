@@ -681,3 +681,6 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             return self.forward_one_directional_multi_dimensional_lstm(x)
             #return self.\
             #    forward_one_directional_multi_dimensional_lstm_with_additional_skewing_unskewing_step(x)
+
+    def set_use_examples_packing(self, use_examples_packing):
+        self.use_example_packing = use_examples_packing

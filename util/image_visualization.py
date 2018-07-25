@@ -20,7 +20,6 @@ def imshow(img):
     plt.imshow(np.transpose(npimg, (1, 2, 0)))
 
 
-
 def show_random_batch_from_image_loader_with_class_labels(image_loader, classes):
     # get some random training images
     dataiter = iter(image_loader)
