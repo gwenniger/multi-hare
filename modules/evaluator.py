@@ -129,6 +129,6 @@ class Evaluator:
         total_examples = len(test_loader.dataset)
         validation_stats = ValidationStats(total_examples, correct)
         # https://stackoverflow.com/questions/3395138/using-multiple-arguments-for-string-formatting-in-python-e-g-s-s
-        print("Accuracy of the network on the {} test inputs: {:.2f} %% accuracy".format(total_examples,
+        print("Accuracy of the network on the {} test inputs: {:.2f} % accuracy".format(total_examples,
                                                                                          validation_stats.accuracy()))
         return validation_stats

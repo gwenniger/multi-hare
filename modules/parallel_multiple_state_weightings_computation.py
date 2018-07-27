@@ -22,7 +22,7 @@ from util.tensor_utils import TensorUtils
 # shifting the querying index for getting the shifted result.
 class ParallelMultipleStateWeightingsComputation(Module):
     def __init__(self, hidden_states_size: int,
-                 number_of_paired_input_weightings: int,
+                 number_of_paired_input_weightings_per_group: list,
                  output_states_size: int,
                  parallel_convolution: nn.Conv1d,
                  clamp_gradients: bool,
@@ -30,12 +30,13 @@ class ParallelMultipleStateWeightingsComputation(Module):
                  training: bool):
         super(ParallelMultipleStateWeightingsComputation, self).__init__()
         self.hidden_states_size = hidden_states_size
-        self.number_of_paired_input_weightings = number_of_paired_input_weightings
+        self.number_of_paired_input_weightings_per_group = number_of_paired_input_weightings_per_group
         self.output_states_size = output_states_size
         self.parallel_convolution = parallel_convolution
         self.clamp_gradients = clamp_gradients
         self.use_dropout = use_dropout
         self.training = training
+
 
     @staticmethod
     def create_parallel_multiple_state_weighting_computation(hidden_states_size: int,
@@ -55,11 +56,43 @@ class ParallelMultipleStateWeightingsComputation(Module):
         # Xavier weight initialization
         torch.nn.init.xavier_uniform_(parallel_convolution.weight)
 
-        return ParallelMultipleStateWeightingsComputation(hidden_states_size, number_of_paired_input_weightings,
+        return ParallelMultipleStateWeightingsComputation(hidden_states_size, list([number_of_paired_input_weightings]),
+                                                          output_states_size, parallel_convolution, clamp_gradients,
+                                                          use_dropout,
+                                                          None, True)
 
+    @staticmethod
+    def create_parallel_multiple_state_weighting_computation_multiple_groups(
+            hidden_states_size: int, number_of_paired_input_weightings_per_group: list,
+            clamp_gradients: bool, use_dropout: bool):
+        number_of_paired_input_weightings = sum(number_of_paired_input_weightings_per_group)
+        input_states_size = number_of_paired_input_weightings * hidden_states_size
+        output_states_size = hidden_states_size * number_of_paired_input_weightings * 2
+
+        # parallel_convolution = nn.Conv1d(hidden_states_size, output_states_size, 1)
+
+        print("create_parallel_multiple_state_weighting_computation_multiple_groups - \n"
+              + "hidden_states_size: " + str(hidden_states_size) +
+              " number_of_paired_input_weightings_per_group: " + str(number_of_paired_input_weightings_per_group) +
+              "  output_states_size: " + str(output_states_size))
+        parallel_convolution = nn.Conv1d(input_states_size, output_states_size, 1,
+                                         groups=number_of_paired_input_weightings)
+
+        if clamp_gradients:
+            parallel_convolution = GradientClampedModule(parallel_convolution)
+
+        # Xavier weight initialization
+        torch.nn.init.xavier_uniform_(parallel_convolution.weight)
+
+        return ParallelMultipleStateWeightingsComputation(hidden_states_size,
+                                                          number_of_paired_input_weightings_per_group,
                                                           output_states_size, parallel_convolution, clamp_gradients,
                                                           use_dropout,
                                                           True)
+
+    def get_number_of_paired_input_weightings(self):
+        return sum(self.number_of_paired_input_weightings_per_group)
+
 
     # How to do dropout in pytorch:
     # https://discuss.pytorch.org/t/dropout-functional-api-advantages-disadvantages/181/4
@@ -114,7 +147,7 @@ class ParallelMultipleStateWeightingsComputation(Module):
         #      + " compute_result_and_split_into_output_elements - convolution_result.size(): " +
         #      str(convolution_result.size()))
 
-        for i in range(0, self.number_of_paired_input_weightings):
+        for i in range(0, self.get_number_of_paired_input_weightings()):
             range_begin = self.get_result_range_start_index(i * 2)
             range_end = self.get_result_range_end_index(i * 2)
             # print("range begin: " + str(range_begin) + " range end: " + str(range_end))
@@ -149,6 +182,52 @@ class ParallelMultipleStateWeightingsComputation(Module):
             result.append(pair)
         return result
 
+    """
+    Compute the previous state columns for all groups from a list of previous state columns,
+    by repeating each previous_state_column_i  N_i times, where N_i is the number of paired input
+    weightings for the group of previous_state_column_i. By setting the groups of the convolution
+    to the total number of paired input weightings, this allows to compute the results of 
+    multiple convolutions from multiple input states with different numbers of output states.
+    The trick of repeating the previous state columns multiple times in combination with the 
+    "over-grouping" of the convolution in this way is necessary, because with "normal grouping"
+    (i.e. the number of convolution groups is the number of previous states) it would not be possible
+    to have different numbers of paired input weightings for the different states.  
+    """
+    def compute_previous_state_column_all_groups(self, previous_state_columns: list):
+        cat_list = list([])
+        for index, previous_state_column in enumerate(previous_state_columns):
+            number_of_paired_weightings_group = self.number_of_paired_input_weightings_per_group[index]
+            # print("number_of_paired_weightings_group: " + str(number_of_paired_weightings_group))
+            previous_state_column_repeated_for_number_or_paired_weigthings_group = \
+                list([previous_state_column] * number_of_paired_weightings_group)
+            cat_list.extend(previous_state_column_repeated_for_number_or_paired_weigthings_group)
+            # print("len(cat_list): " + str(len(cat_list)))
+        # Concatenate the repeated states list over the channel dimension
+        # print("final len(cat_list): " + str(len(cat_list)))
+        # print("cat_list: " + str(cat_list))
+        previous_state_column_all_groups = torch.cat(cat_list, 1)
+        return previous_state_column_all_groups
+
+    def compute_result_and_split_into_pairs_with_second_pair_element_shifted_multiple_groups(
+            self, previous_state_columns, mask: torch.Tensor = None):
+        # print("ParallelMultipleStateWeightingsComputation \n" +
+        #      "compute_result_and_split_into_pairs_with_second_pair_element_shifted_multiple_groups...")
+        previous_state_column_all_groups = self.compute_previous_state_column_all_groups(previous_state_columns)
+        # print("previous_state_column_all_groups.size(): " + str(previous_state_column_all_groups.size()))
+        return self.compute_result_and_split_into_pairs_with_second_pair_element_shifted(
+            previous_state_column_all_groups, mask)
+
+    @staticmethod
+    def compute_summed_outputs_every_pair_static(convolution_result_pairs):
+        result = list([])
+        for result_pair in convolution_result_pairs:
+            pair_element_one = result_pair[0]
+            pair_two_element_shifted = result_pair[1]
+            # print("pair two element shifted: " + str(pair_two_element_shifted))
+            summed_values = pair_element_one + pair_two_element_shifted
+            result.append(summed_values)
+        return result
+
     # This method :
     # 1. Computes the shared convolution over the previous_state_column
     # 2. Splits the output of the convolution with dimension of
@@ -162,16 +241,10 @@ class ParallelMultipleStateWeightingsComputation(Module):
     #    element to get the final output for each pair. Return the list of these
     #    results, which has number_of_paired_input_weightings elements
     def compute_summed_outputs_every_pair(self, previous_state_column,  mask: torch.Tensor):
-        result = list([])
         convolution_result_pairs = self.\
             compute_result_and_split_into_pairs_with_second_pair_element_shifted(previous_state_column, mask)
-        for result_pair in convolution_result_pairs:
-            pair_element_one = result_pair[0]
-            pair_two_element_shifted = result_pair[1]
-            # print("pair two element shifted: " + str(pair_two_element_shifted))
-            summed_values = pair_element_one + pair_two_element_shifted
-            result.append(summed_values)
-        return result
+        return ParallelMultipleStateWeightingsComputation.compute_summed_outputs_every_pair_static(
+            convolution_result_pairs)
 
     def get_state_convolutions_as_list(self):
         return list([self.parallel_convolution])

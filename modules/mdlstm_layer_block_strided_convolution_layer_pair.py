@@ -55,12 +55,12 @@ class MDLSTMLayerBlockStridedConvolutionLayerPair(Module):
 
         print("Create {mdlstm,_block-strided_convolution} layer_pair...")
         multi_dimensional_lstm = MultiDimensionalLSTM.\
-            create_multi_dimensional_lstm_fast(layer_index, input_channels, mdlstm_hidden_states_size,
-                                               compute_multi_directional,
-                                               clamp_gradients,
-                                               use_dropout,
-                                               use_example_packing,
-                                               nonlinearity)
+            create_multi_dimensional_lstm_fully_parallel(layer_index, input_channels, mdlstm_hidden_states_size,
+                                                         compute_multi_directional,
+                                                         clamp_gradients,
+                                                         use_dropout,
+                                                         use_example_packing,
+                                                         nonlinearity)
         block_strided_convolution = BlockStridedConvolution. \
             create_block_strided_convolution(mdlstm_hidden_states_size, output_channels,
                                              block_strided_convolution_block_size,

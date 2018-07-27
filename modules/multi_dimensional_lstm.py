@@ -11,6 +11,7 @@ from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParame
 from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParametersCreator
 from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParametersCreatorSlow
 from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParametersCreatorFast
+from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParametersCreatorFullyParallel
 from util.image_input_transformer import ImageInputTransformer
 from modules.inside_model_gradient_clipping import InsideModelGradientClamping
 from util.tensor_utils import TensorUtils
@@ -156,6 +157,23 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                     use_example_packing,
                                     nonlinearity)
 
+    @staticmethod
+    def create_multi_dimensional_lstm_fully_parallel(
+            layer_index: int, input_channels: int, hidden_states_size: int,
+            compute_multi_directional: bool,
+            clamp_gradients: bool,
+            use_dropout: bool,
+            use_example_packing: bool,
+            nonlinearity="tanh"):
+
+        return MultiDimensionalLSTM(layer_index, input_channels, hidden_states_size, compute_multi_directional,
+                                    clamp_gradients, use_dropout,
+                                    True,
+                                    MultiDimensionalLSTMParametersCreatorFullyParallel(),
+                                    use_example_packing,
+                                    nonlinearity)
+
+
     def set_training(self, training):
         self.mdlstm_direction_one_parameters.set_training(training)
 
@@ -181,7 +199,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             skewed_images_variable = ImageInputTransformer.create_skewed_images_variable_four_dim(x)
             number_of_images = x.size(0)
 
-        print("skewed_images_variable: " + str(skewed_images_variable))
+        # print("skewed_images_variable: " + str(skewed_images_variable))
 
         # Add a column of padding zeros to mask, so that mask[:, column_index]
         # will return the padding for the previous column

@@ -17,6 +17,11 @@ from modules.gradient_clamped_module import GradientClampedModule
 # convolution output pair as in the other class.
 # 2. There is no need to shift outputs as in the other class.
 
+# The parameter number_of_groups can be used to further parallelize
+# the computation of multiple groups of 2d convolutions. Choosing the
+# number of groups > 1, each group has its own set of convolutions
+# that processes one chunk of the input and produces one chunk of the output
+
 class ParallelMultipleInputConvolutionsComputation(Module):
     def __init__(self, hidden_states_size: int,
                  number_of_input_convolutions: int,
@@ -24,7 +29,8 @@ class ParallelMultipleInputConvolutionsComputation(Module):
                  parallel_convolution: nn.Conv2d,
                  clamp_gradients: bool,
                  use_dropout: bool,
-                 training: bool):
+                 training: bool,
+                 number_of_groups: int):
         super(ParallelMultipleInputConvolutionsComputation, self).__init__()
         self.hidden_states_size = hidden_states_size
         self.number_of_input_convolutions = number_of_input_convolutions
@@ -33,20 +39,29 @@ class ParallelMultipleInputConvolutionsComputation(Module):
         self.clamp_gradients = clamp_gradients
         self.use_dropout = use_dropout
         self.training = training
+        self.number_of_groups = number_of_groups
 
         print("ParallelMultipleInputConvolutions - clamp_gradients: " + str(clamp_gradients))
 
     @staticmethod
-    def create_parallel_multiple_input_convolutions_computation(input_channels: int,
+    def create_parallel_multiple_input_convolutions_computation(input_channels_per_group: int,
                                                                 hidden_states_size: int,
                                                                 number_of_input_convolutions: int,
                                                                 clamp_gradients: bool,
-                                                                use_dropout: bool):
-        output_states_size = hidden_states_size * number_of_input_convolutions
+                                                                use_dropout: bool,
+                                                                number_of_groups=1):
+
+        # Compute the required output states size, which is a function of the hidden states size,
+        # the number of input convolutions to be computed in parallel, and the number of groups
+        # to be computed in parallel
+        output_states_size = hidden_states_size * number_of_input_convolutions * number_of_groups
+        # Compute the required input channels size, which is a function of the input channels per
+        # group and the number of groups
+        input_channels = input_channels_per_group * number_of_groups
 
         # parallel_convolution = nn.Conv1d(hidden_states_size, output_states_size, 1)
 
-        parallel_convolution = nn.Conv2d(input_channels, output_states_size, 1)
+        parallel_convolution = nn.Conv2d(input_channels, output_states_size, 1, groups=number_of_groups)
 
         if clamp_gradients:
             parallel_convolution = GradientClampedModule(parallel_convolution)
@@ -58,7 +73,7 @@ class ParallelMultipleInputConvolutionsComputation(Module):
         return ParallelMultipleInputConvolutionsComputation(hidden_states_size, number_of_input_convolutions,
                                                             output_states_size, parallel_convolution, clamp_gradients,
                                                             use_dropout,
-                                                            True)
+                                                            True, number_of_groups)
 
     # How to do dropout in pytorch:
     # https://discuss.pytorch.org/t/dropout-functional-api-advantages-disadvantages/181/4
@@ -82,18 +97,29 @@ class ParallelMultipleInputConvolutionsComputation(Module):
         return result
 
     def get_result_range_start_index(self, result_element_index):
-        return self.hidden_states_size * result_element_index
+        if self.number_of_groups != 1:
+            raise RuntimeError("Error: this function should not be used unless number_of_groups = 1")
+        return self.get_group_result_range_start_index(result_element_index, 0)
 
     def get_result_range_end_index(self, result_element_index):
-        return self.hidden_states_size * (result_element_index + 1)
+        if self.number_of_groups != 1:
+            raise RuntimeError("Error: this function should not be used unless number_of_groups = 1")
 
-    def compute_result_and_split_into_output_elements(self, input_tensor):
+        return self.get_group_result_range_end_index(result_element_index, 0)
+
+    def get_output_states_per_group(self):
+        return self.hidden_states_size * self.number_of_input_convolutions
+
+    def get_group_result_range_start_index(self, result_element_index, group_index):
+        group_offset = group_index * self.get_output_states_per_group()
+        return group_offset + self.hidden_states_size * result_element_index
+
+    def get_group_result_range_end_index(self, result_element_index, group_index):
+        group_offset = group_index * self.get_output_states_per_group()
+        return group_offset + self.hidden_states_size * (result_element_index + 1)
+
+    def split_result_into_output_elements_for_single_group_computation(self, convolution_result):
         result = list([])
-
-        convolution_result = self.compute_convolution_result(input_tensor)
-        # print(">>> compute_result_and_split_into_output_elements - convolution_result.size(): " +
-        #      str(convolution_result.size()))
-
         for i in range(0, self.number_of_input_convolutions):
             range_begin = self.get_result_range_start_index(i)
             range_end = self.get_result_range_end_index(i)
@@ -102,6 +128,30 @@ class ParallelMultipleInputConvolutionsComputation(Module):
 
             result.append(element)
         return result
+
+    def split_result_into_output_elements_for_multiple_group_computation(self, convolution_result):
+        for group_index in self.number_of_groups:
+
+            group_results_list = list([])
+            for i in range(0, self.number_of_input_convolutions):
+                range_begin = self.get_group_result_range_start_index(i, group_index)
+                range_end = self.get_group_result_range_end_index(i, group_index)
+                # print("range begin: " + str(range_begin) + " range end: " + str(range_end))
+                element = convolution_result[:, range_begin:range_end, :]
+                group_results_list.append(element)
+
+    def compute_result_and_split_into_output_elements(self, input_tensor):
+
+
+        convolution_result = self.compute_convolution_result(input_tensor)
+        # print(">>> compute_result_and_split_into_output_elements - convolution_result.size(): " +
+        #      str(convolution_result.size()))
+
+        if self.number_of_groups > 1:
+            # TODO: Fixme
+            raise RuntimeError("Not implemented")
+        else:
+                return self.split_result_into_output_elements_for_single_group_computation(convolution_result)
 
     def get_state_convolutions_as_list(self):
         return list([self.parallel_convolution])
