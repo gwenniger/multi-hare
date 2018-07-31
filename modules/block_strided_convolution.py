@@ -14,6 +14,7 @@ class BlockStridedConvolution(Module):
                  clamp_gradients: bool,
                  use_bias: bool,
                  use_example_packing: bool,
+                 comput_multi_directional: bool,
                  nonlinearity="tanh"):
         super(BlockStridedConvolution, self).__init__()
         self.input_channels = input_channels
@@ -22,6 +23,7 @@ class BlockStridedConvolution(Module):
         self.nonlinearity = nonlinearity
         self.clamp_gradients = clamp_gradients
         self.use_example_packing = use_example_packing
+        self.compute_multi_directional = comput_multi_directional
         # What types of convolutions are there:
         # https://github.com/vdumoulin/conv_arithmetic/blob/master/README.md
         # https://towardsdatascience.com/types-of-convolutions-in-deep-learning-717013397f4d
@@ -46,9 +48,10 @@ class BlockStridedConvolution(Module):
     @staticmethod
     def create_block_strided_convolution(input_channels: int, output_channels: int, block_size: SizeTwoDimensional,
                                          clamp_gradients: bool, use_bias: bool, use_example_packing: bool,
-                 nonlinearity="tanh"):
+                                         compute_multi_directional: bool, nonlinearity="tanh"):
         return BlockStridedConvolution(input_channels, output_channels, block_size,
-                                       clamp_gradients, use_bias, use_example_packing, nonlinearity)
+                                       clamp_gradients, use_bias, use_example_packing,
+                                       compute_multi_directional, nonlinearity)
 
     def get_activation_function(self):
         if self.nonlinearity == "tanh":
@@ -87,7 +90,14 @@ class BlockStridedConvolution(Module):
             # obtained from MDLSTM is a list of 4-D tensors, so must convert
             x_three_dim = list([])
             for tensor in x:
+                print("block_strided_convolution.forward - tensor.size(): " + str(tensor.size()))
                 x_three_dim.append(tensor.squeeze(0))
+
+            # FIXME: For 4-directional MDLSTM, tensor list chunking must be done for 4 different
+            # directions after splitting list on batch dimension
+            # Then convolutions must be computed for every dimension separately and summed
+            # Also a separate convolution should be saved (with it's own parameters) for
+            # each direction
             tensor_list_chunking = TensorListChunking.create_tensor_list_chunking(x_three_dim, self.block_size)
             x_chunked = \
                 tensor_list_chunking.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension(x_three_dim, False)

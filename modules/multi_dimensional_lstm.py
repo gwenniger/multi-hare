@@ -12,10 +12,13 @@ from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParame
 from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParametersCreatorSlow
 from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParametersCreatorFast
 from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParametersCreatorFullyParallel
+from modules.multi_dimensional_lstm_parameters import MultiDirectionalMultiDimensionalLSTMParametersFullyParallel
+from modules.multi_dimensional_lstm_parameters import MultiDirectionalMultiDimensionalLSTMParametersCreatorFullyParallel
 from util.image_input_transformer import ImageInputTransformer
 from modules.inside_model_gradient_clipping import InsideModelGradientClamping
 from util.tensor_utils import TensorUtils
 from modules.mdlstm_examples_packing import MDLSTMExamplesPacking
+
 
 def printgradnorm(self, grad_input, grad_output):
     print('Inside ' + self.__class__.__name__ + ' backward')
@@ -70,7 +73,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
     def __init__(self, layer_index: int, input_channels: int, hidden_states_size: int, compute_multi_directional: bool,
                  clamp_gradients: bool,
                  use_dropout: bool, training: bool,
-                 multi_dimensional_lstm_parameter_creator: MultiDimensionalLSTMParametersCreator,
+                 mdlstm_parameters,
                  use_example_packing: bool,
                  nonlinearity="tanh"):
         super(MultiDimensionalLSTM, self).__init__(layer_index, input_channels, hidden_states_size,
@@ -85,36 +88,28 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
         self.use_dropout = use_dropout
         self.training = training
-
-        self.mdlstm_direction_one_parameters = \
-            multi_dimensional_lstm_parameter_creator.create_multi_dimensional_lstm_parameters_one_direction(
-                self.hidden_states_size, self.input_channels, self.clamp_gradients, use_dropout)
-
-
         self.use_example_packing = use_example_packing
+        self.mdlstm_parameters =  mdlstm_parameters
 
-        # Set initial bias for the forget gates to one, since it is known to give better results
-        self.mdlstm_direction_one_parameters.set_bias_forget_gates_to_one()
-
-        # For multi-directional rnn
-        if self.compute_multi_directional_flag:
-            self.mdlstm_direction_two_parameters = \
-                multi_dimensional_lstm_parameter_creator.create_multi_dimensional_lstm_parameters_one_direction(
-                    self.hidden_states_size, self.input_channels, self.clamp_gradients, use_dropout)
-            # Set initial bias for the forget gates to one, since it is known to give better results
-            self.mdlstm_direction_two_parameters.set_bias_forget_gates_to_one()
-
-            self.mdlstm_direction_three_parameters = \
-                multi_dimensional_lstm_parameter_creator.create_multi_dimensional_lstm_parameters_one_direction(
-                    self.hidden_states_size, self.input_channels, self.clamp_gradients, use_dropout)
-            # Set initial bias for the forget gates to one, since it is known to give better results
-            self.mdlstm_direction_three_parameters.set_bias_forget_gates_to_one()
-
-            self.mdlstm_direction_four_parameters = \
-                multi_dimensional_lstm_parameter_creator.create_multi_dimensional_lstm_parameters_one_direction(
-                    self.hidden_states_size, self.input_channels, self.clamp_gradients, use_dropout)
-            # Set initial bias for the forget gates to one, since it is known to give better results
-            self.mdlstm_direction_four_parameters.set_bias_forget_gates_to_one()
+        # # For multi-directional rnn
+        # if self.compute_multi_directional_flag:
+        #     self.mdlstm_direction_two_parameters = \
+        #         multi_dimensional_lstm_parameter_creator.create_multi_dimensional_lstm_parameters_one_direction(
+        #             self.hidden_states_size, self.input_channels, self.clamp_gradients, use_dropout)
+        #     # Set initial bias for the forget gates to one, since it is known to give better results
+        #     self.mdlstm_direction_two_parameters.set_bias_forget_gates_to_one()
+        #
+        #     self.mdlstm_direction_three_parameters = \
+        #         multi_dimensional_lstm_parameter_creator.create_multi_dimensional_lstm_parameters_one_direction(
+        #             self.hidden_states_size, self.input_channels, self.clamp_gradients, use_dropout)
+        #     # Set initial bias for the forget gates to one, since it is known to give better results
+        #     self.mdlstm_direction_three_parameters.set_bias_forget_gates_to_one()
+        #
+        #     self.mdlstm_direction_four_parameters = \
+        #         multi_dimensional_lstm_parameter_creator.create_multi_dimensional_lstm_parameters_one_direction(
+        #             self.hidden_states_size, self.input_channels, self.clamp_gradients, use_dropout)
+        #     # Set initial bias for the forget gates to one, since it is known to give better results
+        #     self.mdlstm_direction_four_parameters.set_bias_forget_gates_to_one()
 
         self.state_convolutions = nn.ModuleList([])
         self.register_parameters_to_assure_same_gpu_is_used()
@@ -123,23 +118,52 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         # self.register_backward_hook(printgradnorm)
 
     def register_parameters_to_assure_same_gpu_is_used(self):
-        self.state_convolutions.extend(self.mdlstm_direction_one_parameters.get_all_parameters_as_list())
+        self.state_convolutions.extend(self.mdlstm_parameters.get_all_parameters_as_list())
 
-        if self.compute_multi_directional_flag:
-            self.state_convolutions.extend(self.mdlstm_direction_two_parameters.get_all_parameters_as_list())
-            self.state_convolutions.extend(self.mdlstm_direction_three_parameters.get_all_parameters_as_list())
-            self.state_convolutions.extend(self.mdlstm_direction_four_parameters.get_all_parameters_as_list())
+        # if self.compute_multi_directional_flag:
+        #     self.state_convolutions.extend(self.mdlstm_direction_two_parameters.get_all_parameters_as_list())
+        #     self.state_convolutions.extend(self.mdlstm_direction_three_parameters.get_all_parameters_as_list())
+        #     self.state_convolutions.extend(self.mdlstm_direction_four_parameters.get_all_parameters_as_list())
+
 
     @staticmethod
-    def create_multi_dimensional_lstm(layer_index: int, input_channels: int, hidden_states_size: int, compute_multi_directional: bool,
+    def create_mdlstm_paramters(multi_dimensional_lstm_parameter_creator,
+                                compute_multi_directional: bool,
+                                hidden_states_size: int, input_channels: int,
+                                use_dropout: bool, clamp_gradients: bool):
+        if compute_multi_directional:
+            mdlstm_parameters = \
+                multi_dimensional_lstm_parameter_creator.create_multi_directional_multi_dimensional_lstm_parameters(
+                    hidden_states_size, input_channels,
+                    use_dropout, clamp_gradients, 4)
+        else:
+
+            mdlstm_parameters = \
+                multi_dimensional_lstm_parameter_creator.create_multi_dimensional_lstm_parameters_one_direction(
+                    hidden_states_size, input_channels, clamp_gradients, use_dropout)
+
+        # Set initial bias for the forget gates to one, since it is known to give better results
+        mdlstm_parameters.set_bias_forget_gates_to_one()
+
+        return mdlstm_parameters
+
+    @staticmethod
+    def create_multi_dimensional_lstm(layer_index: int, input_channels: int, hidden_states_size: int,
+                                      compute_multi_directional: bool,
                                       clamp_gradients: bool,
                                       use_dropout: bool,
                                       use_example_packing: bool,
                                       nonlinearity="tanh"):
+
+        mdlstm_parameters = MultiDimensionalLSTM.create_mdlstm_paramters(
+            MultiDimensionalLSTMParametersCreatorSlow(),
+            compute_multi_directional, hidden_states_size, input_channels,
+            use_dropout, clamp_gradients)
+
         return MultiDimensionalLSTM(layer_index, input_channels, hidden_states_size, compute_multi_directional,
                                     clamp_gradients, use_dropout,
                                     True,
-                                    MultiDimensionalLSTMParametersCreatorSlow(),
+                                    mdlstm_parameters,
                                     use_example_packing,
                                     nonlinearity)
 
@@ -150,10 +174,16 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                            use_dropout: bool,
                                            use_example_packing: bool,
                                            nonlinearity="tanh"):
+
+        mdlstm_parameters = MultiDimensionalLSTM.create_mdlstm_paramters(
+            MultiDimensionalLSTMParametersCreatorFast(),
+            compute_multi_directional, hidden_states_size, input_channels,
+            use_dropout, clamp_gradients)
+
         return MultiDimensionalLSTM(layer_index, input_channels, hidden_states_size, compute_multi_directional,
                                     clamp_gradients, use_dropout,
                                     True,
-                                    MultiDimensionalLSTMParametersCreatorFast(),
+                                    mdlstm_parameters,
                                     use_example_packing,
                                     nonlinearity)
 
@@ -166,16 +196,43 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             use_example_packing: bool,
             nonlinearity="tanh"):
 
+        if compute_multi_directional:
+            mult_dimensional_lstm_parameters_creater = \
+                MultiDirectionalMultiDimensionalLSTMParametersCreatorFullyParallel()
+        else:
+            mult_dimensional_lstm_parameters_creater = MultiDimensionalLSTMParametersCreatorFast()
+
+        mdlstm_parameters = MultiDimensionalLSTM.create_mdlstm_paramters(
+            mult_dimensional_lstm_parameters_creater,
+            compute_multi_directional, hidden_states_size, input_channels,
+            use_dropout, clamp_gradients)
+
         return MultiDimensionalLSTM(layer_index, input_channels, hidden_states_size, compute_multi_directional,
                                     clamp_gradients, use_dropout,
                                     True,
-                                    MultiDimensionalLSTMParametersCreatorFullyParallel(),
+                                    mdlstm_parameters,
                                     use_example_packing,
                                     nonlinearity)
 
+    def create_one_directional_mdlstms_from_multi_directional_mdlstm(self):
+        if not self.compute_multi_directional():
+            raise RuntimeError("Error: only allowed for multi-directional MDLSTM")
+        if not isinstance(self.mdlstm_parameters, MultiDirectionalMultiDimensionalLSTMParametersFullyParallel):
+            raise RuntimeError("Error: method only implemented for multi-directional MDSLTM with "
+                               "parameters of type MultiDirectionalMultiDimensionalLSTMParametersFullyParallel")
+
+        result = list([])
+
+        one_directional_mdlstms_parameters = self.mdlstm_parameters.\
+            create_one_directional_mdlstm_parameters_each_direction_using_current_weights()
+        for mdlstm_parameters in one_directional_mdlstms_parameters:
+            result.append(MultiDimensionalLSTM(self.layer_index, self.input_channels, self.hidden_states_size,
+                          False, self.clamp_gradients, self.use_dropout, self.training,
+                          mdlstm_parameters, self.use_example_packing, self.nonlinearity))
+        return result
 
     def set_training(self, training):
-        self.mdlstm_direction_one_parameters.set_training(training)
+        self.mdlstm_parameters.set_training(training)
 
         if self.compute_multi_directional_flag:
             self.mdlstm_direction_two_parameters.set_training(training)
@@ -189,9 +246,17 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         if self.use_example_packing:
             mdlstm_examples_packing = \
                 MDLSTMExamplesPacking.created_mdlstm_examples_packing(examples, 1)
-            skewed_images_variable, mask = mdlstm_examples_packing.\
-                create_vertically_and_horizontally_packed_examples(examples)
-            number_of_images = 1
+            if self.compute_multi_directional():
+                skewed_images_variable, mask = mdlstm_examples_packing. \
+                    create_vertically_and_horizontally_packed_examples_four_directions_plus_mask(examples)
+                if skewed_images_variable.size(0) != 4:
+                    raise RuntimeError("Error: expected the 4 images for four directions to be stacked on "
+                                       "the first (batch) dimension")
+                number_of_images = 4
+            else:
+                skewed_images_variable, mask = mdlstm_examples_packing.\
+                    create_vertically_and_horizontally_packed_examples_and_mask_one_direction(examples)
+                number_of_images = 1
         else:
             x = examples
             # Create a binary mask that tells which of the cell positions are valid and which are not
@@ -199,7 +264,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             skewed_images_variable = ImageInputTransformer.create_skewed_images_variable_four_dim(x)
             number_of_images = x.size(0)
 
-        # print("skewed_images_variable: " + str(skewed_images_variable))
+        print("skewed_images_variable: " + str(skewed_images_variable))
 
         # Add a column of padding zeros to mask, so that mask[:, column_index]
         # will return the padding for the previous column
@@ -260,8 +325,10 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
         # print("skewed image columns: " + str(skewed_image_columns))
 
+        print("starting MDLSTM column computation...")
+
         for column_index in range(0, skewed_image_columns):
-            # print("column_index: " + str(column_index))
+            print("column_index: " + str(column_index))
             #print("previous_hidden_state_column.is_leaf: " + str(previous_hidden_state_column.is_leaf))
             #print("previous_hidden_state_column.grad_fn: " + str(previous_hidden_state_column.grad_fn))
             #print("previous_memory_state_column.is_leaf: " + str(previous_memory_state_column.is_leaf))
@@ -294,12 +361,14 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # Compute convolution on previous state column vector padded with zeros
             input_hidden_state_column = mdlstm_parameters.get_input_hidden_state_column()
 
-            # print("input_hidden_state_column.size(): " + str(input_hidden_state_column.size()))
+            print("input_hidden_state_column.size(): " + str(input_hidden_state_column.size()))
             # print("input_hidden_state_column: " + str(input_hidden_state_column))
 
             input_state_plus_input = MultiDimensionalRNNBase.\
                 compute_states_plus_input(input_matrices.input_input_matrix, column_index,
                                           input_hidden_state_column)
+
+
 
             # Compute the sum of weighted inputs of the input gate
             input_gate_weighted_states_plus_input = MultiDimensionalLSTM.\
@@ -323,7 +392,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
             input_and_input_gate_combined = torch.mul(input_activation_column, input_gate_activation_column)
 
-            # print("input_and_input_gate_combined.size(): " + str(input_and_input_gate_combined.size()))
+            print("input_and_input_gate_combined.size(): " + str(input_and_input_gate_combined.size()))
 
             if self.clamp_gradients:
                 input_and_input_gate_combined = \
@@ -333,6 +402,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
 
             # print("input and input gate combined: " + str(input_and_input_gate_combined))
+
+
 
             memory_states_column_forget_gate_one = previous_memory_state_column
 
@@ -442,7 +513,6 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             #new_memory_state = input_and_input_gate_combined + \
             #    forget_gate_two_activation_multiplied_with_previous_memory_state
 
-
             # print("new memory state: " + str(new_memory_state))
 
             # This additional tanh activation function taken from the NVIDIA diagram
@@ -500,6 +570,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                     register_gradient_clamping_default_clamping_bound(
                         output_gate_activation_column, variable_identification_string
                     )
+
+
 
             # TensorUtils.print_max(output_gate_activation_column, "output_gate_activation_column")
 
@@ -567,42 +639,49 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         # https://discuss.pytorch.org/t/is-there-a-way-to-parallelize-independent-sequential-steps/3360
 
     def forward_multi_directional_multi_dimensional_lstm(self, x):
-        # print("list(x.size()): " + str(list(x.size())))
+        # # print("list(x.size()): " + str(list(x.size())))
+        #
+        # # Original order
+        # activations_unskewed_direction_one = self.\
+        #     compute_multi_dimensional_lstm_one_direction(self.mdlstm_parameters, x)
+        #
+        # # Fixme: This does not work with example packing
+        #
+        # # Flipping 2nd dimension
+        # height_flipping = util.tensor_flipping.TensorFlipping.create_tensor_flipping(True, False)
+        # activations_unskewed_direction_two_flipped = self.compute_multi_dimensional_lstm_one_direction(
+        #     self.mdlstm_direction_two_parameters, height_flipping.flip(x))
+        # # Flip back the activations to get the retrieve the original orientation
+        # activations_unskewed_direction_two = height_flipping.flip(activations_unskewed_direction_two_flipped)
+        #
+        # # print("activations_one_dimensional_two: " + str(activations_one_dimensional_two))
+        #
+        # # Flipping 3th dimension
+        # width_flipping = util.tensor_flipping.TensorFlipping.create_tensor_flipping(False, True)
+        # activations_unskewed_direction_three_flipped = self.compute_multi_dimensional_lstm_one_direction(
+        #     self.mdlstm_direction_three_parameters, width_flipping.flip(x))
+        # # Flip back the activations to get the retrieve the original orientation
+        # activations_unskewed_direction_three = width_flipping.flip(activations_unskewed_direction_three_flipped)
+        #
+        # # Flipping 2nd and 3th dimension combined
+        # height_and_width_flipping = util.tensor_flipping.TensorFlipping.create_tensor_flipping(True, True)
+        # activations_unskewed_direction_four_flipped = self.compute_multi_dimensional_lstm_one_direction(
+        #     self.mdlstm_direction_four_parameters, height_and_width_flipping.flip(x))
+        # # Flip back the activations to get the retrieve the original orientation
+        # activations_unskewed_direction_four = height_and_width_flipping.flip(activations_unskewed_direction_four_flipped)
+        #
+        # activations_combined = torch.cat((activations_unskewed_direction_one, activations_unskewed_direction_two,
+        #                                   activations_unskewed_direction_three, activations_unskewed_direction_four), 1)
+        #
+        # result = activations_combined
+        # return result
 
-        # Original order
-        activations_unskewed_direction_one = self.\
-            compute_multi_dimensional_lstm_one_direction(self.mdlstm_direction_one_parameters, x)
+        activations_unskewed = self.compute_multi_dimensional_lstm_one_direction(self.mdlstm_parameters,
+                                                                                 x)
+        print("len(activations_unskewed: " + str(len(activations_unskewed)))
+        # print("activations_unskewed.size(): " + str(activations_unskewed.size()))
 
-        # Fixme: This does not work with example packing
-
-        # Flipping 2nd dimension
-        height_flipping = util.tensor_flipping.TensorFlipping.create_tensor_flipping(True, False)
-        activations_unskewed_direction_two_flipped = self.compute_multi_dimensional_lstm_one_direction(
-            self.mdlstm_direction_two_parameters, height_flipping.flip(x))
-        # Flip back the activations to get the retrieve the original orientation
-        activations_unskewed_direction_two = height_flipping.flip(activations_unskewed_direction_two_flipped)
-
-        # print("activations_one_dimensional_two: " + str(activations_one_dimensional_two))
-
-        # Flipping 3th dimension
-        width_flipping = util.tensor_flipping.TensorFlipping.create_tensor_flipping(False, True)
-        activations_unskewed_direction_three_flipped = self.compute_multi_dimensional_lstm_one_direction(
-            self.mdlstm_direction_three_parameters, width_flipping.flip(x))
-        # Flip back the activations to get the retrieve the original orientation
-        activations_unskewed_direction_three = width_flipping.flip(activations_unskewed_direction_three_flipped)
-
-        # Flipping 2nd and 3th dimension combined
-        height_and_width_flipping = util.tensor_flipping.TensorFlipping.create_tensor_flipping(True, True)
-        activations_unskewed_direction_four_flipped = self.compute_multi_dimensional_lstm_one_direction(
-            self.mdlstm_direction_four_parameters, height_and_width_flipping.flip(x))
-        # Flip back the activations to get the retrieve the original orientation
-        activations_unskewed_direction_four = height_and_width_flipping.flip(activations_unskewed_direction_four_flipped)
-
-        activations_combined = torch.cat((activations_unskewed_direction_one, activations_unskewed_direction_two,
-                                          activations_unskewed_direction_three, activations_unskewed_direction_four), 1)
-
-        result = activations_combined
-        return result
+        return MDLSTMExamplesPacking.extract_flipped_back_activations_from_unskewed_activations(activations_unskewed)
 
     @staticmethod
     def compute_weighted_input_input_gate(column_number, input_gate_input_matrix, mdlstm_parameters):
@@ -619,13 +698,12 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
         if self.use_dropout:
             output_gate_memory_state_column = \
-                F.dropout(StateUpdateBlock.compute_weighted_state_input_state_one(
-                    mdlstm_parameters.output_gate_memory_state_convolution,
-                    previous_memory_state_column), p=0.2, training=self.training)
+                F.dropout(mdlstm_parameters.
+                          compute_output_gate_memory_state_weighted_input(previous_memory_state_column),
+                          p=0.2, training=self.training)
         else:
-            output_gate_memory_state_column = StateUpdateBlock. \
-                compute_weighted_state_input_state_one(mdlstm_parameters.output_gate_memory_state_convolution,
-                                                       previous_memory_state_column)
+            output_gate_memory_state_column = \
+                mdlstm_parameters.compute_output_gate_memory_state_weighted_input(previous_memory_state_column)
 
         if self.clamp_gradients:
             output_gate_memory_state_column = InsideModelGradientClamping.\
@@ -656,7 +734,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         return forget_gate_weighted_states_plus_weighted_input
 
     def forward_one_directional_multi_dimensional_lstm(self, x):
-        activations_unskewed = self.compute_multi_dimensional_lstm_one_direction(self.mdlstm_direction_one_parameters,
+        activations_unskewed = self.compute_multi_dimensional_lstm_one_direction(self.mdlstm_parameters,
                                                                                  x)
         # print("activations_unskewed.size(): " + str(activations_unskewed.size()))
 
@@ -688,7 +766,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
     # Needs to be implemented in the subclasses
     def _compute_multi_dimensional_function_one_direction(self, function_input):
-        return self.compute_multi_dimensional_lstm_one_direction(self.mdlstm_direction_one_parameters, function_input)
+        return self.compute_multi_dimensional_lstm_one_direction(self.mdlstm_parameters, function_input)
 
     # Input tensor x is a batch of image tensors
     def forward(self, x):

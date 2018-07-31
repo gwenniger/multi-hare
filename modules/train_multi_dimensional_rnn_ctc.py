@@ -594,8 +594,8 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
     # device_ids should include device!
     # device_ids lists all the gpus that may be used for parallelization
     # device is the initial device the model will be put on
-    device_ids = [0, 1]
-    #device_ids = [0]
+    # device_ids = [0, 1]
+    device_ids = [0]
 
     # assert compute_multi_directional
 
@@ -740,9 +740,9 @@ def mnist_recognition_fixed_length():
 
 
 def mnist_recognition_variable_length(model_opt, checkpoint):
-    batch_size = 128
+    # batch_size = 128
     # batch_size = 256
-    # batch_size = 4
+    batch_size = 4
     # batch_size = 256
     # batch_size = 1024
     min_num_digits = 1
@@ -768,7 +768,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     # Possibly a batch size of 128 leads to more instability in training?
     #batch_size = 128
 
-    compute_multi_directional = False
+    compute_multi_directional = True
     # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
     use_dropout = False
 

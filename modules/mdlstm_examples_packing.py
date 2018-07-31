@@ -10,6 +10,7 @@ from util.image_input_transformer import ImageInputTransformer
 from util.tensor_utils import TensorUtils
 from util.utils import Utils
 import util.image_visualization
+from util.tensor_flipping import TensorFlipping
 
 
 class IndexedExampleSize:
@@ -481,7 +482,7 @@ class MDLSTMExamplesPacking:
     """
     def skew_parallel_vertically_pad_and_add_packed_row_tensors(self, same_height_packed_row_tensors,
                                                                 result_cat_list):
-        # print("skew_parallel_vertically_pad_and_add_packed_row_tensors...")
+        print("skew_parallel_vertically_pad_and_add_packed_row_tensors...")
         stacked_same_height_packed_tensors = torch.cat(same_height_packed_row_tensors, 0)
         stacked_same_height_packed_tensors_skewed = ImageInputTransformer. \
             create_skewed_images_variable_four_dim(stacked_same_height_packed_tensors)
@@ -494,10 +495,11 @@ class MDLSTMExamplesPacking:
                 vertical_separator = self.create_vertical_separator(skewed_packed_example_row_tensor)
                 # print("vertical_separator.size(): " + str(vertical_separator.size()))
                 result_cat_list.append(vertical_separator)
-            # print("skewed_packed_example_row_tensor.size(): " + str(skewed_packed_example_row_tensor.size()))
+            print("skewed_packed_example_row_tensor.size(): " + str(skewed_packed_example_row_tensor.size()))
             result_cat_list.append(skewed_packed_example_row_tensor)
 
-    def create_vertically_and_horizontally_packed_examples(self, examples: list):
+    def create_vertically_and_horizontally_packed_examples_one_direction(self, examples: list,
+                                                                         tensor_flipping: TensorFlipping):
 
         number_of_dimensions = TensorUtils.number_of_dimensions(examples[0])
         if number_of_dimensions != 3:
@@ -505,7 +507,6 @@ class MDLSTMExamplesPacking:
                                "dimensions but got: " + str(number_of_dimensions))
 
         result_cat_list = list([])
-        mask_result_cat_list = list([])
 
         current_height = self.packed_examples[0][0].example_size.height
         same_height_packed_row_tensors = list([])
@@ -524,35 +525,81 @@ class MDLSTMExamplesPacking:
                 same_height_packed_row_tensors = list([])
 
             row_cat_list = list([])
-            mask_row_cat_list = list([])
             for indexed_example_size in packed_examples_row:
                 example_index = indexed_example_size.original_example_index
                 example = examples[example_index]
                 example_unsqueezed = example.unsqueeze(0)
+                if tensor_flipping is not None:
+                    # Flip example for computation to obtain the example with the right scanning
+                    # direction for Multi-Directional MDLSTM
+                    example_unsqueezed_flipped_for_current_direction = tensor_flipping.flip(example_unsqueezed)
+                else:
+                    example_unsqueezed_flipped_for_current_direction = example_unsqueezed
 
                 if len(row_cat_list) > 0:
                     row_cat_list.append(self.create_horizontal_separator(example))
 
-                row_cat_list.append(example_unsqueezed)
+                print(" example_unsqueezed_flipped_for_current_direction.size(): " +
+                      str(example_unsqueezed_flipped_for_current_direction.size()))
+
+                row_cat_list.append(example_unsqueezed_flipped_for_current_direction)
 
             extra_padding = self.create_extra_padding(row_cat_list, packed_examples_row)
             if extra_padding is not None:
                 # print("extra_padding: " + str(extra_padding))
                 row_cat_list.append(extra_padding)
 
+            for element in row_cat_list:
+                print("row cat list element.size(): " + str(element.size()))
             catted_row_unskewed = torch.cat(row_cat_list, 3)
             same_height_packed_row_tensors.append(catted_row_unskewed)
+
+            # print("len(row_cat_list): " + str(len(row_cat_list)))
+            # print("row_cat_list: " + str(row_cat_list))
+            # for element in row_cat_list:
+            #    print("row_cat_list element.size(): " + str(element.size()))
+
+            # print("catted_row_unskewed: " + str(catted_row_unskewed))
+
+        print("Add final same height tensors...")
+        # Add final same height tensors
+        self.skew_parallel_vertically_pad_and_add_packed_row_tensors(same_height_packed_row_tensors,
+                                                                     result_cat_list)
+        print("len(result_cat_list): " + str(len(result_cat_list)))
+        result = torch.cat(result_cat_list, 2)
+
+        print("create_vertically_and_horizontally_packed_examples_one_direction --- finished" +
+              "result.size(): " + str(result.size()))
+
+        # packed_examples_2d = result.squeeze(1)
+        # packed_examples_2d = packed_examples_2d.squeeze(0)
+        # util.image_visualization.imshow_tensor_2d(packed_examples_2d.cpu())
+
+        return result
+
+    def create_vertically_and_horizontally_packed_examples_mask_one_direction(self, examples: list):
+
+        number_of_dimensions = TensorUtils.number_of_dimensions(examples[0])
+        if number_of_dimensions != 3:
+            raise RuntimeError("Error: expected an examples tensor with 3 "
+                               "dimensions but got: " + str(number_of_dimensions))
+
+        mask_result_cat_list = list([])
+
+        for packed_examples_row in self.packed_examples:
+            # print("create_vertically_and_horizontally_packed_examples - packed_examples_row: "
+            #     + str(packed_examples_row))
+
+            mask_row_cat_list = list([])
+            for indexed_example_size in packed_examples_row:
+                example_index = indexed_example_size.original_example_index
+                example = examples[example_index]
 
             device = examples[0].get_device()
             mask_row_cat_list.append(self.create_row_mask_packed_mdlstm_computation(packed_examples_row, device))
             mask_extra_padding = self.create_mask_extra_padding(mask_row_cat_list, packed_examples_row)
             if mask_extra_padding is not None:
                 mask_row_cat_list.append(mask_extra_padding)
-
-            # print("len(row_cat_list): " + str(len(row_cat_list)))
-            # print("row_cat_list: " + str(row_cat_list))
-            # for element in row_cat_list:
-            #    print("row_cat_list element.size(): " + str(element.size()))
 
             catted_mask_row = torch.cat(mask_row_cat_list, 1)
 
@@ -563,15 +610,77 @@ class MDLSTMExamplesPacking:
 
             mask_result_cat_list.append(catted_mask_row)
 
-        # Add final same height tensors
-        self.skew_parallel_vertically_pad_and_add_packed_row_tensors(same_height_packed_row_tensors,
-                                                                     result_cat_list)
-
-        # print("len(result_cat_list): " + str(len(result_cat_list)))
-        result = torch.cat(result_cat_list, 2)
         mask_result = torch.cat(mask_result_cat_list, 0)
 
+        return mask_result
 
+    def create_vertically_and_horizontally_packed_examples_and_mask_one_direction(self, examples: list):
+
+        result = self.create_vertically_and_horizontally_packed_examples_one_direction(examples, None)
+        mask_result = self.create_vertically_and_horizontally_packed_examples_mask_one_direction(examples)
+
+        #
+        # print("mask_result: " + str(mask_result))
+        # print("result: " + str(result))
+
+        # print("result.size(): " + str(result.size()))
+        # packed_examples_2d = result.squeeze(1)
+        # packed_examples_2d = packed_examples_2d.squeeze(0)
+        # util.image_visualization.imshow_tensor_2d(mask_result.cpu())
+        # util.image_visualization.imshow_tensor_2d(packed_examples_2d.cpu())
+
+        # Sanity check to see that the result and the mask are of the same height and
+        # width
+        if (result.size(2) != mask_result.size(0)) or (result.size(3) != mask_result.size(1)):
+            raise RuntimeError("Error: size of result " + str(result.size()) +
+                               " and generated mask " + str(mask_result.size()) +
+                               " are not compatible")
+
+            # print("Percentage of real (non-padding) cells: " + str(100 * self.get_non_padding_fraction()) + "%")
+
+        return result, mask_result
+
+    @staticmethod
+    def create_four_directions_tensor_flippings():
+        no_flipping = util.tensor_flipping.TensorFlipping.create_tensor_flipping(False, False)
+        # Flipping 2nd dimension
+        height_flipping = util.tensor_flipping.TensorFlipping.create_tensor_flipping(True, False)
+        # Flipping 3th dimension
+        width_flipping = util.tensor_flipping.TensorFlipping.create_tensor_flipping(False, True)
+        # Flipping 2nd and 3th dimension combined
+        height_and_width_flipping = util.tensor_flipping.TensorFlipping.create_tensor_flipping(True, True)
+
+        result = list([no_flipping, height_flipping, width_flipping, height_and_width_flipping])
+        return result
+
+
+    def create_vertically_and_horizontally_packed_examples_four_directions_plus_mask(self, examples: list):
+
+        tensor_flipping_list = MDLSTMExamplesPacking.create_four_directions_tensor_flippings()
+
+        # Original direction: left-to-right and top-to-bottom
+        packed_examples_direction_one = self.\
+            create_vertically_and_horizontally_packed_examples_one_direction(examples, tensor_flipping_list[0])
+
+        packed_examples_direction_two = self.\
+            create_vertically_and_horizontally_packed_examples_one_direction(examples, tensor_flipping_list[1])
+
+        packed_examples_direction_three = self. \
+            create_vertically_and_horizontally_packed_examples_one_direction(examples, tensor_flipping_list[2])
+
+        packed_examples_direction_four = self. \
+            create_vertically_and_horizontally_packed_examples_one_direction(examples, tensor_flipping_list[3])
+
+        print("mdlstm_examples_packing - Created vertically and horizontally packed examples in four directions...")
+
+        cat_list = list([packed_examples_direction_one, packed_examples_direction_two, packed_examples_direction_three,
+                         packed_examples_direction_four])
+        # Concatenate the packed examples for different directions on the batch-dimension
+        result = torch.cat(cat_list, 0)
+
+        mask_result = self.create_vertically_and_horizontally_packed_examples_mask_one_direction(examples)
+
+        print("mdlstm_examples_packing - Created mask...")
 
         #
         # print("mask_result: " + str(mask_result))
@@ -687,6 +796,26 @@ class MDLSTMExamplesPacking:
         #       + str(activations_as_tensor))
         return self.extract_unskewed_activations_from_activation_tensor(activations_as_tensor)
 
+    @staticmethod
+    def extract_flipped_back_activations_from_unskewed_activations(activations_unskewed):
+        tensor_flipping_list = MDLSTMExamplesPacking.create_four_directions_tensor_flippings()
+        result = list([])
+        for tensor in activations_unskewed:
+            direction_tensors = torch.split(tensor, 1, 0)
+
+            cat_list = list([])
+            for i, direction_tensor in enumerate(direction_tensors):
+                tensor_flipping = tensor_flipping_list[i]
+                if tensor_flipping is not None:
+                    cat_list.append(tensor_flipping.flip(direction_tensor))
+                else:
+                    cat_list.append(direction_tensor)
+            result.append(torch.cat(cat_list, 0))
+
+        return result
+
+
+
 
 def test_create_vertically_and_horizontally_packed_examples():
     print("test_create_vertically_and_horizontally_packed_examples...")
@@ -699,7 +828,8 @@ def test_create_vertically_and_horizontally_packed_examples():
     examples_list = Utils.move_tensor_list_to_device(examples_list, 0)
 
     mdlstm_examples_packing = MDLSTMExamplesPacking.created_mdlstm_examples_packing(examples_list, 1)
-    packed_examples, packed_examples_mask = mdlstm_examples_packing.create_vertically_and_horizontally_packed_examples(examples_list)
+    packed_examples, packed_examples_mask = mdlstm_examples_packing.\
+        create_vertically_and_horizontally_packed_examples_and_mask_one_direction(examples_list)
 
     # Visualize the packed_examples and the packed_examples_mask to check
     # that they are as expected

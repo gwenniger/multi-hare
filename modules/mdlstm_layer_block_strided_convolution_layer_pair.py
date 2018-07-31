@@ -67,6 +67,7 @@ class MDLSTMLayerBlockStridedConvolutionLayerPair(Module):
                                              clamp_gradients,
                                              use_bias_with_block_strided_convolution,
                                              use_example_packing,
+                                             compute_multi_directional,
                                              nonlinearity)
 
         return MDLSTMLayerBlockStridedConvolutionLayerPair(multi_dimensional_lstm, block_strided_convolution)

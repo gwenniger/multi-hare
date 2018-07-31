@@ -2,6 +2,7 @@ import torch
 from modules.multi_dimensional_lstm import MultiDimensionalLSTM
 from util.tensor_utils import TensorUtils
 
+
 class MultiDimensionalLSTMTest:
 
     def __init__(self, mdlstm):
