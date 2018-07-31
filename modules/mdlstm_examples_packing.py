@@ -810,7 +810,8 @@ class MDLSTMExamplesPacking:
                     cat_list.append(tensor_flipping.flip(direction_tensor))
                 else:
                     cat_list.append(direction_tensor)
-            result.append(torch.cat(cat_list, 0))
+            # Concatenate the tensors along the channel dimension and add to the result
+            result.append(torch.cat(cat_list, 1))
 
         return result
 

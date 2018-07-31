@@ -35,7 +35,7 @@ class TensorListChunking:
 
     @staticmethod
     def create_tensor_list_chunking(tensor_list: list,
-                               block_size: SizeTwoDimensional):
+                                    block_size: SizeTwoDimensional):
         return TensorListChunking(TensorListChunking.get_original_sizes_from_tensor_list(tensor_list), block_size)
 
     @staticmethod

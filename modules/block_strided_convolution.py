@@ -16,7 +16,7 @@ class BlockStridedConvolution(Module):
                  use_bias: bool,
                  use_example_packing: bool,
                  comput_multi_directional: bool,
-                 convolutions,
+                 convolution,
                  nonlinearity="tanh"):
         super(BlockStridedConvolution, self).__init__()
         self.input_channels = input_channels
@@ -30,7 +30,7 @@ class BlockStridedConvolution(Module):
         # https://github.com/vdumoulin/conv_arithmetic/blob/master/README.md
         # https://towardsdatascience.com/types-of-convolutions-in-deep-learning-717013397f4d
 
-        self.convolutions = convolutions
+        self.convolution = convolution
 
         if use_bias:
             print("WARNING: using bias with block_strided_Convolution")
@@ -40,25 +40,30 @@ class BlockStridedConvolution(Module):
         print("BlockStridedConvolution - clamp_gradients: " + str(clamp_gradients))
 
     @staticmethod
-    def create_convolutions_list(input_channels: int,
-                                 output_channels: int,
-                                 block_size,
-                                 use_bias: bool,
-                                 number_of_directions: int):
-        result = nn.ModuleList([])
+    def create_convolution(input_channels: int,
+                           output_channels: int,
+                           block_size,
+                           use_bias: bool,
+                           number_of_directions: int):
         # Don't use bias in the convolution layer (?). This is suggested by
         # "Dropout improves Recurrent Neural Networks for Handwriting Recognition"
-        for i in range(0, number_of_directions):
+
+        if number_of_directions > 1:
+            convolution = nn.Conv2d(input_channels * number_of_directions,
+                                    output_channels * number_of_directions,
+                                    (block_size.height, block_size.width),
+                                    stride=(block_size.height, block_size.width),
+                                    bias=use_bias, groups=number_of_directions)
+        else:
             convolution = nn.Conv2d(input_channels, output_channels,
                                     (block_size.height, block_size.width),
                                     stride=(block_size.height, block_size.width),
                                     bias=use_bias)
 
-            # Initialize the convolution with the
-            # Xavier Glorot scheme
-            nn.init.xavier_uniform_(convolution.weight)
-            result.append(convolution)
-        return result
+        # Initialize the convolution with the
+        # Xavier Glorot scheme
+        nn.init.xavier_uniform_(convolution.weight)
+        return convolution
 
     @staticmethod
     def create_block_strided_convolution(input_channels: int, output_channels: int, block_size: SizeTwoDimensional,
@@ -68,13 +73,13 @@ class BlockStridedConvolution(Module):
             number_of_directions = 4
         else:
             number_of_directions = 1
-        convolutions = BlockStridedConvolution.create_convolutions_list(input_channels, output_channels,
-                                                                        block_size, use_bias,
-                                                                        number_of_directions)
+        convolution = BlockStridedConvolution.create_convolution(input_channels, output_channels,
+                                                                  block_size, use_bias,
+                                                                  number_of_directions)
 
         return BlockStridedConvolution(input_channels, output_channels, block_size,
                                        clamp_gradients, use_bias, use_example_packing,
-                                       compute_multi_directional, convolutions, nonlinearity)
+                                       compute_multi_directional, convolution, nonlinearity)
 
     def get_activation_function(self):
         if self.nonlinearity == "tanh":
@@ -106,8 +111,8 @@ class BlockStridedConvolution(Module):
     def set_training(self, training):
         return
 
-    def compute_forward_one_directional(self, x, direction_index: int):
-        convolution_output = self.convolutions[direction_index](x)
+    def compute_forward_one_directional(self, x):
+        convolution_output = self.convolution(x)
         # TensorUtils.print_max(convolution_output, "block_strided_convolution - convolution_output")
         if self.clamp_gradients:
             # convolution_output = InsideModelGradientClamping.register_gradient_clamping_default_clamping_bound(
@@ -125,10 +130,9 @@ class BlockStridedConvolution(Module):
         # result = InsideModelGradientClamping.register_gradient_clamping(result)
         return result
 
-    def compute_forward_one_directional_from_chunked_input(self, x_chunked, tensor_list_chunking,
-                                                           direction_index: int):
+    def compute_forward_one_directional_from_chunked_input(self, x_chunked, tensor_list_chunking):
 
-        result = self.compute_forward_one_directional(x_chunked, direction_index)
+        result = self.compute_forward_one_directional(x_chunked)
 
         # If the input and output are lists, the output of the convolution
         # and activation function must again be converted back to the original list
@@ -147,7 +151,7 @@ class BlockStridedConvolution(Module):
                                                                                            SizeTwoDimensional(1, 1))
         return result
 
-    def compute_x_chunked_and_tensor_list_chunking_list_one_directional_input(self, x):
+    def compute_x_chunked_and_tensor_list_chunking_list(self, x):
         # Tensor list chunking expects a list of 3-D tensors as input, but x
         # obtained from MDLSTM is a list of 4-D tensors, so must convert
         x_three_dim = list([])
@@ -173,25 +177,27 @@ class BlockStridedConvolution(Module):
 
         if self.use_example_packing:
             if self.compute_multi_directional:
-                x_per_direction_list = TensorUtils.chunk_list_of_tensors_along_dimension(x, 4, 0)
-                list_of_activations_lists = list([])
-                for i, x in enumerate(x_per_direction_list):
-                    x_chunked, tensor_list_chunking = \
-                        self.compute_x_chunked_and_tensor_list_chunking_list_one_directional_input(x)
-                    activations = self.compute_forward_one_directional_from_chunked_input(
-                        x_chunked, tensor_list_chunking, i)
-                    list_of_activations_lists.append(activations)
+                x_chunked, tensor_list_chunking = \
+                    self.compute_x_chunked_and_tensor_list_chunking_list(x)
+                activations = self.compute_forward_one_directional_from_chunked_input(
+                    x_chunked, tensor_list_chunking)
+                # print("block_strided_convolution - activations[0].size(): " + str(activations[0].size()))
+                # Chunk the list of activations per tensor into a list of activations per tensor
+                # for each direction
+                list_of_activations_lists = TensorUtils.chunk_list_of_tensors_along_dimension(activations, 4, 0)
                 activations_summed = TensorUtils.sum_lists_of_tensor_lists_element_wise(list_of_activations_lists)
+                # print("block_strided_convolution - activations_summed[0].size(): "
+                # + str(activations_summed[0].size()))
 
                 return activations_summed
             else:
                 x_chunked, tensor_list_chunking = \
-                    self.compute_x_chunked_and_tensor_list_chunking_list_one_directional_input(x)
+                    self.compute_x_chunked_and_tensor_list_chunking_list(x)
                 activations = self.compute_forward_one_directional_from_chunked_input(
-                    x_chunked, tensor_list_chunking, 0)
+                    x_chunked, tensor_list_chunking)
                 return activations
         else:
-            return self.compute_forward_one_directional(x, 0)
+            return self.compute_forward_one_directional(x)
 
     def get_width_reduction_factor(self):
         return self.block_size.width

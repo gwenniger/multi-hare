@@ -213,9 +213,9 @@ class MultiDirectionalMDLSTMTest:
 
         activations_for_tensor = activations_multi_directional_mdlstm[0]
         print("activations_for_tensor.size(): " + str(activations_for_tensor.size()))
-        if not activations_for_tensor.size(0) == 4:
-            raise RuntimeError("Error: expected the output tensor to have a size of 4" +
-                               "for its first dimension, i.e. for 4-directional MDLSTM")
+        # if not activations_for_tensor.size(0) == 4:
+        #     raise RuntimeError("Error: expected the output tensor to have a size of 4" +
+        #                        "for its first dimension, i.e. for 4-directional MDLSTM")
 
         tensor_flipping_list = MDLSTMExamplesPacking.create_four_directions_tensor_flippings()
 
@@ -235,8 +235,15 @@ class MultiDirectionalMDLSTMTest:
             # Flip activations back to original orientation
             activations_one_directional_mdlstm = \
                 tensor_flipping.flip(activations_one_directional_mdlstm_flipped[0])
+            start_index = int(direction_index * (activations_for_tensor.size(1) / 4))
+            end_index = int((direction_index + 1) * (activations_for_tensor.size(1) / 4))
+            print("start_index: " + str(start_index))
+            print("end_index: " + str(end_index))
+
+            # Activations are concatenated along the channel dimension
             activations_one_directional_mdlstm_from_four_directional_mdlstm = \
-                activations_for_tensor[direction_index, :, :, :]
+                activations_for_tensor[:, start_index:end_index, :, :]
+
             print("activations_one_directional_mdlstm_from_four_directional_mdlstm: " +
                   str(activations_one_directional_mdlstm_from_four_directional_mdlstm))
             print("activations_one_directional_mdlstm: " +

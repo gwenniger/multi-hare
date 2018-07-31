@@ -234,10 +234,10 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
     def set_training(self, training):
         self.mdlstm_parameters.set_training(training)
 
-        if self.compute_multi_directional_flag:
-            self.mdlstm_direction_two_parameters.set_training(training)
-            self.mdlstm_direction_three_parameters.set_training(training)
-            self.mdlstm_direction_four_parameters.set_training(training)
+        # if self.compute_multi_directional_flag:
+        #     self.mdlstm_direction_two_parameters.set_training(training)
+        #     self.mdlstm_direction_three_parameters.set_training(training)
+        #     self.mdlstm_direction_four_parameters.set_training(training)
 
         self.training = training
 

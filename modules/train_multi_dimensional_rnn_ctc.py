@@ -741,7 +741,7 @@ def mnist_recognition_fixed_length():
 
 def mnist_recognition_variable_length(model_opt, checkpoint):
     # batch_size = 128
-    batch_size = 32
+    # batch_size = 32
     # batch_size = 64
     batch_size = 256
     # batch_size = 1024
