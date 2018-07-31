@@ -131,14 +131,40 @@ class TensorUtils:
     def number_of_dimensions(tensor):
         return len(tensor.size())
 
+    @staticmethod
+    def chunk_list_of_tensors_along_dimension(list_of_tensors: list, number_of_chunks: int, dim: int,):
+        result_lists = list([])
+        for i in range(0, number_of_chunks):
+            result_lists.append(list([]))
+        for tensor in list_of_tensors:
+            chunk_tensors = torch.chunk(tensor, number_of_chunks, dim)
+            for i in range(0, len(chunk_tensors)):
+                result_lists[i].append(chunk_tensors[i])
+        return result_lists
+
+    """
+    Given a list of tensor lists, all of equal length, this method 
+    computes the element-wise summation of tensors with the same index
+    in the inner lists
+    """
+    @staticmethod
+    def sum_lists_of_tensor_lists_element_wise(list_of_tensor_lists: list):
+        result = list([])
+        for element_index in range(0, len(list_of_tensor_lists[0])):
+            activations_summed = list_of_tensor_lists[0][element_index]
+            for list_index in range(1, len(list_of_tensor_lists)):
+                activations_summed += list_of_tensor_lists[list_index][element_index]
+            result.append(activations_summed)
+        return result
+
+
+
 
 def test_number_of_non_zeros():
 
     tensor = torch.zeros(3, 3)
     print("tensor: " + str(tensor))
     print("number of non-zeros: " + str(TensorUtils.number_of_non_zeros(tensor)))
-
-
 
 
 def main():

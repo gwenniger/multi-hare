@@ -81,8 +81,8 @@ class ParallelMultipleInputConvolutionsComputation(Module):
     # Where to apply dropout:
     # https://stats.stackexchange.com/questions/240305/where-should-i-place-dropout-layers-in-a-neural-network
     def compute_convolution_result(self, input_tensor):
-        print("parallel_multiple_input_convolutions_computation - compute_convolution_result")
-        print(" - input_tensor.size(): " + str(input_tensor.size()))
+        # print("parallel_multiple_input_convolutions_computation - compute_convolution_result")
+        # print(" - input_tensor.size(): " + str(input_tensor.size()))
 
         if self.use_dropout:
                 # print("Applying dropout...")

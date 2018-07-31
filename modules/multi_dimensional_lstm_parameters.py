@@ -718,9 +718,6 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
                                                               groups=number_of_directions)
         nn.init.xavier_uniform_(self.output_gate_memory_state_convolution.weight)
 
-
-
-
         self.input_matrices = None
         self.node_hidden_state_columns = None
         self.node_memory_state_columns = None
@@ -732,8 +729,8 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
 
         parallel_multiple_input_convolutions_computations = \
             MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.\
-                create_parallel_multiple_input_convolution_computations(input_channels, hidden_states_size,
-                                                                        clamp_gradients, use_dropout, number_of_directions)
+            create_parallel_multiple_input_convolution_computations(input_channels, hidden_states_size,
+                                                                    clamp_gradients, use_dropout, number_of_directions)
 
         parallel_hidden_and_memory_state_column_computation = \
             MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.\
@@ -764,7 +761,7 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
     def create_parallel_multiple_input_convolution_computations(
             input_channels: int, hidden_states_size: int,
             clamp_gradients: bool, use_dropout: bool, number_of_directions: int):
-        parallel_multiple_input_convolutions_computations = list([])
+        parallel_multiple_input_convolutions_computations = nn.ModuleList([])
 
         for i in range(0, number_of_directions):
             parallel_multiple_input_convolution = ParallelMultipleInputConvolutionsComputation. \
@@ -777,7 +774,7 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
         return parallel_multiple_input_convolutions_computations
 
     def prepare_input_convolutions(self, skewed_images_variable):
-        print("Entered MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.prepare_input_convolutions...")
+        # print("Entered MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.prepare_input_convolutions...")
 
         if TensorUtils.number_of_dimensions(skewed_images_variable) != 4:
             raise RuntimeError("Error: prepare_input_convolution requires 4 dimensional input")
@@ -785,29 +782,28 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
         if skewed_images_variable.size(0) != self.number_of_directions:
             raise RuntimeError("Error: the size of the first dimension should match the number of directions")
 
-        print("MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.prepare_input_convolutions - split")
-        print("skewed_images_variable.size(): " + str(skewed_images_variable.size()))
+        # print("MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.prepare_input_convolutions - split")
+        # print("skewed_images_variable.size(): " + str(skewed_images_variable.size()))
         # First split the image tensor to get the images for the different directions
         skewed_images_variable_list = torch.split(skewed_images_variable, 1, 0)
-        print(" - Split Done")
 
         input_matrices_lists = list([])
         # Then compute the input matrix for each direction
         for i, skewed_image in enumerate(skewed_images_variable_list):
-            print("compute_result_and_split_into_output_elements - direction - " + str(i))
-            print("skewed_image.size(): " + str(skewed_image.size()))
+            # print("compute_result_and_split_into_output_elements - direction - " + str(i))
+            # print("skewed_image.size(): " + str(skewed_image.size()))
             input_matrices = self.parallel_multiple_input_convolutions_computations[i].\
                 compute_result_and_split_into_output_elements(skewed_image)
-            print(">>> len(input_matrices) for direction: " + str(len(input_matrices)))
-            print("compute_result_and_split_into_output_elements - direction - " + str(i) + " - finished")
+            # print(">>> len(input_matrices) for direction: " + str(len(input_matrices)))
+            # print("compute_result_and_split_into_output_elements - direction - " + str(i) + " - finished")
             input_matrices_lists.append(input_matrices)
 
         input_matrices_lists_grouped_by_index_concatenated = \
             MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.\
             concatenate_elements_list_of_lists_along_dimension(input_matrices_lists, 0)
 
-        print(">>> len(input_matrices_lists_grouped_by_index_concatenated): " +
-              str(len(input_matrices_lists_grouped_by_index_concatenated)))
+        # print(">>> len(input_matrices_lists_grouped_by_index_concatenated): " +
+        #       str(len(input_matrices_lists_grouped_by_index_concatenated)))
         self.input_matrices = input_matrices_lists_grouped_by_index_concatenated
 
         if len(self.input_matrices) != 5:
@@ -849,10 +845,10 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
         for elements in list_of_tensor_tuples_lists_re_grouped_by_index:
             tuple_cat_list = list([])
             for i, tuple_index_grouped in enumerate(zip(*elements)):
-                print("index - " + str(i) + " - len(tuple_index_grouped): " + str(len(tuple_index_grouped)))
+                # print("index - " + str(i) + " - len(tuple_index_grouped): " + str(len(tuple_index_grouped)))
 
                 concatenated_tensors = torch.cat(tuple_index_grouped, dim)
-                print("concatenated_tensors.size() :" + str(concatenated_tensors.size()))
+                # print("concatenated_tensors.size() :" + str(concatenated_tensors.size()))
                 tuple_cat_list.append(concatenated_tensors)
             list_of_elements_same_index_concateneated.append(tuple(tuple_cat_list))
 
@@ -883,8 +879,8 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
 
     def prepare_computation_next_column_functions(self, previous_hidden_state_column,
                                                   previous_memory_state_column,  mask: torch.Tensor):
-        print("Entered MultiDirectionalMultiDimensionalLSTMParametersFullyParallel." +
-              "prepare_computation_next_column_functions...")
+        # print("Entered MultiDirectionalMultiDimensionalLSTMParametersFullyParallel." +
+        #       "prepare_computation_next_column_functions...")
 
         if previous_hidden_state_column.size(0) != self.number_of_directions:
             raise RuntimeError("Error: the size of the first dimension of" +
@@ -918,7 +914,7 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
 
         self.previous_memory_state_column = previous_memory_state_column
 
-        print("finished prepare_computation_next_column_functions")
+        # print("finished prepare_computation_next_column_functions")
 
     def compute_output_gate_memory_state_weighted_input(self, previous_memory_state_column):
         if TensorUtils.number_of_dimensions(previous_memory_state_column) != 3:
@@ -936,11 +932,11 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
         result_catted_on_channel_dimension = StateUpdateBlock.compute_weighted_state_input_state_one(
             self.output_gate_memory_state_convolution,
             previous_memory_state_column_catted_on_channel_dimension)
-        print("result_catted_on_channel_dimension.size(): " + str(result_catted_on_channel_dimension.size()))
+        # print("result_catted_on_channel_dimension.size(): " + str(result_catted_on_channel_dimension.size()))
         result_split_into_directions = torch.chunk(result_catted_on_channel_dimension, self.number_of_directions, 1)
         # Re-concatenate the direction results on the batch dimension
         result = torch.cat(result_split_into_directions, 0)
-        print("result.size(): " + str(result.size()))
+        # print("result.size(): " + str(result.size()))
         return result
 
     def get_input_input_matrix(self):

@@ -8,6 +8,7 @@ from modules.inside_model_gradient_clipping import InsideModelGradientClamping
 from util.tensor_utils import TensorUtils
 from modules.module_io_structuring import ModuleIOStructuring
 
+
 class BlockStridedConvolution(Module):
 
     def __init__(self, input_channels: int, output_channels: int, block_size: SizeTwoDimensional,
@@ -15,6 +16,7 @@ class BlockStridedConvolution(Module):
                  use_bias: bool,
                  use_example_packing: bool,
                  comput_multi_directional: bool,
+                 convolutions,
                  nonlinearity="tanh"):
         super(BlockStridedConvolution, self).__init__()
         self.input_channels = input_channels
@@ -27,31 +29,52 @@ class BlockStridedConvolution(Module):
         # What types of convolutions are there:
         # https://github.com/vdumoulin/conv_arithmetic/blob/master/README.md
         # https://towardsdatascience.com/types-of-convolutions-in-deep-learning-717013397f4d
-        # Don't use bias in the convolution layer (?). This is suggested by
-        # "Dropout improves Recurrent Neural Networks for Handwriting Recognition"
-        self.convolution = nn.Conv2d(self.input_channels, self.output_channels,
-                                     (block_size.height, block_size.width),
-                                     stride=(block_size.height, block_size.width),
-                                     bias=use_bias) #bias=True)
+
+        self.convolutions = convolutions
 
         if use_bias:
             print("WARNING: using bias with block_strided_Convolution")
         else:
             print("Creating block_strided_convolution without bias parameters...")
 
-        # Initialize the convolution with the
-        # Xavier Glorot scheme
-        nn.init.xavier_uniform_(self.convolution.weight)
-
         print("BlockStridedConvolution - clamp_gradients: " + str(clamp_gradients))
+
+    @staticmethod
+    def create_convolutions_list(input_channels: int,
+                                 output_channels: int,
+                                 block_size,
+                                 use_bias: bool,
+                                 number_of_directions: int):
+        result = nn.ModuleList([])
+        # Don't use bias in the convolution layer (?). This is suggested by
+        # "Dropout improves Recurrent Neural Networks for Handwriting Recognition"
+        for i in range(0, number_of_directions):
+            convolution = nn.Conv2d(input_channels, output_channels,
+                                    (block_size.height, block_size.width),
+                                    stride=(block_size.height, block_size.width),
+                                    bias=use_bias)
+
+            # Initialize the convolution with the
+            # Xavier Glorot scheme
+            nn.init.xavier_uniform_(convolution.weight)
+            result.append(convolution)
+        return result
 
     @staticmethod
     def create_block_strided_convolution(input_channels: int, output_channels: int, block_size: SizeTwoDimensional,
                                          clamp_gradients: bool, use_bias: bool, use_example_packing: bool,
                                          compute_multi_directional: bool, nonlinearity="tanh"):
+        if compute_multi_directional:
+            number_of_directions = 4
+        else:
+            number_of_directions = 1
+        convolutions = BlockStridedConvolution.create_convolutions_list(input_channels, output_channels,
+                                                                        block_size, use_bias,
+                                                                        number_of_directions)
+
         return BlockStridedConvolution(input_channels, output_channels, block_size,
                                        clamp_gradients, use_bias, use_example_packing,
-                                       compute_multi_directional, nonlinearity)
+                                       compute_multi_directional, convolutions, nonlinearity)
 
     def get_activation_function(self):
         if self.nonlinearity == "tanh":
@@ -70,7 +93,7 @@ class BlockStridedConvolution(Module):
         block_size = self.block_size
         tensor_chunking = TensorChunking.create_tensor_chunking(input_size, block_size)
         feature_blocks_per_example = tensor_chunking.number_of_feature_blocks_per_example
-        print("feature_blocks_per_example : " + str(feature_blocks_per_example))
+        # print("block_strided_convolution - feature_blocks_per_example : " + str(feature_blocks_per_example))
         result = feature_blocks_per_example * self.output_channels
         return result
 
@@ -83,32 +106,8 @@ class BlockStridedConvolution(Module):
     def set_training(self, training):
         return
 
-    def forward(self, x):
-
-        if self.use_example_packing:
-            # Tensor list chunking expects a list of 3-D tensors as input, but x
-            # obtained from MDLSTM is a list of 4-D tensors, so must convert
-            x_three_dim = list([])
-            for tensor in x:
-                print("block_strided_convolution.forward - tensor.size(): " + str(tensor.size()))
-                x_three_dim.append(tensor.squeeze(0))
-
-            # FIXME: For 4-directional MDLSTM, tensor list chunking must be done for 4 different
-            # directions after splitting list on batch dimension
-            # Then convolutions must be computed for every dimension separately and summed
-            # Also a separate convolution should be saved (with it's own parameters) for
-            # each direction
-            tensor_list_chunking = TensorListChunking.create_tensor_list_chunking(x_three_dim, self.block_size)
-            x_chunked = \
-                tensor_list_chunking.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension(x_three_dim, False)
-
-            # # Debugging: check that the de-chunked version recovers the original
-            # ModuleIOStructuring. \
-            #     check_dechunking_chunked_tensor_list_recovers_original(tensor_list_chunking, x_three_dim, x_chunked)
-        else:
-            x_chunked = x
-
-        convolution_output = self.convolution(x_chunked)
+    def compute_forward_one_directional(self, x, direction_index: int):
+        convolution_output = self.convolutions[direction_index](x)
         # TensorUtils.print_max(convolution_output, "block_strided_convolution - convolution_output")
         if self.clamp_gradients:
             # convolution_output = InsideModelGradientClamping.register_gradient_clamping_default_clamping_bound(
@@ -122,8 +121,14 @@ class BlockStridedConvolution(Module):
         # Tanh and sigmoid have a derivative that is not higher than 1,
         # so they should not give large gradients in the backward pass
         # if self.clamp_gradients:
-            # print("BlockStridedConvolution.forward - clamp gradients")
-        #result = InsideModelGradientClamping.register_gradient_clamping(result)
+        # print("BlockStridedConvolution.forward - clamp gradients")
+        # result = InsideModelGradientClamping.register_gradient_clamping(result)
+        return result
+
+    def compute_forward_one_directional_from_chunked_input(self, x_chunked, tensor_list_chunking,
+                                                           direction_index: int):
+
+        result = self.compute_forward_one_directional(x_chunked, direction_index)
 
         # If the input and output are lists, the output of the convolution
         # and activation function must again be converted back to the original list
@@ -137,12 +142,56 @@ class BlockStridedConvolution(Module):
 
         if self.use_example_packing:
             # print("block_strided_convolution - use example packing")
-            result = tensor_list_chunking.\
+            result = tensor_list_chunking. \
                 dechunk_block_tensor_concatenated_along_batch_dimension_changed_block_size(result,
-                                                                                           SizeTwoDimensional(1, 1)
-                                                                                           )
-
+                                                                                           SizeTwoDimensional(1, 1))
         return result
+
+    def compute_x_chunked_and_tensor_list_chunking_list_one_directional_input(self, x):
+        # Tensor list chunking expects a list of 3-D tensors as input, but x
+        # obtained from MDLSTM is a list of 4-D tensors, so must convert
+        x_three_dim = list([])
+        for tensor in x:
+            # print("block_strided_convolution.forward - tensor.size(): " + str(tensor.size()))
+            x_three_dim.append(tensor.squeeze(0))
+
+        # FIXME: For 4-directional MDLSTM, tensor list chunking must be done for 4 different
+        # directions after splitting list on batch dimension
+        # Then convolutions must be computed for every dimension separately and summed
+        # Also a separate convolution should be saved (with it's own parameters) for
+        # each direction
+        tensor_list_chunking = TensorListChunking.create_tensor_list_chunking(x_three_dim, self.block_size)
+        x_chunked = \
+            tensor_list_chunking.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension(x_three_dim, False)
+
+        # # Debugging: check that the de-chunked version recovers the original
+        # ModuleIOStructuring. \
+        #     check_dechunking_chunked_tensor_list_recovers_original(tensor_list_chunking, x_three_dim, x_chunked)
+        return x_chunked, tensor_list_chunking
+
+    def forward(self, x):
+
+        if self.use_example_packing:
+            if self.compute_multi_directional:
+                x_per_direction_list = TensorUtils.chunk_list_of_tensors_along_dimension(x, 4, 0)
+                list_of_activations_lists = list([])
+                for i, x in enumerate(x_per_direction_list):
+                    x_chunked, tensor_list_chunking = \
+                        self.compute_x_chunked_and_tensor_list_chunking_list_one_directional_input(x)
+                    activations = self.compute_forward_one_directional_from_chunked_input(
+                        x_chunked, tensor_list_chunking, i)
+                    list_of_activations_lists.append(activations)
+                activations_summed = TensorUtils.sum_lists_of_tensor_lists_element_wise(list_of_activations_lists)
+
+                return activations_summed
+            else:
+                x_chunked, tensor_list_chunking = \
+                    self.compute_x_chunked_and_tensor_list_chunking_list_one_directional_input(x)
+                activations = self.compute_forward_one_directional_from_chunked_input(
+                    x_chunked, tensor_list_chunking, 0)
+                return activations
+        else:
+            return self.compute_forward_one_directional(x, 0)
 
     def get_width_reduction_factor(self):
         return self.block_size.width

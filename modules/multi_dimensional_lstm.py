@@ -264,7 +264,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             skewed_images_variable = ImageInputTransformer.create_skewed_images_variable_four_dim(x)
             number_of_images = x.size(0)
 
-        print("skewed_images_variable: " + str(skewed_images_variable))
+        # print("skewed_images_variable: " + str(skewed_images_variable))
 
         # Add a column of padding zeros to mask, so that mask[:, column_index]
         # will return the padding for the previous column
@@ -325,10 +325,10 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
         # print("skewed image columns: " + str(skewed_image_columns))
 
-        print("starting MDLSTM column computation...")
+        # print("starting MDLSTM column computation...")
 
         for column_index in range(0, skewed_image_columns):
-            print("column_index: " + str(column_index))
+            # print("column_index: " + str(column_index))
             #print("previous_hidden_state_column.is_leaf: " + str(previous_hidden_state_column.is_leaf))
             #print("previous_hidden_state_column.grad_fn: " + str(previous_hidden_state_column.grad_fn))
             #print("previous_memory_state_column.is_leaf: " + str(previous_memory_state_column.is_leaf))
@@ -361,7 +361,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # Compute convolution on previous state column vector padded with zeros
             input_hidden_state_column = mdlstm_parameters.get_input_hidden_state_column()
 
-            print("input_hidden_state_column.size(): " + str(input_hidden_state_column.size()))
+            # print("input_hidden_state_column.size(): " + str(input_hidden_state_column.size()))
             # print("input_hidden_state_column: " + str(input_hidden_state_column))
 
             input_state_plus_input = MultiDimensionalRNNBase.\
@@ -392,7 +392,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
             input_and_input_gate_combined = torch.mul(input_activation_column, input_gate_activation_column)
 
-            print("input_and_input_gate_combined.size(): " + str(input_and_input_gate_combined.size()))
+            # print("input_and_input_gate_combined.size(): " + str(input_and_input_gate_combined.size()))
 
             if self.clamp_gradients:
                 input_and_input_gate_combined = \
@@ -678,7 +678,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
         activations_unskewed = self.compute_multi_dimensional_lstm_one_direction(self.mdlstm_parameters,
                                                                                  x)
-        print("len(activations_unskewed: " + str(len(activations_unskewed)))
+        # print("len(activations_unskewed: " + str(len(activations_unskewed)))
         # print("activations_unskewed.size(): " + str(activations_unskewed.size()))
 
         return MDLSTMExamplesPacking.extract_flipped_back_activations_from_unskewed_activations(activations_unskewed)

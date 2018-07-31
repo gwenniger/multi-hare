@@ -59,7 +59,7 @@ class ParallelMultipleStateWeightingsComputation(Module):
         return ParallelMultipleStateWeightingsComputation(hidden_states_size, list([number_of_paired_input_weightings]),
                                                           output_states_size, parallel_convolution, clamp_gradients,
                                                           use_dropout,
-                                                          None, True)
+                                                          True)
 
     @staticmethod
     def create_parallel_multiple_state_weighting_computation_multiple_groups(

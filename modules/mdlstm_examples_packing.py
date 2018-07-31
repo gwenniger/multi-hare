@@ -482,7 +482,7 @@ class MDLSTMExamplesPacking:
     """
     def skew_parallel_vertically_pad_and_add_packed_row_tensors(self, same_height_packed_row_tensors,
                                                                 result_cat_list):
-        print("skew_parallel_vertically_pad_and_add_packed_row_tensors...")
+        # print("skew_parallel_vertically_pad_and_add_packed_row_tensors...")
         stacked_same_height_packed_tensors = torch.cat(same_height_packed_row_tensors, 0)
         stacked_same_height_packed_tensors_skewed = ImageInputTransformer. \
             create_skewed_images_variable_four_dim(stacked_same_height_packed_tensors)
@@ -495,7 +495,7 @@ class MDLSTMExamplesPacking:
                 vertical_separator = self.create_vertical_separator(skewed_packed_example_row_tensor)
                 # print("vertical_separator.size(): " + str(vertical_separator.size()))
                 result_cat_list.append(vertical_separator)
-            print("skewed_packed_example_row_tensor.size(): " + str(skewed_packed_example_row_tensor.size()))
+            # print("skewed_packed_example_row_tensor.size(): " + str(skewed_packed_example_row_tensor.size()))
             result_cat_list.append(skewed_packed_example_row_tensor)
 
     def create_vertically_and_horizontally_packed_examples_one_direction(self, examples: list,
@@ -539,8 +539,8 @@ class MDLSTMExamplesPacking:
                 if len(row_cat_list) > 0:
                     row_cat_list.append(self.create_horizontal_separator(example))
 
-                print(" example_unsqueezed_flipped_for_current_direction.size(): " +
-                      str(example_unsqueezed_flipped_for_current_direction.size()))
+                # print(" example_unsqueezed_flipped_for_current_direction.size(): " +
+                #       str(example_unsqueezed_flipped_for_current_direction.size()))
 
                 row_cat_list.append(example_unsqueezed_flipped_for_current_direction)
 
@@ -549,8 +549,8 @@ class MDLSTMExamplesPacking:
                 # print("extra_padding: " + str(extra_padding))
                 row_cat_list.append(extra_padding)
 
-            for element in row_cat_list:
-                print("row cat list element.size(): " + str(element.size()))
+            # for element in row_cat_list:
+            #     print("row cat list element.size(): " + str(element.size()))
             catted_row_unskewed = torch.cat(row_cat_list, 3)
             same_height_packed_row_tensors.append(catted_row_unskewed)
 
@@ -561,15 +561,15 @@ class MDLSTMExamplesPacking:
 
             # print("catted_row_unskewed: " + str(catted_row_unskewed))
 
-        print("Add final same height tensors...")
+        # print("Add final same height tensors...")
         # Add final same height tensors
         self.skew_parallel_vertically_pad_and_add_packed_row_tensors(same_height_packed_row_tensors,
                                                                      result_cat_list)
-        print("len(result_cat_list): " + str(len(result_cat_list)))
+        # print("len(result_cat_list): " + str(len(result_cat_list)))
         result = torch.cat(result_cat_list, 2)
 
-        print("create_vertically_and_horizontally_packed_examples_one_direction --- finished" +
-              "result.size(): " + str(result.size()))
+        # print("create_vertically_and_horizontally_packed_examples_one_direction --- finished" +
+        #       "result.size(): " + str(result.size()))
 
         # packed_examples_2d = result.squeeze(1)
         # packed_examples_2d = packed_examples_2d.squeeze(0)
@@ -671,7 +671,7 @@ class MDLSTMExamplesPacking:
         packed_examples_direction_four = self. \
             create_vertically_and_horizontally_packed_examples_one_direction(examples, tensor_flipping_list[3])
 
-        print("mdlstm_examples_packing - Created vertically and horizontally packed examples in four directions...")
+        # print("mdlstm_examples_packing - Created vertically and horizontally packed examples in four directions...")
 
         cat_list = list([packed_examples_direction_one, packed_examples_direction_two, packed_examples_direction_three,
                          packed_examples_direction_four])
@@ -680,7 +680,7 @@ class MDLSTMExamplesPacking:
 
         mask_result = self.create_vertically_and_horizontally_packed_examples_mask_one_direction(examples)
 
-        print("mdlstm_examples_packing - Created mask...")
+        # print("mdlstm_examples_packing - Created mask...")
 
         #
         # print("mask_result: " + str(mask_result))

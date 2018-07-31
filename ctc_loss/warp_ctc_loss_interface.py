@@ -245,7 +245,7 @@ class WarpCTCLossInterface:
         # tensor, otherwise the ctc_loss function will give wrong results and or
         # crash.
         if probabilities_batch_second_dimension.size(1) != batch_size:
-            raise RuntimeError("Error: the second dimension of probabilities_batch_second_dimension" +
+            raise RuntimeError("Error: the second dimension of probabilities_batch_second_dimension " +
                                "should equal batch_size " + str(batch_size) + " but is " +
                                str(probabilities_batch_second_dimension.size(1))
                                )
