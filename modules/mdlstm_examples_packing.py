@@ -359,10 +359,10 @@ class MDLSTMExamplesPacking:
         for packed_examples_row in self.packed_examples:
             MDLSTMExamplesPacking.print_packed_examples_row(packed_examples_row)
 
-    def create_horizontal_separator(self, example):
-        channels = example.size(0)
-        example_height = example.size(1)
-        device = example.get_device()
+    def create_horizontal_separator(self, example_unsqueezed_multi_directional):
+        channels = example_unsqueezed_multi_directional.size(1)
+        example_height = example_unsqueezed_multi_directional.size(2)
+        device = example_unsqueezed_multi_directional.get_device()
 
         # print("create_horizontal_separator - device: " + str(device))
         # https://discuss.pytorch.org/t/creating-tensors-on-gpu-directly/2714
@@ -498,8 +498,23 @@ class MDLSTMExamplesPacking:
             # print("skewed_packed_example_row_tensor.size(): " + str(skewed_packed_example_row_tensor.size()))
             result_cat_list.append(skewed_packed_example_row_tensor)
 
-    def create_vertically_and_horizontally_packed_examples_one_direction(self, examples: list,
-                                                                         tensor_flipping: TensorFlipping):
+    @staticmethod
+    def create_multi_directional_examples_stacked_on_channel_direction(example_unsqueezed,
+                                                                       tensor_flippings: list):
+        cat_list = list([])
+
+        for tensor_flipping in tensor_flippings:
+            if tensor_flipping is not None:
+                # Flip example for computation to obtain the example with the right scanning
+                # direction for Multi-Directional MDLSTM
+                example_unsqueezed_flipped_for_current_direction = tensor_flipping.flip(example_unsqueezed)
+            else:
+                example_unsqueezed_flipped_for_current_direction = example_unsqueezed
+            cat_list.append(example_unsqueezed_flipped_for_current_direction)
+        return torch.cat(cat_list, 1)
+
+    def create_vertically_and_horizontally_packed_examples_multiple_directions(self, examples: list,
+                                                                               tensor_flippings: list):
 
         number_of_dimensions = TensorUtils.number_of_dimensions(examples[0])
         if number_of_dimensions != 3:
@@ -529,20 +544,19 @@ class MDLSTMExamplesPacking:
                 example_index = indexed_example_size.original_example_index
                 example = examples[example_index]
                 example_unsqueezed = example.unsqueeze(0)
-                if tensor_flipping is not None:
-                    # Flip example for computation to obtain the example with the right scanning
-                    # direction for Multi-Directional MDLSTM
-                    example_unsqueezed_flipped_for_current_direction = tensor_flipping.flip(example_unsqueezed)
-                else:
-                    example_unsqueezed_flipped_for_current_direction = example_unsqueezed
+
+                example_unsqueezed_flipped_for_multiple_directions_stacked =\
+                    MDLSTMExamplesPacking.create_multi_directional_examples_stacked_on_channel_direction(
+                        example_unsqueezed, tensor_flippings)
 
                 if len(row_cat_list) > 0:
-                    row_cat_list.append(self.create_horizontal_separator(example))
+                    row_cat_list.append(self.create_horizontal_separator(
+                        example_unsqueezed_flipped_for_multiple_directions_stacked))
 
-                # print(" example_unsqueezed_flipped_for_current_direction.size(): " +
-                #       str(example_unsqueezed_flipped_for_current_direction.size()))
+                # print(" example_unsqueezed_flipped_for_multiple_directions_stacked.size(): " +
+                #       str(example_unsqueezed_flipped_for_multiple_directions_stacked.size()))
 
-                row_cat_list.append(example_unsqueezed_flipped_for_current_direction)
+                row_cat_list.append(example_unsqueezed_flipped_for_multiple_directions_stacked)
 
             extra_padding = self.create_extra_padding(row_cat_list, packed_examples_row)
             if extra_padding is not None:
@@ -616,7 +630,7 @@ class MDLSTMExamplesPacking:
 
     def create_vertically_and_horizontally_packed_examples_and_mask_one_direction(self, examples: list):
 
-        result = self.create_vertically_and_horizontally_packed_examples_one_direction(examples, None)
+        result = self.create_vertically_and_horizontally_packed_examples_multiple_directions(examples, list([None]))
         mask_result = self.create_vertically_and_horizontally_packed_examples_mask_one_direction(examples)
 
         #
@@ -657,25 +671,28 @@ class MDLSTMExamplesPacking:
 
         tensor_flipping_list = MDLSTMExamplesPacking.create_four_directions_tensor_flippings()
 
-        # Original direction: left-to-right and top-to-bottom
-        packed_examples_direction_one = self.\
-            create_vertically_and_horizontally_packed_examples_one_direction(examples, tensor_flipping_list[0])
+        # # Original direction: left-to-right and top-to-bottom
+        # packed_examples_direction_one = self.\
+        #     create_vertically_and_horizontally_packed_examples_multiple_directions(examples, tensor_flipping_list[0])
+        #
+        # packed_examples_direction_two = self.\
+        #     create_vertically_and_horizontally_packed_examples_multiple_directions(examples, tensor_flipping_list[1])
+        #
+        # packed_examples_direction_three = self. \
+        #     create_vertically_and_horizontally_packed_examples_multiple_directions(examples, tensor_flipping_list[2])
+        #
+        # packed_examples_direction_four = self. \
+        #     create_vertically_and_horizontally_packed_examples_multiple_directions(examples, tensor_flipping_list[3])
+        #
+        # # print("mdlstm_examples_packing - Created vertically and horizontally packed examples in four directions...")
+        #
+        # cat_list = list([packed_examples_direction_one, packed_examples_direction_two, packed_examples_direction_three,
+        #                  packed_examples_direction_four])
+        # # Concatenate the packed examples for different directions on the channels-dimension
+        # result = torch.cat(cat_list, 1)
 
-        packed_examples_direction_two = self.\
-            create_vertically_and_horizontally_packed_examples_one_direction(examples, tensor_flipping_list[1])
-
-        packed_examples_direction_three = self. \
-            create_vertically_and_horizontally_packed_examples_one_direction(examples, tensor_flipping_list[2])
-
-        packed_examples_direction_four = self. \
-            create_vertically_and_horizontally_packed_examples_one_direction(examples, tensor_flipping_list[3])
-
-        # print("mdlstm_examples_packing - Created vertically and horizontally packed examples in four directions...")
-
-        cat_list = list([packed_examples_direction_one, packed_examples_direction_two, packed_examples_direction_three,
-                         packed_examples_direction_four])
-        # Concatenate the packed examples for different directions on the channels-dimension
-        result = torch.cat(cat_list, 1)
+        result = self.create_vertically_and_horizontally_packed_examples_multiple_directions(examples,
+                                                                                             tensor_flipping_list)
 
         mask_result = self.create_vertically_and_horizontally_packed_examples_mask_one_direction(examples)
 
