@@ -817,7 +817,7 @@ class MDLSTMExamplesPacking:
         tensor_flipping_list = MDLSTMExamplesPacking.create_four_directions_tensor_flippings()
         result = list([])
         for tensor in activations_unskewed:
-            direction_tensors = torch.split(tensor, 1, 0)
+            direction_tensors = torch.chunk(tensor, 4, 1)
 
             cat_list = list([])
             for i, direction_tensor in enumerate(direction_tensors):
@@ -830,8 +830,6 @@ class MDLSTMExamplesPacking:
             result.append(torch.cat(cat_list, 1))
 
         return result
-
-
 
 
 def test_create_vertically_and_horizontally_packed_examples():

@@ -160,10 +160,10 @@ class BlockStridedConvolution(Module):
             x_three_dim.append(tensor.squeeze(0))
 
         # FIXME: For 4-directional MDLSTM, tensor list chunking must be done for 4 different
-        # directions after splitting list on batch dimension
+        # directions.
         # Then convolutions must be computed for every dimension separately and summed
-        # Also a separate convolution should be saved (with it's own parameters) for
-        # each direction
+        # This is achieved efficiently using a single convolution using groups.
+
         tensor_list_chunking = TensorListChunking.create_tensor_list_chunking(x_three_dim, self.block_size)
         x_chunked = \
             tensor_list_chunking.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension(x_three_dim, False)

@@ -284,16 +284,28 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         # print("list(x.size()): " + str(list(x.size())))
         image_height = skewed_images_variable.size(2)
 
-        # print("image height: " + str(image_height))
-        previous_hidden_state_column = torch.zeros(number_of_images,
-                                                   self.hidden_states_size,
-                                                   image_height)
+        if self.compute_multi_directional():
+            # print("image height: " + str(image_height))
+            previous_hidden_state_column = torch.zeros(1,
+                                                       self.hidden_states_size * 4,
+                                                       image_height)
 
-        # and previous_hidden_state: why the latter has dimension equal to
-        # batch size but for the former it doesn't seem to matter
-        previous_memory_state_column = torch.zeros(number_of_images,
-                                                   self.hidden_states_size,
-                                                   image_height)
+            # and previous_hidden_state: why the latter has dimension equal to
+            # batch size but for the former it doesn't seem to matter
+            previous_memory_state_column = torch.zeros(1,
+                                                       self.hidden_states_size * 4,
+                                                       image_height)
+        else:
+            # print("image height: " + str(image_height))
+            previous_hidden_state_column = torch.zeros(number_of_images,
+                                                       self.hidden_states_size,
+                                                       image_height)
+
+            # and previous_hidden_state: why the latter has dimension equal to
+            # batch size but for the former it doesn't seem to matter
+            previous_memory_state_column = torch.zeros(number_of_images,
+                                                       self.hidden_states_size,
+                                                       image_height)
 
         # After initialization, the value of grad_fn is still None, later it gets set
         # print("initialization: previous_memory_state_column.grad_fn: " + str(previous_memory_state_column.grad_fn))

@@ -801,7 +801,7 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
 
         input_matrices_lists_grouped_by_index_concatenated = \
             MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.\
-            concatenate_elements_list_of_lists_along_dimension(input_matrices_lists, 0)
+            concatenate_elements_list_of_lists_along_dimension(input_matrices_lists, 1)
 
         # print(">>> len(input_matrices_lists_grouped_by_index_concatenated): " +
         #       str(len(input_matrices_lists_grouped_by_index_concatenated)))
@@ -878,7 +878,7 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
             node_hidden_state_columns_lists.append(node_hidden_state_columns)
 
         return MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.\
-            concatenate_elements_list_of_lists_along_dimension(node_hidden_state_columns_lists, 0)
+            concatenate_elements_list_of_lists_along_dimension(node_hidden_state_columns_lists, 1)
 
     def get_next_node_memory_state_columns(self, node_hidden_and_memory_state_columns):
 
@@ -897,23 +897,27 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
             node_memory_state_columns_lists.append(node_hidden_state_columns)
 
         return MultiDirectionalMultiDimensionalLSTMParametersFullyParallel. \
-            concatenate_elements_list_of_lists_of_tuples_along_dimension(node_memory_state_columns_lists, 0)
+            concatenate_elements_list_of_lists_of_tuples_along_dimension(node_memory_state_columns_lists, 1)
 
     def prepare_computation_next_column_functions(self, previous_hidden_state_column,
                                                   previous_memory_state_column,  mask: torch.Tensor):
         # print("Entered MultiDirectionalMultiDimensionalLSTMParametersFullyParallel." +
         #       "prepare_computation_next_column_functions...")
 
-        if previous_hidden_state_column.size(0) != self.number_of_directions:
-            raise RuntimeError("Error: the size of the first dimension of" +
-                               " previous_hidden_state_column should match the number of directions")
+        if previous_hidden_state_column.size(1) != self.hidden_states_size * self.number_of_directions:
+            raise RuntimeError("Error: the size of the second dimension of" +
+                               " previous_hidden_state_column should match the number of directions" +
+                               "times the number of hidden states")
 
-        if previous_memory_state_column.size(0) != self.number_of_directions:
-            raise RuntimeError("Error: the size of the first dimension of" +
-                               " memory_state_column should match the number of directions")
+        if previous_memory_state_column.size(1) != self.hidden_states_size * self.number_of_directions:
+            raise RuntimeError("Error: the size of the second dimension of" +
+                               " memory_state_column should match the number of directions " +
+                               "times the number of hidden states")
 
-        previous_hidden_state_columns_split_by_direction = torch.split(previous_hidden_state_column, 1, 0)
-        previous_memory_state_columns_split_by_direction = torch.split(previous_memory_state_column, 1, 0)
+        previous_hidden_state_columns_split_by_direction = torch.chunk(previous_hidden_state_column,
+                                                                       self.number_of_directions, 1)
+        previous_memory_state_columns_split_by_direction = torch.chunk(previous_memory_state_column,
+                                                                       self.number_of_directions, 1)
 
         computation_arguments_list = list([])
         for i in range(0, self.number_of_directions):
@@ -946,23 +950,30 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
             raise RuntimeError("Error: prepare_input_convolution requires 3 dimensional input"
                                + " got size: " + str(previous_memory_state_column.size()))
 
-        if previous_memory_state_column.size(0) != self.number_of_directions:
+        if previous_memory_state_column.size(1) != self.hidden_states_size * self.number_of_directions:
             raise RuntimeError("Error: the size of the first dimension of" +
-                               " memory_state_column should match the number of directions")
+                               " memory_state_column should match the number of directions" +
+                               " times the number of hidden states")
 
-        previous_memory_state_columns_split_by_direction = torch.split(previous_memory_state_column, 1, 0)
-        previous_memory_state_column_catted_on_channel_dimension = \
-            torch.cat(previous_memory_state_columns_split_by_direction, 1)
+        # previous_memory_state_columns_split_by_direction = torch.split(previous_memory_state_column, 1, 0)
+        # previous_memory_state_column_catted_on_channel_dimension = \
+        #     torch.cat(previous_memory_state_columns_split_by_direction, 1)
+        #
+        # result_catted_on_channel_dimension = StateUpdateBlock.compute_weighted_state_input_state_one(
+        #     self.output_gate_memory_state_convolution,
+        #     previous_memory_state_column_catted_on_channel_dimension)
+        # # print("result_catted_on_channel_dimension.size(): " + str(result_catted_on_channel_dimension.size()))
+        # result_split_into_directions = torch.chunk(result_catted_on_channel_dimension, self.number_of_directions, 1)
+        # # Re-concatenate the direction results on the batch dimension
+        # result = torch.cat(result_split_into_directions, 0)
+        # # print("result.size(): " + str(result.size()))
+        # return result
 
         result_catted_on_channel_dimension = StateUpdateBlock.compute_weighted_state_input_state_one(
             self.output_gate_memory_state_convolution,
-            previous_memory_state_column_catted_on_channel_dimension)
-        # print("result_catted_on_channel_dimension.size(): " + str(result_catted_on_channel_dimension.size()))
-        result_split_into_directions = torch.chunk(result_catted_on_channel_dimension, self.number_of_directions, 1)
-        # Re-concatenate the direction results on the batch dimension
-        result = torch.cat(result_split_into_directions, 0)
-        # print("result.size(): " + str(result.size()))
-        return result
+            previous_memory_state_column)
+
+        return result_catted_on_channel_dimension
 
     def get_input_input_matrix(self):
         return self.input_matrices[0]
