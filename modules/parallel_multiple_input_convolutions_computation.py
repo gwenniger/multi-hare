@@ -133,7 +133,8 @@ class ParallelMultipleInputConvolutionsComputation(Module):
         return result
 
     def split_result_into_output_elements_for_multiple_group_computation(self, convolution_result):
-        for group_index in self.number_of_groups:
+        result = list([])
+        for group_index in range(0, self.number_of_groups):
 
             group_results_list = list([])
             for i in range(0, self.number_of_input_convolutions):
@@ -142,6 +143,8 @@ class ParallelMultipleInputConvolutionsComputation(Module):
                 # print("range begin: " + str(range_begin) + " range end: " + str(range_end))
                 element = convolution_result[:, range_begin:range_end, :]
                 group_results_list.append(element)
+            result.append(group_results_list)
+        return result
 
     def compute_result_and_split_into_output_elements(self, input_tensor):
 
@@ -150,8 +153,7 @@ class ParallelMultipleInputConvolutionsComputation(Module):
         #      str(convolution_result.size()))
 
         if self.number_of_groups > 1:
-            # TODO: Fixme
-            raise RuntimeError("Not implemented")
+            return self.split_result_into_output_elements_for_multiple_group_computation(convolution_result)
         else:
                 return self.split_result_into_output_elements_for_single_group_computation(convolution_result)
 

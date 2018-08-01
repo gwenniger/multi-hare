@@ -661,7 +661,8 @@ class MultiDimensionalLSTMParametersOneDirectionFullyParallel(OneDirectionalMult
         # print("before: self.parallel_memory_state_column_computation.parallel_convolution.bias.data: " +
         #        str(self.parallel_memory_state_column_computation.parallel_convolution.bias.data))
         start_index = self.hidden_states_size * 2 * 6
-        end_index = self.hidden_states_size * 2 * 7
+        end_index = self.hidden_states_size * 2 * MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.\
+            num_paired_hidden_and_memory_state_weightings()
         # print("start index: " + str(start_index) + " end index: " + str(end_index))
         for index in range(start_index, end_index):
             self.parallel_hidden_and_memory_state_column_computation.parallel_convolution.bias.data[index] = \
@@ -697,9 +698,13 @@ class MultiDimensionalLSTMParametersOneDirectionFullyParallel(OneDirectionalMult
 
 
 class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimensionalLSTMParametersBase):
+    NUMBER_OF_INPUT_CONVOLUTIONS_PER_DIRECTION = 5
+    NUMBER_OF_PAIRED_HIDDEN_STATE_WEIGHTINGS = 5
+    NUMBER_OF_PAIRED_MEMORY_STATE_WEIGHTINGS = 2
+
     def __init__(self, hidden_states_size, input_channels,
                  use_dropout: bool, number_of_directions: int,
-                 parallel_multiple_input_convolutions_computations,
+                 parallel_multiple_input_convolutions_computation,
                  parallel_hidden_and_memory_state_column_computation
 
                  ):
@@ -708,7 +713,7 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
                                                                                           use_dropout)
         self.number_of_directions = number_of_directions
 
-        self.parallel_multiple_input_convolutions_computations = parallel_multiple_input_convolutions_computations
+        self.parallel_multiple_input_convolutions_computation = parallel_multiple_input_convolutions_computation
 
         self.parallel_hidden_and_memory_state_column_computation = parallel_hidden_and_memory_state_column_computation
 
@@ -726,10 +731,11 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
     @staticmethod
     def create_multi_directional_multi_dimensional_lstm_parameters_fully_parallel(
             hidden_states_size, input_channels, clamp_gradients: bool, use_dropout: bool, number_of_directions: int):
+        print(">>>create_multi_directional_multi_dimensional_lstm_parameters_fully_parallel...")
 
-        parallel_multiple_input_convolutions_computations = \
+        parallel_multiple_input_convolutions_computation = \
             MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.\
-            create_parallel_multiple_input_convolution_computations(input_channels, hidden_states_size,
+            create_parallel_multiple_input_convolutions_computation(input_channels, hidden_states_size,
                                                                     clamp_gradients, use_dropout, number_of_directions)
 
         parallel_hidden_and_memory_state_column_computation = \
@@ -739,7 +745,7 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
 
         return MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
             hidden_states_size, input_channels, use_dropout, number_of_directions,
-            parallel_multiple_input_convolutions_computations,
+            parallel_multiple_input_convolutions_computation,
             parallel_hidden_and_memory_state_column_computation)
 
     @staticmethod
@@ -748,7 +754,11 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
             use_dropout: bool, number_of_directions: int):
         number_of_paired_input_weightings_per_group = list([])
         for i in range(0, number_of_directions):
-            number_of_paired_input_weightings_per_group.extend(list([5, 2]))
+            number_of_paired_input_weightings_per_group.extend(
+                list([MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.
+                     NUMBER_OF_PAIRED_HIDDEN_STATE_WEIGHTINGS,
+                      MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.
+                      NUMBER_OF_PAIRED_MEMORY_STATE_WEIGHTINGS]))
 
         parallel_hidden_and_memory_state_column_computation = \
             ParallelMultipleStateWeightingsComputation. \
@@ -758,20 +768,17 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
         return parallel_hidden_and_memory_state_column_computation
 
     @staticmethod
-    def create_parallel_multiple_input_convolution_computations(
+    def create_parallel_multiple_input_convolutions_computation(
             input_channels: int, hidden_states_size: int,
             clamp_gradients: bool, use_dropout: bool, number_of_directions: int):
-        parallel_multiple_input_convolutions_computations = nn.ModuleList([])
 
-        for i in range(0, number_of_directions):
-            parallel_multiple_input_convolution = ParallelMultipleInputConvolutionsComputation. \
-                create_parallel_multiple_input_convolutions_computation(input_channels,
-                                                                        hidden_states_size,
-                                                                        5,
-                                                                        clamp_gradients,
-                                                                        use_dropout)
-            parallel_multiple_input_convolutions_computations.append(parallel_multiple_input_convolution)
-        return parallel_multiple_input_convolutions_computations
+        parallel_multiple_input_convolutions_computation = ParallelMultipleInputConvolutionsComputation. \
+            create_parallel_multiple_input_convolutions_computation(
+                input_channels, hidden_states_size,
+                MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.NUMBER_OF_INPUT_CONVOLUTIONS_PER_DIRECTION,
+                clamp_gradients, use_dropout, number_of_directions)
+
+        return parallel_multiple_input_convolutions_computation
 
     def prepare_input_convolutions(self, skewed_images_variable):
         # print("Entered MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.prepare_input_convolutions...")
@@ -786,17 +793,11 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
         # print("skewed_images_variable.size(): " + str(skewed_images_variable.size()))
         # First split the image tensor to get the images for the different directions
         skewed_images_variable_list = torch.split(skewed_images_variable, 1, 0)
+        # Concatenate the four images on the channels direction
+        skewed_image_four_directions = torch.cat(skewed_images_variable_list, 1)
 
-        input_matrices_lists = list([])
-        # Then compute the input matrix for each direction
-        for i, skewed_image in enumerate(skewed_images_variable_list):
-            # print("compute_result_and_split_into_output_elements - direction - " + str(i))
-            # print("skewed_image.size(): " + str(skewed_image.size()))
-            input_matrices = self.parallel_multiple_input_convolutions_computations[i].\
-                compute_result_and_split_into_output_elements(skewed_image)
-            # print(">>> len(input_matrices) for direction: " + str(len(input_matrices)))
-            # print("compute_result_and_split_into_output_elements - direction - " + str(i) + " - finished")
-            input_matrices_lists.append(input_matrices)
+        input_matrices_lists = self.parallel_multiple_input_convolutions_computation.\
+            compute_result_and_split_into_output_elements(skewed_image_four_directions)
 
         input_matrices_lists_grouped_by_index_concatenated = \
             MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.\
@@ -806,9 +807,13 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
         #       str(len(input_matrices_lists_grouped_by_index_concatenated)))
         self.input_matrices = input_matrices_lists_grouped_by_index_concatenated
 
-        if len(self.input_matrices) != 5:
+        if len(self.input_matrices) != \
+                MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.NUMBER_OF_INPUT_CONVOLUTIONS_PER_DIRECTION:
             raise RuntimeError("Error: length of input_matrices after merging matrices for multiple" +
-                               " directions should still be 5")
+                               " directions should still be " +
+                               str(MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.
+                                   NUMBER_OF_INPUT_CONVOLUTIONS_PER_DIRECTION)
+                               )
 
         # Finally concatenate back the input matrices
 
@@ -854,13 +859,22 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
 
         return list_of_elements_same_index_concateneated
 
+    @staticmethod
+    def num_paired_hidden_and_memory_state_weightings():
+        return MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.NUMBER_OF_PAIRED_HIDDEN_STATE_WEIGHTINGS + \
+               MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.NUMBER_OF_PAIRED_MEMORY_STATE_WEIGHTINGS
+
     def get_next_node_hidden_state_columns(self, node_hidden_and_memory_state_columns):
 
         node_hidden_state_columns_lists = list([])
         for i in range(0, self.number_of_directions):
-            offset = 7 * i
+            offset = MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.\
+                         num_paired_hidden_and_memory_state_weightings() * i
             node_hidden_state_columns = ParallelMultipleStateWeightingsComputation. \
-                compute_summed_outputs_every_pair_static(node_hidden_and_memory_state_columns[offset:offset+5])
+                compute_summed_outputs_every_pair_static(
+                    node_hidden_and_memory_state_columns[offset:offset+
+                                                         MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.
+                                                         NUMBER_OF_PAIRED_HIDDEN_STATE_WEIGHTINGS])
             node_hidden_state_columns_lists.append(node_hidden_state_columns)
 
         return MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.\
@@ -870,8 +884,16 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
 
         node_memory_state_columns_lists = list([])
         for i in range(0, self.number_of_directions):
-            offset = 7 * i
-            node_hidden_state_columns = node_hidden_and_memory_state_columns[offset+5:offset+7]
+            offset = MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.\
+                         num_paired_hidden_and_memory_state_weightings() * i
+            node_hidden_state_columns = \
+                node_hidden_and_memory_state_columns[offset +
+                                                     MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.
+                                                     NUMBER_OF_PAIRED_HIDDEN_STATE_WEIGHTINGS
+                                                     :offset +
+                                                     MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.
+                                                     num_paired_hidden_and_memory_state_weightings()
+                                                     ]
             node_memory_state_columns_lists.append(node_hidden_state_columns)
 
         return MultiDirectionalMultiDimensionalLSTMParametersFullyParallel. \
@@ -904,9 +926,12 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
                 computation_arguments_list, mask)
 
         # Sanity check that the number of output pairs is as expected
-        if len(node_hidden_and_memory_state_columns) != (7 * self.number_of_directions):
+        if len(node_hidden_and_memory_state_columns) != (MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.
+                                                         num_paired_hidden_and_memory_state_weightings() *
+                                                         self.number_of_directions):
             raise RuntimeError("Error: there are " + str(self.number_of_directions) + " directions, " +
-                               "therefore expected " + 7 + " * " + str(self.number_of_directions) +
+                               "therefore expected " + MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.
+                               num_paired_hidden_and_memory_state_weightings() + " * " + str(self.number_of_directions) +
                                " output pairs")
 
         self.node_hidden_state_columns = self.get_next_node_hidden_state_columns(node_hidden_and_memory_state_columns)
@@ -997,7 +1022,12 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
         return result
 
     def number_of_hidden_and_memory_state_weights_per_direction(self):
-        return self.hidden_states_size * 2 * 7
+        return self.hidden_states_size * 2 * MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.\
+            num_paired_hidden_and_memory_state_weightings()
+
+    def number_of_input_weighting_weights_per_direction(self):
+        return self.hidden_states_size * MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.\
+            NUMBER_OF_INPUT_CONVOLUTIONS_PER_DIRECTION
 
     def set_bias_forget_gates_hidden_states_input(self):
         relative_start_index = self.hidden_states_size * 2 * 2
@@ -1042,8 +1072,7 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
 
     def get_all_input_convolutions_as_list(self):
         result = list([])
-        for input_convolution_computation in self.parallel_multiple_input_convolutions_computations:
-            result.append(input_convolution_computation.parallel_convolution)
+        result.append(self.parallel_multiple_input_convolutions_computation.parallel_convolution)
         return result
 
     def forward(self, x):
@@ -1068,8 +1097,20 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
 
     def copy_parallel_multiple_input_convolutions_computation_to_one_directional_mdlstm_parameters(
             self, mdlstm_parameters_one_direction, direction_index):
-        mdlstm_parameters_one_direction.parallel_multiple_input_convolutions_computation =\
-            self.parallel_multiple_input_convolutions_computations[direction_index]
+        relative_start_index = 0
+        relative_end_index = self.number_of_input_weighting_weights_per_direction()
+        for one_directional_mdlstm_index in range(relative_start_index, relative_end_index):
+            multi_directional_mdlstm_index = \
+                one_directional_mdlstm_index + \
+                self.number_of_input_weighting_weights_per_direction() * direction_index
+            mdlstm_parameters_one_direction.parallel_multiple_input_convolutions_computation.\
+                parallel_convolution.bias.data[one_directional_mdlstm_index] = \
+                self.parallel_multiple_input_convolutions_computation.\
+                    parallel_convolution.bias.data[multi_directional_mdlstm_index]
+            mdlstm_parameters_one_direction.parallel_multiple_input_convolutions_computation.\
+                parallel_convolution.weight.data[one_directional_mdlstm_index, :, :] = \
+                self.parallel_multiple_input_convolutions_computation.parallel_convolution. \
+                    weight.data[multi_directional_mdlstm_index, :, :]
 
     def copy_output_gate_memory_state_convolution_to_one_directional_mdlstm_parameters(
             self, mdlstm_parameters_one_direction, direction_index):
