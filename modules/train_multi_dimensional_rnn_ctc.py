@@ -768,7 +768,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     # Possibly a batch size of 128 leads to more instability in training?
     #batch_size = 128
 
-    compute_multi_directional = False
+    compute_multi_directional = True
     # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
     use_dropout = False
 
@@ -957,14 +957,14 @@ def main():
         model_opt = opt
 
     # mnist_recognition_fixed_length()
-    mnist_recognition_variable_length(model_opt, checkpoint,)
+    # mnist_recognition_variable_length(model_opt, checkpoint,)
 
-    # if opt.iam_database_data_type == "lines":
-    #     iam_line_recognition(model_opt, checkpoint)
-    # elif opt.iam_database_data_type == "words":
-    #     iam_word_recognition(model_opt, checkpoint)
-    # else:
-    #     raise RuntimeError("Unrecognized data type")
+    if opt.iam_database_data_type == "lines":
+        iam_line_recognition(model_opt, checkpoint)
+    elif opt.iam_database_data_type == "words":
+        iam_word_recognition(model_opt, checkpoint)
+    else:
+        raise RuntimeError("Unrecognized data type")
     # cifar_ten_basic_recognition()
 
 

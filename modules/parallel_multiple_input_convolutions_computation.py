@@ -134,16 +134,24 @@ class ParallelMultipleInputConvolutionsComputation(Module):
 
     def split_result_into_output_elements_for_multiple_group_computation(self, convolution_result):
         result = list([])
-        for group_index in range(0, self.number_of_groups):
 
-            group_results_list = list([])
-            for i in range(0, self.number_of_input_convolutions):
-                range_begin = self.get_group_result_range_start_index(i, group_index)
-                range_end = self.get_group_result_range_end_index(i, group_index)
-                # print("range begin: " + str(range_begin) + " range end: " + str(range_end))
-                element = convolution_result[:, range_begin:range_end, :]
-                group_results_list.append(element)
-            result.append(group_results_list)
+        convolution_results_split_by_group = torch.chunk(convolution_result, self.number_of_groups,
+                                                         1)
+        for convolution_result_group in convolution_results_split_by_group:
+            convolution_results_split_by_group_and_index = \
+                torch.chunk(convolution_result_group, self.number_of_input_convolutions, 1)
+            result.append(convolution_results_split_by_group_and_index)
+
+        # for group_index in range(0, self.number_of_groups):
+        #
+        #     group_results_list = list([])
+        #     for i in range(0, self.number_of_input_convolutions):
+        #         range_begin = self.get_group_result_range_start_index(i, group_index)
+        #         range_end = self.get_group_result_range_end_index(i, group_index)
+        #         # print("range begin: " + str(range_begin) + " range end: " + str(range_end))
+        #         element = convolution_result[:, range_begin:range_end, :]
+        #         group_results_list.append(element)
+        #     result.append(group_results_list)
         return result
 
     def compute_result_and_split_into_output_elements(self, input_tensor):

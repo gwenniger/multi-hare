@@ -249,9 +249,9 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             if self.compute_multi_directional():
                 skewed_images_variable, mask = mdlstm_examples_packing. \
                     create_vertically_and_horizontally_packed_examples_four_directions_plus_mask(examples)
-                if skewed_images_variable.size(0) != 4:
+                if skewed_images_variable.size(1) != 4 * self.input_channels:
                     raise RuntimeError("Error: expected the 4 images for four directions to be stacked on "
-                                       "the first (batch) dimension")
+                                       "the second (channel) dimension")
                 number_of_images = 4
             else:
                 skewed_images_variable, mask = mdlstm_examples_packing.\

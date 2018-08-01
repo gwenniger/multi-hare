@@ -653,7 +653,6 @@ class MDLSTMExamplesPacking:
         result = list([no_flipping, height_flipping, width_flipping, height_and_width_flipping])
         return result
 
-
     def create_vertically_and_horizontally_packed_examples_four_directions_plus_mask(self, examples: list):
 
         tensor_flipping_list = MDLSTMExamplesPacking.create_four_directions_tensor_flippings()
@@ -675,8 +674,8 @@ class MDLSTMExamplesPacking:
 
         cat_list = list([packed_examples_direction_one, packed_examples_direction_two, packed_examples_direction_three,
                          packed_examples_direction_four])
-        # Concatenate the packed examples for different directions on the batch-dimension
-        result = torch.cat(cat_list, 0)
+        # Concatenate the packed examples for different directions on the channels-dimension
+        result = torch.cat(cat_list, 1)
 
         mask_result = self.create_vertically_and_horizontally_packed_examples_mask_one_direction(examples)
 

@@ -147,17 +147,28 @@ class ParallelMultipleStateWeightingsComputation(Module):
         #      + " compute_result_and_split_into_output_elements - convolution_result.size(): " +
         #      str(convolution_result.size()))
 
+        # Faster implementation using chunking instead of slicing
+        convolution_result_chunks = torch.chunk(convolution_result,
+                                                self.get_number_of_paired_input_weightings() * 2, 1)
+
         for i in range(0, self.get_number_of_paired_input_weightings()):
-            range_begin = self.get_result_range_start_index(i * 2)
-            range_end = self.get_result_range_end_index(i * 2)
-            # print("range begin: " + str(range_begin) + " range end: " + str(range_end))
-            pair_element_one = convolution_result[:, range_begin:range_end, :]
-            range_begin = self.get_result_range_start_index(i * 2 + 1)
-            range_end = self.get_result_range_end_index(i * 2 + 1)
-            # print("range begin: " + str(range_begin) + " range end: " + str(range_end))
-            pair_element_two = convolution_result[:, range_begin:range_end, :]
+            pair_element_one = convolution_result_chunks[i*2]
+            pair_element_two = convolution_result_chunks[i*2 + 1]
             pair = tuple((pair_element_one, pair_element_two))
             result.append(pair)
+
+        # Old implementation using slicing
+        # for i in range(0, self.get_number_of_paired_input_weightings()):
+        #     range_begin = self.get_result_range_start_index(i * 2)
+        #     range_end = self.get_result_range_end_index(i * 2)
+        #     # print("range begin: " + str(range_begin) + " range end: " + str(range_end))
+        #     pair_element_one = convolution_result[:, range_begin:range_end, :]
+        #     range_begin = self.get_result_range_start_index(i * 2 + 1)
+        #     range_end = self.get_result_range_end_index(i * 2 + 1)
+        #     # print("range begin: " + str(range_begin) + " range end: " + str(range_end))
+        #     pair_element_two = convolution_result[:, range_begin:range_end, :]
+        #     pair = tuple((pair_element_one, pair_element_two))
+        #     result.append(pair)
         return result
 
     def compute_result_and_split_into_pairs_with_second_pair_element_shifted(self, previous_state_column,

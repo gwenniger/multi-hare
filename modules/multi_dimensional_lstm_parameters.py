@@ -786,18 +786,18 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
         if TensorUtils.number_of_dimensions(skewed_images_variable) != 4:
             raise RuntimeError("Error: prepare_input_convolution requires 4 dimensional input")
 
-        if skewed_images_variable.size(0) != self.number_of_directions:
-            raise RuntimeError("Error: the size of the first dimension should match the number of directions")
+        # if skewed_images_variable.size(0) != self.number_of_directions:
+        #     raise RuntimeError("Error: the size of the first dimension should match the number of directions")
 
-        # print("MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.prepare_input_convolutions - split")
-        # print("skewed_images_variable.size(): " + str(skewed_images_variable.size()))
-        # First split the image tensor to get the images for the different directions
-        skewed_images_variable_list = torch.split(skewed_images_variable, 1, 0)
-        # Concatenate the four images on the channels direction
-        skewed_image_four_directions = torch.cat(skewed_images_variable_list, 1)
+        # # print("MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.prepare_input_convolutions - split")
+        # # print("skewed_images_variable.size(): " + str(skewed_images_variable.size()))
+        # # First split the image tensor to get the images for the different directions
+        # skewed_images_variable_list = torch.split(skewed_images_variable, 1, 0)
+        # # Concatenate the four images on the channels direction
+        # skewed_image_four_directions = torch.cat(skewed_images_variable_list, 1)
 
         input_matrices_lists = self.parallel_multiple_input_convolutions_computation.\
-            compute_result_and_split_into_output_elements(skewed_image_four_directions)
+            compute_result_and_split_into_output_elements(skewed_images_variable)
 
         input_matrices_lists_grouped_by_index_concatenated = \
             MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.\
