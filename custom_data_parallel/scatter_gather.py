@@ -54,6 +54,11 @@ def scatter_kwargs(inputs, kwargs, target_gpus, dim=0):
     kwargs = tuple(kwargs)
     return inputs, kwargs
 
+def is_list_of_lists(out):
+    if isinstance(out, list):
+        if len(out) > 0 and isinstance(out[0], list):
+            return True
+    return False
 
 def gather(outputs, target_device, dim=0):
     r"""
@@ -67,6 +72,7 @@ def gather(outputs, target_device, dim=0):
         out = outputs
 
         if isinstance(out, torch.Tensor):
+            print("Scatter-Gather, gathering tensor...")
             return Gather.apply(target_device, dim, *outputs)
         if out is None:
             return None
@@ -82,8 +88,10 @@ def gather(outputs, target_device, dim=0):
                 [(k, Gather.apply(target_device, dim, *[each[k] for each in outputs])) for k in out.keys()])
 
         # https://discuss.pytorch.org/t/training-network-with-multiple-outputs-with-multi-gpus/6344/4
-        if isinstance(out, list):
-            # print("scatter_gather - gather_map  - len(out): " + str(len(out)))
+
+        if is_list_of_lists(out):
+            print("Scatter-Gather, gathering list...")
+            print("scatter_gather - gather_map  - len(out): " + str(len(out)))
             # result = list(
             #     [(k, Gather.apply(target_device, dim, *[each[k] for each in outputs])) for k in out])
             # #return GatherList.apply(target_device, dim, *outputs)
@@ -91,6 +99,10 @@ def gather(outputs, target_device, dim=0):
 
             # print("scatter_gather - gather_map  - len(result): " + str(len(result)))
             return result
+        elif isinstance(out, list):
+            # Gather a list of tensors as opposed to a list of lists of tensors
+            if isinstance((out[0]), torch.Tensor):
+                return Gather.apply(target_device, dim, *out)
 
         return type(out)(map(gather_map, zip(*outputs)))
 

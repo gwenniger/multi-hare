@@ -5,6 +5,7 @@ from modules.trainer import Trainer
 import ctcdecode
 from data_preprocessing.iam_database_preprocessing.iam_dataset import IamLinesDataset
 from modules.validation_stats import ValidationStats
+from modules.network_to_softmax_network import NetworkToSoftMaxNetwork
 
 class Evaluator:
 
@@ -69,7 +70,8 @@ class Evaluator:
             with torch.no_grad():
 
                 # outputs = multi_dimensional_rnn(Variable(inputs))  # For "Net" (Le Net)
-                outputs = multi_dimensional_rnn(inputs)
+                max_input_width = NetworkToSoftMaxNetwork.get_max_input_width(inputs)
+                outputs = multi_dimensional_rnn(inputs, max_input_width)
 
                 probabilities_sum_to_one_dimension = 2
                 # Outputs is the output of the linear layer which is the input to warp_ctc

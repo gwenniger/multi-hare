@@ -325,7 +325,15 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
             view(-1, self.number_of_output_channels)
         return activations_resized_no_batch_dimension
 
-    def forward(self, x):
+    @staticmethod
+    def get_max_input_width(list_of_input_tensors):
+        max_input_width = 0
+        for example in list_of_input_tensors:
+            # print("example.size(): " + str(example.size()))
+            max_input_width = max(max_input_width, example.size(2))
+        return max_input_width
+
+    def forward(self, x, max_input_width=None):
 
         if self.input_is_list:
 
@@ -348,11 +356,6 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
                 activations = self.network(x)
                 activations, examples_activation_heights, examples_activation_widths = \
                     NetworkToSoftMaxNetwork.get_activations_single_tensor_and_activation_heights_and_widths(activations)
-
-                max_input_width = 0
-                for example in x:
-                    # print("example.size(): " + str(example.size()))
-                    max_input_width = max(max_input_width, example.size(2))
 
             else:
                 last_minute_padding = LastMinutePadding(self.get_height_reduction_factor(),
@@ -487,6 +490,7 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
                                " but got: " + str(output_width))
 
         # print(">>> MultiDimensionalRNNToSoftMaxNetwork.forward.result: " + str(result))
+        # print(">>> MultiDimensionalRNNToSoftMaxNetwork.forward.result.size(): " + str(result.size()))
         return result
 
     # Gets the class activations summed over height, from a 2D tensor of class activations

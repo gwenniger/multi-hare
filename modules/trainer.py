@@ -13,7 +13,7 @@ from modules.validation_stats import ValidationStats
 from modules.optim import Optim
 import modules.find_bad_gradients
 from graphviz import render
-
+from modules.network_to_softmax_network import NetworkToSoftMaxNetwork
 
 class ModelProperties:
 
@@ -137,7 +137,8 @@ class Trainer:
             # print("train_multi_dimensional_rnn_ctc.train_mdrnn - inputs: " + str(inputs))
 
             time_start_network_forward = util.timing.date_time_start()
-            outputs = self.model(inputs)
+            max_input_width = NetworkToSoftMaxNetwork.get_max_input_width(inputs)
+            outputs = self.model(inputs, max_input_width)
             # print("Time used for network forward: " + str(util.timing.milliseconds_since(time_start_network_forward)))
 
             # print(">>> outputs.size(): " + str(outputs.size()))
@@ -242,6 +243,12 @@ class Trainer:
                       str(util.timing.time_since_and_expected_remaining_time(time_start, percent)))
                 sys.stdout.flush()
 
+    def get_real_model(self):
+        real_model = (self.model.module
+                      if isinstance(self.model, torch.nn.DataParallel)
+                      else self.model)
+        return real_model
+
     def drop_checkpoint(self, opt, epoch, valid_stats:ValidationStats):
         """ Save a resumable checkpoint.
 
@@ -250,9 +257,7 @@ class Trainer:
             epoch (int): epoch number
             valid_stats : statistics of last validation run
         """
-        real_model = (self.model.module
-                      if isinstance(self.model, torch.nn.DataParallel)
-                      else self.model)
+        real_model = self.get_real_model()
         # real_generator = (real_model.generator.module
         #                   if isinstance(real_model.generator, torch.nn.DataParallel)
         #                   else real_model.generator)

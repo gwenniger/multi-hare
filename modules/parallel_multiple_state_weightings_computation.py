@@ -93,7 +93,6 @@ class ParallelMultipleStateWeightingsComputation(Module):
     def get_number_of_paired_input_weightings(self):
         return sum(self.number_of_paired_input_weightings_per_group)
 
-
     # How to do dropout in pytorch:
     # https://discuss.pytorch.org/t/dropout-functional-api-advantages-disadvantages/181/4
     # https://github.com/pytorch/examples/blob/master/mnist/main.py
