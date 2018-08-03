@@ -418,6 +418,7 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
         use_example_packing,
         use_block_mdlstm)
     network = custom_data_parallel.data_parallel.DataParallel(network, device_ids=device_ids)
+    network.to(torch.device("cuda:0"))
 
     if checkpoint is not None:
         print("before loading checkpoint: network.module.fc3" + str(network.fc3.weight))
@@ -957,15 +958,15 @@ def main():
         model_opt = opt
 
     # mnist_recognition_fixed_length()
-    mnist_recognition_variable_length(model_opt, checkpoint,)
+    # mnist_recognition_variable_length(model_opt, checkpoint,)
 
-    # if opt.iam_database_data_type == "lines":
-    #     iam_line_recognition(model_opt, checkpoint)
-    # elif opt.iam_database_data_type == "words":
-    #     iam_word_recognition(model_opt, checkpoint)
-    # else:
-    #     raise RuntimeError("Unrecognized data type")
-    # cifar_ten_basic_recognition()
+    if opt.iam_database_data_type == "lines":
+        iam_line_recognition(model_opt, checkpoint)
+    elif opt.iam_database_data_type == "words":
+        iam_word_recognition(model_opt, checkpoint)
+    else:
+        raise RuntimeError("Unrecognized data type")
+    # #cifar_ten_basic_recognition()
 
 
 if __name__ == "__main__":

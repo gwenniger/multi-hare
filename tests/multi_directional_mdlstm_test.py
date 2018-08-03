@@ -104,33 +104,35 @@ class MultiDirectionalMDLSTMTest:
     def assert_input_convolution_weights_are_equal(multi_directional_mdlstm, one_directional_mdlstm,
                                                    direction_index: int):
         multi_directional_mdlstm_input_convolution_computation =\
-            multi_directional_mdlstm.mdlstm_parameters.\
-            parallel_multiple_input_convolutions_computation
+            multi_directional_mdlstm.mdlstm_parameters. \
+            parallel_multiple_input_convolutions_computations[direction_index]
 
-        out_channels_size = multi_directional_mdlstm_input_convolution_computation.\
-            parallel_convolution.weight.size(0)
-        out_channels_per_direction = out_channels_size / 4
-        start_index = int(out_channels_per_direction * direction_index)
-        end_index = int(out_channels_per_direction * (direction_index + 1))
+        #parallel_multiple_input_convolutions_computations
+        #
+        # out_channels_size = multi_directional_mdlstm_input_convolution_computation.\
+        #     parallel_convolution.weight.size(0)
+        # out_channels_per_direction = out_channels_size / 4
+        # start_index = int(out_channels_per_direction * direction_index)
+        # end_index = int(out_channels_per_direction * (direction_index + 1))
+        #
+        # one_directional_weight_from_multi_directional =\
+        #     multi_directional_mdlstm_input_convolution_computation.parallel_convolution.weight[start_index:end_index,
+        #                                                                                        :, :, :]
 
-        one_directional_weight_from_multi_directional =\
-            multi_directional_mdlstm_input_convolution_computation.parallel_convolution.weight[start_index:end_index,
-                                                                                               :, :, :]
-
-        one_directional_bias_from_multi_directional =\
-            multi_directional_mdlstm_input_convolution_computation.parallel_convolution.bias[start_index:end_index]
+        # one_directional_bias_from_multi_directional =\
+        #     multi_directional_mdlstm_input_convolution_computation.parallel_convolution.bias[start_index:end_index]
 
         one_directional_mdlstm_input_convolution_computation =\
             one_directional_mdlstm.mdlstm_parameters.parallel_multiple_input_convolutions_computation
 
         if not TensorUtils.tensors_are_equal(
-                one_directional_weight_from_multi_directional,
+                multi_directional_mdlstm_input_convolution_computation.parallel_convolution.weight,
                 one_directional_mdlstm_input_convolution_computation.parallel_convolution.weight):
                 raise RuntimeError("Error: the weight matrices for the input convolution computation for " +
                                    "multi-directional MDLSTM and the corresponding one-directional MDLSTM" +
                                    "are not the same")
         if not TensorUtils.tensors_are_equal(
-                one_directional_bias_from_multi_directional,
+                multi_directional_mdlstm_input_convolution_computation.parallel_convolution.bias,
                 one_directional_mdlstm_input_convolution_computation.parallel_convolution.bias):
             raise RuntimeError("Error: the bias matrices for the input convolution computation for " +
                                "multi-directional MDLSTM and the corresponding one-directional MDLSTM" +

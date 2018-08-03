@@ -490,7 +490,7 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
                                " but got: " + str(output_width))
 
         # print(">>> MultiDimensionalRNNToSoftMaxNetwork.forward.result: " + str(result))
-        # print(">>> MultiDimensionalRNNToSoftMaxNetwork.forward.result.size(): " + str(result.size()))
+        print(">>> MultiDimensionalRNNToSoftMaxNetwork.forward.result.size(): " + str(result.size()))
         return result
 
     # Gets the class activations summed over height, from a 2D tensor of class activations

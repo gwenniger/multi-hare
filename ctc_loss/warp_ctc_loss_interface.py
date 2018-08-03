@@ -5,6 +5,7 @@ from torch.autograd import Variable
 import util.tensor_utils
 import math
 
+
 class WarpCTCLossInterface:
 
     def __init__(self):

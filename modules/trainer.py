@@ -179,7 +179,7 @@ class Trainer:
             else:
                 loss_value = loss.item()
 
-            # print("loss: " + str(loss))
+            print("loss: " + str(loss))
             # loss = criterion(outputs, labels)
 
             time_start_loss_backward = util.timing.date_time_start()
@@ -189,6 +189,7 @@ class Trainer:
             self.model.zero_grad()
 
             # get_dot = modules.find_bad_gradients.register_hooks(outputs)
+            loss = loss.contiguous()
             loss.backward()
 
             # https://discuss.pytorch.org/t/how-to-check-for-vanishing-exploding-gradients/9019/4
