@@ -14,6 +14,8 @@ from modules.optim import Optim
 import modules.find_bad_gradients
 from graphviz import render
 from modules.network_to_softmax_network import NetworkToSoftMaxNetwork
+import custom_data_parallel.data_parallel
+
 
 class ModelProperties:
 
@@ -245,9 +247,8 @@ class Trainer:
                 sys.stdout.flush()
 
     def get_real_model(self):
-        real_model = (self.model.module
-                      if isinstance(self.model, torch.nn.DataParallel)
-                      else self.model)
+        real_model = custom_data_parallel.data_parallel.get_real_model(self.model)
+
         return real_model
 
     def drop_checkpoint(self, opt, epoch, valid_stats:ValidationStats):

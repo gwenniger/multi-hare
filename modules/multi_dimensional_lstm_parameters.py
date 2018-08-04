@@ -1102,11 +1102,12 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(MultiDimension
         self.parallel_hidden_and_memory_state_column_computation.set_training(training)
 
     def get_all_input_convolutions_as_list(self):
-        result = list([])
-        #result.append(self.parallel_multiple_input_convolutions_computations.parallel_convolution)
-        for input_convolution_computation in self.parallel_multiple_input_convolutions_computations:
-            result.append(input_convolution_computation.parallel_convolution)
-        return result
+        # result = list([])
+        # #result.append(self.parallel_multiple_input_convolutions_computations.parallel_convolution)
+        # for input_convolution_computation in self.parallel_multiple_input_convolutions_computations:
+        #     result.append(input_convolution_computation)
+        # return result
+        return self.parallel_multiple_input_convolutions_computations
 
     def forward(self, x):
         raise NotImplementedError

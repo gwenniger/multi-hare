@@ -417,13 +417,15 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
         inputs_and_outputs_are_lists,
         use_example_packing,
         use_block_mdlstm)
-    network = custom_data_parallel.data_parallel.DataParallel(network, device_ids=device_ids)
+
     network.to(torch.device("cuda:0"))
 
     if checkpoint is not None:
         print("before loading checkpoint: network.module.fc3" + str(network.fc3.weight))
         network.load_state_dict(checkpoint["model"])
         print("after loading checkpoint: network.module.fc3" + str(network.fc3.weight))
+
+    network = custom_data_parallel.data_parallel.DataParallel(network, device_ids=device_ids)
 
     return network
 
@@ -649,7 +651,7 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
     # Get the width reduction factor which will be needed to compute the real widths
     # in the output from the real input width information in the warp_ctc_loss function
 
-    real_model = custom_data_parallel.data_parallel.get_real_network(network)
+    real_model = custom_data_parallel.data_parallel.get_real_model(network)
 
     width_reduction_factor = real_model.get_width_reduction_factor()
 
@@ -869,7 +871,8 @@ def iam_word_recognition(model_opt, checkpoint):
     # and memory usage is less, so batch_size 30 instead of 20 is possible,
     # but it is only slightly faster (GPU usage appears to be already maxed out)
     # batch_size = 64 #  #128 #32 #128
-    batch_size = 128
+    #batch_size = 128
+    batch_size = 96
     # batch_size = 64
 
     # lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"

@@ -168,10 +168,10 @@ def data_parallel(module, inputs, device_ids=None, output_device=None, dim=0, mo
     return gather(outputs, output_device, dim)
 
 
-def get_real_network(network):
+def get_real_model(model):
     """
-    Get the real network
+    Get the real model
     """
-    real_network = (network.module if isinstance(network, DataParallel) else network)
-    return real_network
+    real_model = (model.module if isinstance(model, DataParallel) else model)
+    return real_model
 

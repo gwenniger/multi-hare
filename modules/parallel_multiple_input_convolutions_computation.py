@@ -122,15 +122,17 @@ class ParallelMultipleInputConvolutionsComputation(Module):
         return group_offset + self.hidden_states_size * (result_element_index + 1)
 
     def split_result_into_output_elements_for_single_group_computation(self, convolution_result):
-        result = list([])
-        for i in range(0, self.number_of_input_convolutions):
-            range_begin = self.get_result_range_start_index(i)
-            range_end = self.get_result_range_end_index(i)
-            # print("range begin: " + str(range_begin) + " range end: " + str(range_end))
-            element = convolution_result[:, range_begin:range_end, :]
+        # result = list([])
+        # for i in range(0, self.number_of_input_convolutions):
+        #     range_begin = self.get_result_range_start_index(i)
+        #     range_end = self.get_result_range_end_index(i)
+        #     # print("range begin: " + str(range_begin) + " range end: " + str(range_end))
+        #     element = convolution_result[:, range_begin:range_end, :]
+        #
+        #     result.append(element)
+        # return result
 
-            result.append(element)
-        return result
+        return torch.chunk(convolution_result, self.number_of_input_convolutions, 1)
 
     def split_result_into_output_elements_for_multiple_group_computation(self, convolution_result):
         result = list([])
