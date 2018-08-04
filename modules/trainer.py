@@ -15,7 +15,7 @@ import modules.find_bad_gradients
 from graphviz import render
 from modules.network_to_softmax_network import NetworkToSoftMaxNetwork
 import custom_data_parallel.data_parallel
-
+from util.tensor_utils import TensorUtils
 
 class ModelProperties:
 
@@ -99,6 +99,9 @@ class Trainer:
 
             # get the inputs
             inputs, labels = data
+            # This one might expect to make things faster, but it doesn't seems
+            # to help yet
+            # inputs = TensorUtils.get_pinned_memory_copy_of_list(inputs)
 
             Trainer.check_there_are_no_zero_labels(labels, inputs_is_list)
 

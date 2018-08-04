@@ -115,6 +115,8 @@ class TensorUtils:
             # print("result after addition: " + str(result))
         return result
 
+
+
     """
     Applies a binary mask to a tensor. The dimensions of the mask must 
     match the last dimensions of the tensor
@@ -151,13 +153,34 @@ class TensorUtils:
     def sum_lists_of_tensor_lists_element_wise(list_of_tensor_lists: list):
         result = list([])
         for element_index in range(0, len(list_of_tensor_lists[0])):
+
+            # Alternative implementation using torch.sum(torch.stack)
+            # (Turns out to be not really faster)
+            # summation_elements = list([])
+            # for list_index in range(0, len(list_of_tensor_lists)):
+            #     summation_elements.append(list_of_tensor_lists[list_index][element_index])
+            # # https://discuss.pytorch.org/t/how-to-turn-a-list-of-tensor-to-tensor/8868/5
+            # # First stack the summation elements along new dimension 0, then sum them
+            # # along that dimension
+            # activations_summed = torch.sum(torch.stack(summation_elements, 0), 0)
+
+            # Current implementation
             activations_summed = list_of_tensor_lists[0][element_index]
             for list_index in range(1, len(list_of_tensor_lists)):
                 activations_summed += list_of_tensor_lists[list_index][element_index]
             result.append(activations_summed)
         return result
 
-
+    # Return a copy of a list of tensors with every element in pinned memory
+    # The idea is that this may help when the list of tensors needs to be moved
+    # to GPU, to speed up the data transfer
+    @staticmethod
+    def get_pinned_memory_copy_of_list(list_of_tensor_lists: list):
+        result = list([])
+        for tensor in list_of_tensor_lists:
+            # See: https://pytorch.org/docs/master/notes/cuda.html
+            result.append(tensor.pin_memory())
+        return result
 
 
 def test_number_of_non_zeros():

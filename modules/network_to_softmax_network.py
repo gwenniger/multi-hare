@@ -132,7 +132,6 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         print("NetworkToSoftMaxNetwork - number of classes: " + str(self.get_number_of_classes_including_blank()))
         self.fc3 = nn.Linear(self.number_of_output_channels, self.get_number_of_classes_including_blank())
 
-
         # MDLSTMExamplesPacking for the to-be-processed batch of examples
         # When example-packing is used, this must be computed at the beginning of the
         # forward function

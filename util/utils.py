@@ -19,6 +19,7 @@ class Utils:
                 # if isinstance(device, torch.device):
                     # print("move_tensor_list_to_device with \"cuda\" - device.type: " + str(device.type))
                 # non-blocking option is only supported by "cuda" method, not by "to" method
+
                 element = element.cuda(device, non_blocking=non_blocking)
             else:
                 # print("move_tensor_list_to_device with \"to\": " + str(device))
