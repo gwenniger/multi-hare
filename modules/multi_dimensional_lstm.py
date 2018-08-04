@@ -111,20 +111,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         #     # Set initial bias for the forget gates to one, since it is known to give better results
         #     self.mdlstm_direction_four_parameters.set_bias_forget_gates_to_one()
 
-        self.state_convolutions = nn.ModuleList([])
-        self.register_parameters_to_assure_same_gpu_is_used()
-
         # See: https://pytorch.org/tutorials/beginner/former_torchies/nn_tutorial.html
         # self.register_backward_hook(printgradnorm)
-
-    def register_parameters_to_assure_same_gpu_is_used(self):
-        self.state_convolutions.extend(self.mdlstm_parameters.get_all_parameters_as_list())
-
-        # if self.compute_multi_directional_flag:
-        #     self.state_convolutions.extend(self.mdlstm_direction_two_parameters.get_all_parameters_as_list())
-        #     self.state_convolutions.extend(self.mdlstm_direction_three_parameters.get_all_parameters_as_list())
-        #     self.state_convolutions.extend(self.mdlstm_direction_four_parameters.get_all_parameters_as_list())
-
 
     @staticmethod
     def create_mdlstm_paramters(multi_dimensional_lstm_parameter_creator,
