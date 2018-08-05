@@ -148,6 +148,8 @@ class TensorListChunking:
     # Reconstruct the tensor block row, using a combination of torch.split, squeeze and torch.cat operations
     # which for some reason yields better loss.backward performance than the original
     # implementation using torch.cat with a for loop and slicing
+    # Note: this method is highly similar to the method with the same name in TensorChunking,
+    # but works with 4D instead of 5D input tensors
     @staticmethod
     def reconstruct_tensor_block_row_split_squeeze_cat(row_slice):
         tensors_split = torch.split(row_slice, 1, 0)
@@ -160,14 +162,25 @@ class TensorListChunking:
         # In "one go" with a combination of split, squeeze and cat
         return torch.cat(tensors_split_squeezed, 2)
 
+    # Optimized version of "reconstruct_tensor_block_row_split_squeeze_cat"
+    # without for loop, performing squeeze as last step
+    # on the result tensor
+    @staticmethod
+    def reconstruct_tensor_block_row_split_cat_squeeze(row_slice):
+        tensors_split = torch.split(row_slice, 1, 0)
+        # Splitting still retains the extra first dimension,
+        # which must be removed then after concatenation,
+        # using squeeze(0)
+        return torch.cat(tensors_split, 3).squeeze(0)
+
     # Reconstructs a tensor block row from a 4 dimensional tensor whose first dimension
     # goes over the blocks int the original tensor, and whose other three dimensions go over
     # the channel dimension and height and width dimensions of these blocks
     @staticmethod
     def reconstruct_tensor_block_row(row_slice):
-        # return self.reconstruct_tensor_block_row_original(tensor_grouped_by_block, row_index)
-        # This implementation somehow yields much faster loss.backward performance than the original
-        return TensorListChunking.reconstruct_tensor_block_row_split_squeeze_cat(row_slice)
+        # return TensorListChunking.reconstruct_tensor_block_row_split_squeeze_cat(row_slice)
+        # Further optimized version, avoiding for loop altogether, squeeze as last step
+        return TensorListChunking.reconstruct_tensor_block_row_split_cat_squeeze(row_slice)
 
     def get_number_of_blocks_for_example(self, example_index):
         original_size = self.original_sizes[example_index]

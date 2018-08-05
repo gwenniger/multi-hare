@@ -183,8 +183,8 @@ class TensorChunking:
     # Reconstruct the tensor block row, using a combination of torch.split, squeeze and torch.cat operations
     # which for some reason yields better loss.backward performance than the original
     # implementation using torch.cat with a for loop and slicing
-    def reconstruct_tensor_block_row_split_squeeze_cat(self, tensor_grouped_by_block, row_index):
-        first_block_index = row_index * self.blocks_per_row
+    @staticmethod
+    def reconstruct_tensor_block_row_split_squeeze_cat(row_slice):
 
         # >>> IMPORTANT <<<
         # This alternate computation using split in combination with squeeze to remove
@@ -192,7 +192,7 @@ class TensorChunking:
         # loss.backward. Why this is the case is not very clear. Perhaps avoiding slicing
         # when possible helps?
         # print("tensor_grouped_by_block.size(): " + str(tensor_grouped_by_block.size()))
-        row_slice = tensor_grouped_by_block[first_block_index:first_block_index+self.blocks_per_row, :, :, :, :]
+
         tensors_split = torch.split(row_slice, 1, 0)
         # print("tensors_split[0].size(): " + str(tensors_split[0].size()))
         # Splitting still retains the extra first dimension, which must be removed then
@@ -221,7 +221,9 @@ class TensorChunking:
     def reconstruct_tensor_block_row(self, tensor_grouped_by_block, row_index):
         # return self.reconstruct_tensor_block_row_original(tensor_grouped_by_block, row_index)
         # This implementation somehow yields much faster loss.backward performance than the original
-        return self.reconstruct_tensor_block_row_split_squeeze_cat(tensor_grouped_by_block, row_index)
+        first_block_index = row_index * self.blocks_per_row
+        row_slice = tensor_grouped_by_block[first_block_index:first_block_index + self.blocks_per_row, :, :, :, :]
+        return TensorChunking.reconstruct_tensor_block_row_split_squeeze_cat(row_slice)
 
     # This function performs the inverse of
     # "chunk_tensor_into_blocks_concatenate_along_batch_dimension" : it takes
