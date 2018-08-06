@@ -201,15 +201,62 @@ class TensorListChunking:
             blocks_for_examples_list.append(blocks_for_example)
         return blocks_per_column_list, blocks_per_row_list, blocks_for_examples_list
 
+    """
+    Reconstruct tensor from a tensor grouped by blocks on the first dimension,
+    by reconstructing the tensor rows row-by-row, and then concatenating 
+    these rows
+    """
+    @staticmethod
+    def reconstruct_tensor_row_by_row(tensor_grouped_by_block,
+                                      blocks_per_column,
+                                      blocks_per_row):
 
+        row_slices = torch.split(tensor_grouped_by_block, blocks_per_row, 0)
+        # print("tensor_grouped_by_block: " + str(tensor_grouped_by_block))
 
-    # This function performs the inverse of
-    # "chunk_tensor_into_blocks_concatenate_along_batch_dimension" : it takes
-    # a tensor that is chunked into blocks, with the blocks stored along the
-    # first (batch) dimensions. It then reconstructs the original tensor from these blocks.
-    # The reconstruction is done using the "torch.cat" method, which preserves gradient
-    # information. Simply pasting over tensor slices in a newly created zeros tensor
-    # leads to a faulty implementation, as this does not preserve gradient information.
+        tensor_block_row = TensorListChunking.reconstruct_tensor_block_row(row_slices[0])
+        reconstructed_example_tensor = tensor_block_row
+
+        for row_index in range(1, blocks_per_column):
+            tensor_block_row = TensorListChunking.reconstruct_tensor_block_row(row_slices[row_index])
+            reconstructed_example_tensor = torch.cat((reconstructed_example_tensor, tensor_block_row), 1)
+        return reconstructed_example_tensor
+
+    """
+    Optimized reconstruction of a tensor grouped by blocks on the first dimension:
+    1) Get a list of blocks
+    2) Concatenate all the blocks into one long row, that is all the rows of the 
+       to be reconstructed tensors are concatenated together
+    3) Chunk the long single-row-of-blocks tensor again into the number of blocks
+       per column in the result tensor, reconstructing the block rows of the final 
+       result
+    4) Finally concatenate these block rows to obtain the final result
+    
+    By "over-concatenating" the blocks in step 2, then chunking again in step 3, this 
+    implementation avoids needing a for-loop to reconstruct the block-rows row by 
+    row and then concatenating them. Because the torch.split / torch.cat methods 
+    are likely to be better parallelized than for-loop-based implementations, this 
+    is expected to be faster          
+    """
+    @staticmethod
+    def reconstruct_tensor_cat_split_cat(tensor_grouped_by_block,
+                                         blocks_per_column):
+        block_tensors = torch.split(tensor_grouped_by_block, 1, 0)
+        all_blocks_in_one_row = torch.cat(block_tensors, 3).squeeze(0)
+        block_rows = torch.chunk(all_blocks_in_one_row, blocks_per_column, 2)
+        reconstructed_example_tensor = torch.cat(block_rows, 1)
+
+        return reconstructed_example_tensor
+
+    """
+        This function performs the inverse of 
+        "chunk_tensor_into_blocks_concatenate_along_batch_dimension" : 
+        it takes a tensor that is chunked into blocks, with the blocks stored along the
+        first (batch) dimensions. It then reconstructs the original tensor from these blocks.
+        The reconstruction is done using the "torch.cat" method, which preserves gradient
+        information. Simply pasting over tensor slices in a newly created zeros tensor
+        leads to a faulty implementation, as this does not preserve gradient information.
+    """
     def dechunk_block_tensor_concatenated_along_batch_dimension_changed_block_size(self, tensor: torch.tensor,
                                                                                    block_size: SizeTwoDimensional):
         time_start = util.timing.date_time_start()
@@ -241,16 +288,11 @@ class TensorListChunking:
 
             tensor_grouped_by_block = example_sub_tensor.view(blocks_for_example, channels,
                                                               block_size.height, block_size.width)
-            row_slices = torch.split(tensor_grouped_by_block, blocks_per_row, 0)
-            # print("tensor_grouped_by_block: " + str(tensor_grouped_by_block))
-
-            tensor_block_row = TensorListChunking.reconstruct_tensor_block_row(row_slices[0])
-            reconstructed_example_tensor = tensor_block_row
-
-            for row_index in range(1, blocks_per_column):
-                tensor_block_row = TensorListChunking.reconstruct_tensor_block_row(row_slices[row_index])
-                reconstructed_example_tensor = torch.cat((reconstructed_example_tensor, tensor_block_row), 1)
-
+            reconstructed_example_tensor = TensorListChunking.reconstruct_tensor_row_by_row(tensor_grouped_by_block,
+                                                                                            blocks_per_column,
+                                                                                            blocks_per_row)
+            reconstructed_example_tensor = TensorListChunking.reconstruct_tensor_cat_split_cat(tensor_grouped_by_block,
+                                                                                               blocks_per_column)
             result.append(reconstructed_example_tensor)
 
             # print(">>> dechunk_block_tensor_concatenated_along_batch_dimension: - result.grad_fn "
