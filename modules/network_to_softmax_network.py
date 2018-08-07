@@ -352,7 +352,13 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
 
             elif self.use_example_packing:
                 # print("network_to_softmax_network - use_examples_packing")
-                activations = self.network(x)
+                # Group elements by height for more efficient computation in layers of the
+                # MDLSTM layer pair stacking network at places where tensor_chunking is used
+                reordered_elements_list, original_indices = TensorListChunking.group_examples_by_height(x)
+                activations_reordered = self.network(reordered_elements_list)
+                # Retrieve the original order
+                activations = TensorListChunking.retrieve_original_order(activations_reordered, original_indices)
+                # activations = self.network(reordered_elements_list)
                 activations, examples_activation_heights, examples_activation_widths = \
                     NetworkToSoftMaxNetwork.get_activations_single_tensor_and_activation_heights_and_widths(activations)
 

@@ -4,6 +4,8 @@ from modules.size_two_dimensional import SizeTwoDimensional
 from util.tensor_chunking import TensorChunking
 import util.timing
 from util.tensor_utils import TensorUtils
+from collections import OrderedDict
+
 # This class takes care of chunking a list of four-dimensional image tensors with
 # list elements of the dimensions
 # 1: channels, 2: height, 3: width
@@ -91,6 +93,70 @@ class TensorListChunking:
 
         return result
 
+    def chunk_tensor_list_into_blocks_concatenate_along_batch_same_height_groups(self,
+                                                                                 tensor_list: list):
+        current_same_height_tensors_height = tensor_list[0].size(1)
+        same_height_tensors = list([])
+
+        cat_list = list([])
+
+        for tensor in tensor_list:
+            height = tensor.size(1)
+            if height != current_same_height_tensors_height:
+                tensor_blocks = self.\
+                    chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once_fast_catlist(
+                        same_height_tensors)
+                cat_list.extend(tensor_blocks)
+                same_height_tensors = list([])
+
+            same_height_tensors.append(tensor)
+
+        # Add last element
+        same_height_tensor_blocks = self. \
+            chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once_fast_catlist(
+                same_height_tensors)
+        cat_list.extend(same_height_tensor_blocks)
+
+        return torch.cat(cat_list, 0)
+
+    @staticmethod
+    def group_examples_by_height(tensor_list):
+
+        dictionary = OrderedDict([])
+        for index, tensor in enumerate(tensor_list):
+            height = tensor.size(1)
+            if height in dictionary:
+                same_height_list, original_indices_for_height_list = dictionary[height]
+                same_height_list.append(tensor)
+                original_indices_for_height_list.append(index)
+            else:
+                tensor_indices_tuple = list([tensor]), list([index])
+                dictionary[height] = tensor_indices_tuple
+
+        reordered_elements_list = list([])
+        original_indices = list([])
+
+        for height in dictionary.keys():
+            same_height_list, original_indices_for_height_list = dictionary[height]
+            reordered_elements_list.extend(same_height_list)
+            original_indices.extend(original_indices_for_height_list)
+
+        return reordered_elements_list, original_indices
+
+    @staticmethod
+    def retrieve_original_order(reordered_elements_list, original_indices):
+        lookup_table = [0] * len(original_indices)
+        for i, original_index in enumerate(original_indices):
+            lookup_table[original_index] = i
+
+        result = list([])
+        for i in range(0, len(reordered_elements_list)):
+            original_index = lookup_table[i]
+            original_element = reordered_elements_list[original_index]
+            result.append(original_element)
+        return result
+
+
     def tensor_block_width(self, tensor):
         return int(tensor.size(2) / self.block_size.width)
 
@@ -114,32 +180,39 @@ class TensorListChunking:
             # print("compute_block_re_indexing_order - cumulative_sum_widths: " + str(cumulative_sum_widths))
             cumulative_example_blockrow_widths.append(cumulative_sum_widths)
 
-        result = list([])
-
+        device = tensor_list[0].get_device()
+        cat_list = list([])
         number_of_block_rows = self.tensor_block_height(tensor_list[0])
         for example_index, example in enumerate(tensor_list):
             for block_row_index in range(0, number_of_block_rows):
                 offset = cumulative_example_blockrow_widths[example_index]
                 offset += cumulative_sum_widths * block_row_index
                 # print("offset: " + str(offset))
-                indices = range(offset, offset + self.tensor_block_width(example))
+                indices = torch.arange(offset, offset + self.tensor_block_width(example),
+                                       dtype=torch.long,
+                                       device=device)
                 # print("indices : " + str(indices))
-                result.extend(indices)
+                cat_list.append(indices)
         # print("compute_block_re_indexing_order - result: " + str(result))
-
+        result = torch.cat(cat_list, 0)
         return result
 
     @staticmethod
-    def compute_permuted_list(elements_list, indices_list):
+    def compute_permuted_tensor(tensor, indices_tensor):
+        return torch.index_select(tensor, 0, indices_tensor)
+
+    @staticmethod
+    def compute_permuted_tensor_list(tensor_list, indices_tensor):
         result = list([])
-        for index in indices_list:
-            result.append(elements_list[index])
+        for i in range(0, indices_tensor.size(0)):
+            original_index = indices_tensor[i]
+            result.append(tensor_list[original_index])
         return result
 
-    def chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once_fast(self, tensor_list: list):
+    def chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once_fast_catlist(self, tensor_list: list):
         # New implementation: collect everything and call torch.cat only once
 
-        print("tensor_list[0].size(): " + str(tensor_list[0].size()))
+        # print("tensor_list[0].size(): " + str(tensor_list[0].size()))
 
         # This implementation saves out a for loop by concatenating all the tensors
         # along the width dimension first
@@ -159,13 +232,20 @@ class TensorListChunking:
             # print("blocks: " + str(blocks))
             list_for_cat_wrong_order.extend(blocks)
 
-        order_restoring_permutation = self.compute_block_re_indexing_order(tensor_list)
-        list_for_cat_examples_order = TensorListChunking.\
-            compute_permuted_list(list_for_cat_wrong_order, order_restoring_permutation)
+        order_restoring_permutation_tensor = self.compute_block_re_indexing_order(tensor_list)
+        list_for_cat_right_order = TensorListChunking.compute_permuted_tensor_list(list_for_cat_wrong_order,
+                                                                                   order_restoring_permutation_tensor)
+        return list_for_cat_right_order
 
-        result = torch.cat(list_for_cat_examples_order, 0)
-        # print("chunk_tensor_into_blocks_concatenate_along_batch_dimension - result.size(): " + str(result.size()))
-        # print("chunk_tensor_into_blocks_concatenate_along_batch_dimension - result: " + str(result))
+    def chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once_fast(self, tensor_list: list):
+
+        list_for_cat_right_order = self.\
+            chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once_fast_catlist(tensor_list)
+        result = torch.cat(list_for_cat_right_order, 0)
+        # result_wrong_order = torch.cat(list_for_cat_wrong_order, 0)
+        # result = TensorListChunking.compute_permuted_tensor(result_wrong_order, order_restoring_permutation_tensor)
+        # print("chunk_tensor_into_blocks_concatenate_along_batch_dimension - result_wrong_order.size(): " + str(result_wrong_order.size()))
+        # print("chunk_tensor_into_blocks_concatenate_along_batch_dimension - result_wrong_order: " + str(result_wrong_order))
 
         return result
 
@@ -182,8 +262,13 @@ class TensorListChunking:
         if tensors_all_have_same_height:
             result = self.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once_fast(tensor_list)
         else:
+            # result = self.\
+            #     chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once(tensor_list)
+
+            # New implementation, which tries to exploit groups of tensors of the same height
+            # to perform the chunking faster
             result = self.\
-                chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once(tensor_list)
+                chunk_tensor_list_into_blocks_concatenate_along_batch_same_height_groups(tensor_list)
 
         # print("chunk_tensor_list_into_blocks_concatenate_along_batch_dimension - time used: \n" +
         #      str(util.timing.milliseconds_since(time_start)) + " milliseconds.")
@@ -427,6 +512,9 @@ def main():
     test_tensor_list_block_chunking_followed_by_dechunking_reconstructs_original_single_block_row(True)
     test_tensor_list_block_chunking_followed_by_dechunking_reconstructs_original_multiple_block_rows(True)
 
+    reordered_elements = list(["e", "c", "a", "b", "d"])
+    original_indices = list([4, 2, 0, 1, 3])
+    print(TensorListChunking.retrieve_original_order(reordered_elements, original_indices))
 
 if __name__ == "__main__":
     main()
