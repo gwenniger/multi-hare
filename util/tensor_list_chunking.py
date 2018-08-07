@@ -95,6 +95,8 @@ class TensorListChunking:
         # New implementation: collect everything and call torch.cat only once
         list_for_cat = list([])
 
+        print("tensor_list[0].size(): " + str(tensor_list[0].size()))
+
         # This implementation saves out a for loop by concatenating all the tensors
         # along the width dimension first
         # This only works if the elements in the tensor_list all have the same
@@ -107,14 +109,15 @@ class TensorListChunking:
         tensor_split_on_height = torch.split(tensor_list_concatenated, self.block_size.height, 2)
 
         for row_block in tensor_split_on_height:
+            print("row_block: " + str(row_block))
             blocks = torch.split(row_block, self.block_size.width, 3)
-            # print("blocks: " + str(blocks))
+            print("blocks: " + str(blocks))
             list_for_cat.extend(blocks)
         result = torch.cat(list_for_cat, 0)
         # print("chunk_tensor_into_blocks_concatenate_along_batch_dimension - result.size(): " + str(result.size()))
+        print("chunk_tensor_into_blocks_concatenate_along_batch_dimension - result: " + str(result))
 
         return result
-
 
     # Chunks a list of three-dimensional tensors into blocks.
     # The first element dimension is the input channels,
@@ -124,7 +127,7 @@ class TensorListChunking:
     def chunk_tensor_list_into_blocks_concatenate_along_batch_dimension(self,
                                                                         tensor_list: list,
                                                                         tensors_all_have_same_height: bool):
-        time_start = util.timing.date_time_start()
+        # time_start = util.timing.date_time_start()
 
         if tensors_all_have_same_height:
             result = self.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once_fast(tensor_list)
@@ -281,16 +284,16 @@ class TensorListChunking:
         blocks_start_index = 0
         for example_index in range(0, number_of_examples):
             blocks_per_column = blocks_per_column_list[example_index]
-            blocks_per_row = blocks_per_row_list[example_index]
+            # blocks_per_row = blocks_per_row_list[example_index]
             blocks_for_example = blocks_for_examples_list[example_index]
             example_sub_tensor = example_sub_tensors[example_index]
             # print("example_sub_tensor: " + str(example_sub_tensor))
 
             tensor_grouped_by_block = example_sub_tensor.view(blocks_for_example, channels,
                                                               block_size.height, block_size.width)
-            reconstructed_example_tensor = TensorListChunking.reconstruct_tensor_row_by_row(tensor_grouped_by_block,
-                                                                                            blocks_per_column,
-                                                                                            blocks_per_row)
+            # reconstructed_example_tensor = TensorListChunking.reconstruct_tensor_row_by_row(tensor_grouped_by_block,
+            #                                                                                 blocks_per_column,
+            #                                                                                 blocks_per_row)
             reconstructed_example_tensor = TensorListChunking.reconstruct_tensor_cat_split_cat(tensor_grouped_by_block,
                                                                                                blocks_per_column)
             result.append(reconstructed_example_tensor)
@@ -309,9 +312,8 @@ class TensorListChunking:
         return self.dechunk_block_tensor_concatenated_along_batch_dimension_changed_block_size(tensor, self.block_size)
 
 
-def test_tensor_list_block_chunking_followed_by_dechunking_reconstructs_original():
-    tensor_one = torch.Tensor([range(1, 49)]).view(2, 2, 12)
-    tensor_two = torch.Tensor([range(49, 65)]).view(2, 2, 4)
+def test_tensor_list_block_chunking_followed_by_dechunking_reconstructs_original(
+        tensor_one, tensor_two, block_size, tensors_all_have_same_height: bool):
 
     if Utils.use_cuda():
         tensor_one = tensor_one.cuda()
@@ -322,10 +324,11 @@ def test_tensor_list_block_chunking_followed_by_dechunking_reconstructs_original
     #print("tensor_one[0,  :, :]: " + str(tensor_one[0, :, :]))
     #print("tensor_two[0,  :, :]: " + str(tensor_two[0, :, :]))
 
-    block_size = SizeTwoDimensional.create_size_two_dimensional(2, 2)
     tensor_list = list([tensor_one, tensor_two])
     tensor_chunking = TensorListChunking.create_tensor_list_chunking(tensor_list, block_size)
-    chunking = tensor_chunking.chunk_tensor_list_into_blocks_concatenate_along_batch_dimension(tensor_list, True)
+    chunking = tensor_chunking.\
+        chunk_tensor_list_into_blocks_concatenate_along_batch_dimension(tensor_list,
+                                                                        tensors_all_have_same_height)
     print("chunking: " + str(chunking))
     print("chunking.size(): " + str(chunking.size()))
     dechunked_tensor_list = tensor_chunking.\
@@ -346,8 +349,33 @@ def test_tensor_list_block_chunking_followed_by_dechunking_reconstructs_original
             print("Success: original tensor and dechunked(chunked(tensor)) are equal")
 
 
+def test_tensor_list_block_chunking_followed_by_dechunking_reconstructs_original_single_block_row(
+        tensors_all_have_same_height: bool):
+    tensor_one = torch.Tensor([range(1, 49)]).view(2, 2, 12)
+    tensor_two = torch.Tensor([range(49, 65)]).view(2, 2, 4)
+    block_size = SizeTwoDimensional.create_size_two_dimensional(2, 2)
+    test_tensor_list_block_chunking_followed_by_dechunking_reconstructs_original(tensor_one,
+                                                                                 tensor_two,
+                                                                                 block_size,
+                                                                                 tensors_all_have_same_height)
+
+
+def test_tensor_list_block_chunking_followed_by_dechunking_reconstructs_original_multiple_block_rows(
+    tensors_all_have_same_height: bool):
+    tensor_one = torch.Tensor([range(1, 33)]).view(2, 4, 4)
+    tensor_two = torch.Tensor([range(33, 65)]).view(2, 4, 4)
+    block_size = SizeTwoDimensional.create_size_two_dimensional(2, 2)
+    test_tensor_list_block_chunking_followed_by_dechunking_reconstructs_original(tensor_one,
+                                                                                 tensor_two,
+                                                                                 block_size,
+                                                                                 tensors_all_have_same_height)
+
+
 def main():
-    test_tensor_list_block_chunking_followed_by_dechunking_reconstructs_original()
+    test_tensor_list_block_chunking_followed_by_dechunking_reconstructs_original_single_block_row(False)
+    test_tensor_list_block_chunking_followed_by_dechunking_reconstructs_original_multiple_block_rows(False)
+    test_tensor_list_block_chunking_followed_by_dechunking_reconstructs_original_single_block_row(True)
+    test_tensor_list_block_chunking_followed_by_dechunking_reconstructs_original_multiple_block_rows(True)
 
 
 if __name__ == "__main__":
