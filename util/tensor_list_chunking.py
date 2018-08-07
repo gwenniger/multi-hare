@@ -91,9 +91,53 @@ class TensorListChunking:
 
         return result
 
+    def tensor_block_width(self, tensor):
+        return int(tensor.size(2) / self.block_size.width)
+
+    def tensor_block_height(self, tensor):
+        return int(tensor.size(1) / self.block_size.height)
+
+    """
+    A block-list is effectively obtained by concatenating examples 
+    in the width direction and then extracting blocks block-row by block-row.
+    But this compromises the order of blocks in which all blocks for example 1 come
+    before those for example 2, example 3 ...
+    This method computes the order required to re-index the block list in the 
+    wrong order, such as to restore the order of blocks example after example.  
+    """
+    def compute_block_re_indexing_order(self, tensor_list: list):
+        cumulative_example_blockrow_widths = list([0])
+
+        cumulative_sum_widths = 0
+        for tensor in tensor_list:
+            cumulative_sum_widths += self.tensor_block_width(tensor)
+            # print("compute_block_re_indexing_order - cumulative_sum_widths: " + str(cumulative_sum_widths))
+            cumulative_example_blockrow_widths.append(cumulative_sum_widths)
+
+        result = list([])
+
+        number_of_block_rows = self.tensor_block_height(tensor_list[0])
+        for example_index, example in enumerate(tensor_list):
+            for block_row_index in range(0, number_of_block_rows):
+                offset = cumulative_example_blockrow_widths[example_index]
+                offset += cumulative_sum_widths * block_row_index
+                # print("offset: " + str(offset))
+                indices = range(offset, offset + self.tensor_block_width(example))
+                # print("indices : " + str(indices))
+                result.extend(indices)
+        # print("compute_block_re_indexing_order - result: " + str(result))
+
+        return result
+
+    @staticmethod
+    def compute_permuted_list(elements_list, indices_list):
+        result = list([])
+        for index in indices_list:
+            result.append(elements_list[index])
+        return result
+
     def chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once_fast(self, tensor_list: list):
         # New implementation: collect everything and call torch.cat only once
-        list_for_cat = list([])
 
         print("tensor_list[0].size(): " + str(tensor_list[0].size()))
 
@@ -108,14 +152,20 @@ class TensorListChunking:
         tensor_list_concatenated = tensor_list_concatenated.unsqueeze(0)
         tensor_split_on_height = torch.split(tensor_list_concatenated, self.block_size.height, 2)
 
+        list_for_cat_wrong_order = list([])
         for row_block in tensor_split_on_height:
-            print("row_block: " + str(row_block))
+            # print("row_block: " + str(row_block))
             blocks = torch.split(row_block, self.block_size.width, 3)
-            print("blocks: " + str(blocks))
-            list_for_cat.extend(blocks)
-        result = torch.cat(list_for_cat, 0)
+            # print("blocks: " + str(blocks))
+            list_for_cat_wrong_order.extend(blocks)
+
+        order_restoring_permutation = self.compute_block_re_indexing_order(tensor_list)
+        list_for_cat_examples_order = TensorListChunking.\
+            compute_permuted_list(list_for_cat_wrong_order, order_restoring_permutation)
+
+        result = torch.cat(list_for_cat_examples_order, 0)
         # print("chunk_tensor_into_blocks_concatenate_along_batch_dimension - result.size(): " + str(result.size()))
-        print("chunk_tensor_into_blocks_concatenate_along_batch_dimension - result: " + str(result))
+        # print("chunk_tensor_into_blocks_concatenate_along_batch_dimension - result: " + str(result))
 
         return result
 
@@ -361,7 +411,7 @@ def test_tensor_list_block_chunking_followed_by_dechunking_reconstructs_original
 
 
 def test_tensor_list_block_chunking_followed_by_dechunking_reconstructs_original_multiple_block_rows(
-    tensors_all_have_same_height: bool):
+        tensors_all_have_same_height: bool):
     tensor_one = torch.Tensor([range(1, 33)]).view(2, 4, 4)
     tensor_two = torch.Tensor([range(33, 65)]).view(2, 4, 4)
     block_size = SizeTwoDimensional.create_size_two_dimensional(2, 2)
