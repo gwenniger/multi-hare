@@ -103,19 +103,19 @@ class TensorListChunking:
         for tensor in tensor_list:
             height = tensor.size(1)
             if height != current_same_height_tensors_height:
-                tensor_blocks = self.\
-                    chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once_fast_catlist(
+                same_height_tensor_blocks_tensor = self.\
+                    chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once_fast(
                         same_height_tensors)
-                cat_list.extend(tensor_blocks)
+                cat_list.append(same_height_tensor_blocks_tensor)
                 same_height_tensors = list([])
 
             same_height_tensors.append(tensor)
 
         # Add last element
-        same_height_tensor_blocks = self. \
-            chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once_fast_catlist(
+        same_height_tensor_blocks_tensor = self. \
+            chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once_fast(
                 same_height_tensors)
-        cat_list.extend(same_height_tensor_blocks)
+        cat_list.append(same_height_tensor_blocks_tensor)
 
         return torch.cat(cat_list, 0)
 
@@ -209,7 +209,7 @@ class TensorListChunking:
             result.append(tensor_list[original_index])
         return result
 
-    def chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once_fast_catlist(self, tensor_list: list):
+    def chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once_fast(self, tensor_list: list):
         # New implementation: collect everything and call torch.cat only once
 
         # print("tensor_list[0].size(): " + str(tensor_list[0].size()))
@@ -233,17 +233,11 @@ class TensorListChunking:
             list_for_cat_wrong_order.extend(blocks)
 
         order_restoring_permutation_tensor = self.compute_block_re_indexing_order(tensor_list)
-        list_for_cat_right_order = TensorListChunking.compute_permuted_tensor_list(list_for_cat_wrong_order,
-                                                                                   order_restoring_permutation_tensor)
-        return list_for_cat_right_order
-
-    def chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once_fast(self, tensor_list: list):
-
-        list_for_cat_right_order = self.\
-            chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once_fast_catlist(tensor_list)
-        result = torch.cat(list_for_cat_right_order, 0)
-        # result_wrong_order = torch.cat(list_for_cat_wrong_order, 0)
-        # result = TensorListChunking.compute_permuted_tensor(result_wrong_order, order_restoring_permutation_tensor)
+        # list_for_cat_right_order = TensorListChunking.compute_permuted_tensor_list(list_for_cat_wrong_order,
+        #                                                                           order_restoring_permutation_tensor)
+        # result = torch.cat(list_for_cat_right_order, 0)
+        result_wrong_order = torch.cat(list_for_cat_wrong_order, 0)
+        result = TensorListChunking.compute_permuted_tensor(result_wrong_order, order_restoring_permutation_tensor)
         # print("chunk_tensor_into_blocks_concatenate_along_batch_dimension - result_wrong_order.size(): " + str(result_wrong_order.size()))
         # print("chunk_tensor_into_blocks_concatenate_along_batch_dimension - result_wrong_order: " + str(result_wrong_order))
 
@@ -264,9 +258,6 @@ class TensorListChunking:
         else:
             # result = self.\
             #     chunk_tensor_list_into_blocks_concatenate_along_batch_dimension_cat_once(tensor_list)
-
-            # New implementation, which tries to exploit groups of tensors of the same height
-            # to perform the chunking faster
             result = self.\
                 chunk_tensor_list_into_blocks_concatenate_along_batch_same_height_groups(tensor_list)
 
