@@ -756,32 +756,20 @@ class MDLSTMExamplesPacking:
                                                          packed_examples_row: list,
                                                          first_row_index: int):
 
-        # print("activations_as_tensor.size(): " + str(activations_as_tensor.size()))
+        print("activations_as_tensor.size(): " + str(activations_as_tensor.size()))
+        print("first_row_index: " + str(first_row_index))
 
         skewed_image_rows = packed_examples_row[0].example_size.height
         original_image_columns = self.get_packed_example_widths_plus_separator_overhead(packed_examples_row)
 
+        activations_sub_tensor = activations_as_tensor[:, :,
+                                                       first_row_index:first_row_index + skewed_image_rows, :]
+
         # print("row_number: (original_image_columns + row_number: " +
         #       str(first_row_index) + ":" + str(original_image_columns + first_row_index))
 
-        # The first row of this example row is at vertical index first_row_index (not 0) !!!
-        activations_unskewed = activations_as_tensor[:, :, first_row_index, 0:original_image_columns]
-        activations_unskewed = torch.unsqueeze(activations_unskewed, 2)
-
-        for relative_row_number in range(1, skewed_image_rows):
-            # print("row_number: (original_image_columns + row_number: " +
-            #      str(relative_row_number) + ":" + str(original_image_columns + relative_row_number))
-
-            absolute_row_number = first_row_index + relative_row_number
-            # print("extract_unskewed_activations_packed_examples_row - absolute row number: "
-            # + str(absolute_row_number))
-            activation_columns = \
-                activations_as_tensor[:, :, absolute_row_number,
-                                      relative_row_number: (relative_row_number + original_image_columns)]
-            activation_columns = torch.unsqueeze(activation_columns, 2)
-            # print("activations_columns.size():" + str(activation_columns.size()))
-            # print("activations_unskewed.size():" + str(activations_unskewed.size()))
-            activations_unskewed = torch.cat((activations_unskewed, activation_columns), 2)
+        activations_unskewed = ImageInputTransformer.\
+            extract_unskewed_activations_from_activation_tensor(activations_sub_tensor, original_image_columns)
 
         # print("extract_unskewed_activations_packed_examples_row - activations_unskewed: "
         #       + str(activations_unskewed))
