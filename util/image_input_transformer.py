@@ -403,18 +403,24 @@ class ImageInputTransformer:
 
         # print("activations: " + str(activations))
 
-        activations_unskewed = activations_as_tensor[:, :, 0, 0:original_image_columns]
-        activations_unskewed = torch.unsqueeze(activations_unskewed, 2)
+        # activations_unskewed = activations_as_tensor[:, :, 0, 0:original_image_columns]
+        # activations_unskewed = torch.unsqueeze(activations_unskewed, 2)
+
+        activation_columns_list = list([])
+
         # print("activations_unskewed before:" + str(activations_unskewed))
-        for row_number in range(1, skewed_image_rows):
+        for row_number in range(0, skewed_image_rows):
             # print("row_number: (original_image_columns + row_number: " +
             #      str(row_number) + ":" + str(original_image_columns + row_number))
             activation_columns = activations_as_tensor[:, :, row_number,
                                                        row_number: (original_image_columns + row_number)]
-            activation_columns = torch.unsqueeze(activation_columns, 2)
+            # activation_columns = torch.unsqueeze(activation_columns, 2)
             # print("activations.size():" + str(activations.size()))
             # print("activations_unskewed.size():" + str(activations_unskewed.size()))
-            activations_unskewed = torch.cat((activations_unskewed, activation_columns), 2)
+            #activations_unskewed = torch.cat((activations_unskewed, activation_columns), 2)
+            activation_columns_list.append(activation_columns)
+
+        activations_unskewed = torch.stack(activation_columns_list, 2)
 
         # activations_unskewed = MultiDimensionalRNNBase.break_activations_unskewed(activations_unskewed)
 

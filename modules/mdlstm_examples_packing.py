@@ -756,8 +756,8 @@ class MDLSTMExamplesPacking:
                                                          packed_examples_row: list,
                                                          first_row_index: int):
 
-        print("activations_as_tensor.size(): " + str(activations_as_tensor.size()))
-        print("first_row_index: " + str(first_row_index))
+        # print("activations_as_tensor.size(): " + str(activations_as_tensor.size()))
+        # print("first_row_index: " + str(first_row_index))
 
         skewed_image_rows = packed_examples_row[0].example_size.height
         original_image_columns = self.get_packed_example_widths_plus_separator_overhead(packed_examples_row)
@@ -808,7 +808,7 @@ class MDLSTMExamplesPacking:
     def get_height_packed_examples_row(self, index):
         return self.packed_examples[index][0].example_size.height
 
-    def get_actication_sub_tensors(self, activations_as_tensor):
+    def get_activation_sub_tensors(self, activations_as_tensor):
         activation_sub_tensor_heights = list([])
 
         for index in range(0, len(self.number_of_rows_for_height_list)):
@@ -821,7 +821,7 @@ class MDLSTMExamplesPacking:
                 activation_sub_tensor_height += 1
             activation_sub_tensor_heights.append(activation_sub_tensor_height)
 
-        print("activations_as_tensor.size(): " + str(activations_as_tensor.size()))
+        # print("activations_as_tensor.size(): " + str(activations_as_tensor.size()))
         total_splitting_heights = sum(activation_sub_tensor_heights)
         if not total_splitting_heights == activations_as_tensor.size(2):
             raise RuntimeError("Error: the total splitting heights: " +
@@ -846,7 +846,7 @@ class MDLSTMExamplesPacking:
                                     device=activation_sub_tensor.get_device())
             activation_sub_tensor = torch.cat(list([activation_sub_tensor, extra_row]), 2)
         height, number_of_rows = self.number_of_rows_for_height_list[activation_sub_tensor_index]
-        print("create_block_rows_stacked - number_of_rows: " + str(number_of_rows))
+        # print("create_block_rows_stacked - number_of_rows: " + str(number_of_rows))
         block_rows_with_extra_row = torch.chunk(activation_sub_tensor, number_of_rows, 2)
         block_rows_with_extra_row_stacked = torch.cat(block_rows_with_extra_row, 0)
         block_rows_stacked = \
@@ -880,13 +880,13 @@ class MDLSTMExamplesPacking:
             self, activations_as_tensor):
         result_tensors_packed_order = list([])
 
-        activation_sub_tensors = self.get_actication_sub_tensors(activations_as_tensor)
+        activation_sub_tensors = self.get_activation_sub_tensors(activations_as_tensor)
 
         packed_examples_row_index = 0
         for i, activation_sub_tensor in enumerate(activation_sub_tensors):
             block_rows_stacked = self.create_block_rows_stacked(activation_sub_tensor, i)
 
-            print("block_rows_stacked.size(): " + str(block_rows_stacked.size()))
+            # print("block_rows_stacked.size(): " + str(block_rows_stacked.size()))
             original_image_columns = ImageInputTransformer.\
                 get_original_width_yielding_skewed_image_width(block_rows_stacked.size(2),
                                                                block_rows_stacked.size(3))
