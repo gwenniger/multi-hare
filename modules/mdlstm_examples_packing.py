@@ -69,20 +69,24 @@ class MDLSTMExamplesPacking:
 
     def __init__(self, packed_examples,
                  original_example_index_to_packed_index_table,
+                 number_of_rows_for_height_list,
                  max_example_width: int,
                  example_separator_width: int):
         self.packed_examples = packed_examples
         self.original_example_index_to_packed_index_table = original_example_index_to_packed_index_table
+        self.number_of_rows_for_height_list = number_of_rows_for_height_list
         self.max_example_width = max_example_width
         self.example_separator_width = example_separator_width
 
     @staticmethod
     def created_mdlstm_examples_packing(examples_list: list, example_separator_width: int):
-        packed_examples, max_example_width = MDLSTMExamplesPacking.get_packed_examples(examples_list, example_separator_width)
+        packed_examples, max_example_width, number_of_rows_for_height_list = \
+            MDLSTMExamplesPacking.get_packed_examples(examples_list, example_separator_width)
         original_example_index_to_packed_index_table = \
             MDLSTMExamplesPacking.create_original_example_index_to_packed_index_table(packed_examples, examples_list)
         return MDLSTMExamplesPacking(packed_examples,
                                      original_example_index_to_packed_index_table,
+                                     number_of_rows_for_height_list,
                                      max_example_width, example_separator_width)
 
     @staticmethod
@@ -95,6 +99,7 @@ class MDLSTMExamplesPacking:
             get_maximum_example_width(example_sizes_list)
 
         result = list([])
+        number_of_rows_for_height_list = list([])
 
         for height in height_grouped_examples_table:
             examples_for_height = height_grouped_examples_table[height]
@@ -102,7 +107,9 @@ class MDLSTMExamplesPacking:
                 examples_for_height, max_example_width, example_separator_width)
             result.extend(packed_examples_list)
 
-        return result, max_example_width
+            number_of_rows_for_height_list.append((height, len(packed_examples_list)))
+
+        return result, max_example_width, number_of_rows_for_height_list
 
     @staticmethod
     def create_original_example_index_to_packed_index_table(packed_examples, examples_list):
@@ -719,6 +726,32 @@ class MDLSTMExamplesPacking:
 
         return result, mask_result
 
+    def collect_activations_and_remove_padding_from_unskewed_activations(
+            self, packed_examples_row: list, activations_unskewed):
+        activations_unskewed_split_list = list([])
+        activations_unskewed_split_list.append(packed_examples_row[0].example_size.width)
+        for indexed_example_size in packed_examples_row[1:len(packed_examples_row)]:
+            activations_unskewed_split_list.append(self.example_separator_width)
+            activations_unskewed_split_list.append(indexed_example_size.example_size.width)
+
+        total_width_split_list = sum(activations_unskewed_split_list)
+        remaining_tail_padding_width = activations_unskewed.size(3) - total_width_split_list
+        if remaining_tail_padding_width > 0 :
+            activations_unskewed_split_list.append(remaining_tail_padding_width)
+
+        example_activations_list_with_padding = torch.split(
+            activations_unskewed, activations_unskewed_split_list, 3)
+        example_activations_list = list([])
+
+        # Extract the data and discard the padding
+        for i in range(0, len(example_activations_list_with_padding), 2):
+            example_activations_list.append(example_activations_list_with_padding[i])
+
+        # print("extract_unskewed_activations_packed_examples_row - example_activations_list: " +
+        #       str(example_activations_list))
+
+        return example_activations_list
+
     def extract_unskewed_activations_packed_examples_row(self, activations_as_tensor,
                                                          packed_examples_row: list,
                                                          first_row_index: int):
@@ -753,25 +786,8 @@ class MDLSTMExamplesPacking:
         # print("extract_unskewed_activations_packed_examples_row - activations_unskewed: "
         #       + str(activations_unskewed))
 
-        activations_unskewed_split_list = list([])
-        activations_unskewed_split_list.append(packed_examples_row[0].example_size.width)
-        for indexed_example_size in packed_examples_row[1:len(packed_examples_row)]:
-            activations_unskewed_split_list.append(self.example_separator_width)
-            activations_unskewed_split_list.append(indexed_example_size.example_size.width)
-
-        example_activations_list_with_padding = torch.split(activations_unskewed,
-                                                            activations_unskewed_split_list,
-                                                            3)
-        example_activations_list = list([])
-
-        # Extract the data and discard the padding
-        for i in range(0, len(example_activations_list_with_padding), 2):
-            example_activations_list.append(example_activations_list_with_padding[i])
-
-        # print("extract_unskewed_activations_packed_examples_row - example_activations_list: " +
-        #       str(example_activations_list))
-
-        return example_activations_list
+        return self.collect_activations_and_remove_padding_from_unskewed_activations(
+            packed_examples_row, activations_unskewed)
 
     def get_num_examples(self):
         return len(self.original_example_index_to_packed_index_table)
@@ -783,13 +799,12 @@ class MDLSTMExamplesPacking:
             result.append(result_tensors_packed_order_list[packed_index])
         return result
 
-    def extract_unskewed_activations_from_activation_tensor(self, activations_as_tensor):
-
+    def extract_unskewed_activations_from_activation_tensor_packed_order(self, activations_as_tensor):
         result_tensors_packed_order = list([])
 
         first_row_index = 0
         for packed_examples_row in self.packed_examples:
-            example_activations_list = self.\
+            example_activations_list = self. \
                 extract_unskewed_activations_packed_examples_row(activations_as_tensor,
                                                                  packed_examples_row,
                                                                  first_row_index)
@@ -799,6 +814,116 @@ class MDLSTMExamplesPacking:
             first_row_index += skewed_image_rows + 1
 
             result_tensors_packed_order.extend(example_activations_list)
+
+        return result_tensors_packed_order
+
+    def get_height_packed_examples_row(self, index):
+        return self.packed_examples[index][0].example_size.height
+
+    def get_actication_sub_tensors(self, activations_as_tensor):
+        activation_sub_tensor_heights = list([])
+
+        for index in range(0, len(self.number_of_rows_for_height_list)):
+            height, number_of_rows = self.number_of_rows_for_height_list[index]
+
+            activation_sub_tensor_height = (height + 1) * (number_of_rows - 1) + height
+
+            # Add one extra row for last horizontal separator, except for the last block
+            if index < len(self.number_of_rows_for_height_list) - 1:
+                activation_sub_tensor_height += 1
+            activation_sub_tensor_heights.append(activation_sub_tensor_height)
+
+        print("activations_as_tensor.size(): " + str(activations_as_tensor.size()))
+        total_splitting_heights = sum(activation_sub_tensor_heights)
+        if not total_splitting_heights == activations_as_tensor.size(2):
+            raise RuntimeError("Error: the total splitting heights: " +
+                               str(total_splitting_heights) + " are not equal to the" +
+                               " height of activations_as_tensor: " +
+                               str(activations_as_tensor.size(2))
+                               )
+
+        result = torch.split(activations_as_tensor, activation_sub_tensor_heights, 2)
+        return result
+
+    def create_block_rows_stacked(self, activation_sub_tensor, activation_sub_tensor_index):
+
+        is_last_activation_sub_tensor = False
+        # For the last activation sub-tensor
+        if activation_sub_tensor_index == len(self.number_of_rows_for_height_list) - 1:
+            is_last_activation_sub_tensor = True
+
+        if is_last_activation_sub_tensor:
+            extra_row = torch.zeros(1, activation_sub_tensor.size(1),
+                                    1, activation_sub_tensor.size(3),
+                                    device=activation_sub_tensor.get_device())
+            activation_sub_tensor = torch.cat(list([activation_sub_tensor, extra_row]), 2)
+        height, number_of_rows = self.number_of_rows_for_height_list[activation_sub_tensor_index]
+        print("create_block_rows_stacked - number_of_rows: " + str(number_of_rows))
+        block_rows_with_extra_row = torch.chunk(activation_sub_tensor, number_of_rows, 2)
+        block_rows_with_extra_row_stacked = torch.cat(block_rows_with_extra_row, 0)
+        block_rows_stacked = \
+            block_rows_with_extra_row_stacked[:, :,
+                                              0: block_rows_with_extra_row_stacked.size(2) - 1, :]
+        return block_rows_stacked
+
+    """
+    This method is an optimized (faster) implementation of 
+    extract_unskewed_activations_from_activation_tensor_packed_order.
+    This implementation exploits the fact that packed rows for the same height 
+    can be un-skewed in parallel after MDLSTM activation computation, 
+    just as they can be skewed in parallel before MDLSTM activation computation.
+    To do so:
+        0) Initialize empty final result list
+        1) Extract activation sub-tensors for packed rows with the same height
+        2) Every sub-tensor is processed by:
+            a) Add an extra row if it is the last sub-tensor
+            b) Query the the height and number of rows for this height, 
+               this sub-tensor contains packed tensors for.
+               Chunk the sub-tensor into this number of row.                 
+            c) Remove the last row (= horizontal separator) for each chunk
+            d) Stack the chunks without horizontal separator
+            e) Un-skew the chunks without horizontal separator in parallel
+            f) Extract and collect the actual activations (removing in-between and 
+               tail padding) for each of the un-skewed chunks
+            g) Add these actual activations to the final result list     
+        3) Return final result list                            
+    """
+    def extract_unskewed_activations_from_activation_tensor_packed_order_fast(
+            self, activations_as_tensor):
+        result_tensors_packed_order = list([])
+
+        activation_sub_tensors = self.get_actication_sub_tensors(activations_as_tensor)
+
+        packed_examples_row_index = 0
+        for i, activation_sub_tensor in enumerate(activation_sub_tensors):
+            block_rows_stacked = self.create_block_rows_stacked(activation_sub_tensor, i)
+
+            print("block_rows_stacked.size(): " + str(block_rows_stacked.size()))
+            original_image_columns = ImageInputTransformer.\
+                get_original_width_yielding_skewed_image_width(block_rows_stacked.size(2),
+                                                               block_rows_stacked.size(3))
+            activations_unskewed_stacked = ImageInputTransformer.\
+                extract_unskewed_activations_from_activation_tensor(block_rows_stacked,
+                                                                    original_image_columns)
+
+            activations_unskewed_list = torch.split(activations_unskewed_stacked, 1, 0)
+
+            for activations_unskewed in activations_unskewed_list:
+                packed_examples_row = self.packed_examples[packed_examples_row_index]
+                example_activations_list = \
+                    self.collect_activations_and_remove_padding_from_unskewed_activations(
+                        packed_examples_row, activations_unskewed)
+                result_tensors_packed_order.extend(example_activations_list)
+                packed_examples_row_index += 1
+
+        return result_tensors_packed_order
+
+    def extract_unskewed_activations_from_activation_tensor(self, activations_as_tensor):
+
+        # result_tensors_packed_order = self.\
+        #    extract_unskewed_activations_from_activation_tensor_packed_order(activations_as_tensor)
+        result_tensors_packed_order = self. \
+            extract_unskewed_activations_from_activation_tensor_packed_order_fast(activations_as_tensor)
 
         # The result tensors are first in the order of the packing, we must
         # restore the original example order before returning the result

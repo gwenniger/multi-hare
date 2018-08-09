@@ -395,8 +395,10 @@ class ImageInputTransformer:
 
     @staticmethod
     def extract_unskewed_activations_from_activation_tensor(activations_as_tensor,
-                                                            original_image_columns: int,
-                                                            skewed_image_rows: int):
+                                                            original_image_columns: int):
+
+        skewed_image_rows = activations_as_tensor.size(2)
+
         # print("original image columns: " + str(original_image_columns))
 
         # print("activations: " + str(activations))
@@ -421,15 +423,13 @@ class ImageInputTransformer:
     # activation_columns is a list of activation columns
     @staticmethod
     def extract_unskewed_activations_from_activation_columns(activation_columns,
-                                                             original_image_columns: int,
-                                                             skewed_image_rows: int):
+                                                             original_image_columns: int):
 
         activations_as_tensor = ImageInputTransformer. \
             convert_activation_columns_list_to_tensor(activation_columns)
         return ImageInputTransformer. \
             extract_unskewed_activations_from_activation_tensor(activations_as_tensor,
-                                                                original_image_columns,
-                                                                skewed_image_rows)
+                                                                original_image_columns)
 
     # Method that demonstrates and explains the bug of adding a superfluous variable
     # wrapping. What happens is that the additional wrapping makes

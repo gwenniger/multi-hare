@@ -627,8 +627,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             skewed_image_rows = skewed_images_variable.size(2)
 
             activations_unskewed = ImageInputTransformer.\
-                extract_unskewed_activations_from_activation_columns(activations, original_image_columns,
-                                                                     skewed_image_rows)
+                extract_unskewed_activations_from_activation_columns(activations, original_image_columns)
 
         # print("activations_unskewed: " + str(activations_unskewed))
         return activations_unskewed
@@ -752,13 +751,11 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
         # print("activations_re_skewed.size(): " + str(activations_re_skewed.size()))
         original_image_columns = x.size(3)
-        skewed_image_rows = x.size(2)
 
         # Additional re-un-skewing step
         activations_re_skewed_re_unskewed = ImageInputTransformer.\
             extract_unskewed_activations_from_activation_tensor(activations_re_skewed,
-                                                                original_image_columns,
-                                                                skewed_image_rows)
+                                                                original_image_columns)
         # print("activations_re_skewed_re_unskewed.size(): " + str(activations_re_skewed_re_unskewed.size()))
 
         return activations_re_skewed_re_unskewed

@@ -47,9 +47,10 @@ class MultiDimensionalLSTMTest:
         mdlstm_test = MultiDimensionalLSTMTest.create_multi_dimensional_lstm_test()
         input_tensor = torch.ones(1, 1, 2, 2).cuda()
         input_tensor_list = list([torch.ones(1, 2, 2).cuda()])
-        activations, activations_with_examples_packing = mdlstm_test.\
+        activations, activations_with_examples_packing_list = mdlstm_test.\
             get_mdlstm_activations_with_and_without_packing(input_tensor,
                                                             input_tensor_list)
+        activations_with_examples_packing = activations_with_examples_packing_list[0]
 
         print("activations_without_examples_packing: " + str(activations))
         print("activations_with_examples_packing: " + str(activations_with_examples_packing))
