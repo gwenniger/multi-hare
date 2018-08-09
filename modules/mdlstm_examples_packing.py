@@ -279,8 +279,6 @@ class MDLSTMExamplesPacking:
                 # Reserve space for required separator if additional example is added
                 space_remaining_current_row -= example_separator_width
 
-
-
         # Add the last result row
         result.append(result_row)
 
@@ -892,7 +890,7 @@ class MDLSTMExamplesPacking:
                                                                block_rows_stacked.size(3))
             activations_unskewed_stacked = ImageInputTransformer.\
                 extract_unskewed_activations_from_activation_tensor(block_rows_stacked,
-                                                                    original_image_columns)
+                                                                                original_image_columns)
 
             activations_unskewed_list = torch.split(activations_unskewed_stacked, 1, 0)
 

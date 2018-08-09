@@ -7,7 +7,8 @@ from util.tensor_list_chunking import TensorListChunking
 from modules.inside_model_gradient_clipping import InsideModelGradientClamping
 from util.tensor_utils import TensorUtils
 from modules.module_io_structuring import ModuleIOStructuring
-
+import torch
+import util.timing
 
 class BlockStridedConvolution(Module):
 
@@ -130,7 +131,7 @@ class BlockStridedConvolution(Module):
         # result = InsideModelGradientClamping.register_gradient_clamping(result)
         return result
 
-    def compute_forward_one_directional_from_chunked_input(self, x_chunked, tensor_list_chunking):
+    def compute_forward_from_chunked_input(self, x_chunked, tensor_list_chunking):
 
         result = self.compute_forward_one_directional(x_chunked)
 
@@ -143,6 +144,14 @@ class BlockStridedConvolution(Module):
         #         dechunk_block_tensor_concatenated_along_batch_dimension_changed_block_size(result,
         #                                                                                    convolution_output_size)
         #     return output_ordered_back_to_input_format
+
+        # print("block_strided_convolution - result.size(): " + str(result.size()))
+
+        # Sum the results for multiple directions contained in chunks of the result
+        if self.compute_multi_directional:
+            results_per_direction = torch.chunk(result, 4, 1)
+            result = torch.sum(torch.stack(results_per_direction, 0), 0)
+            # result = TensorUtils.sum_list_of_tensors(results_per_direction)
 
         if self.use_example_packing:
             # print("block_strided_convolution - use example packing")
@@ -175,25 +184,30 @@ class BlockStridedConvolution(Module):
 
     def forward(self, x):
 
+        # time_start_network_forward = util.timing.date_time_start()
+
         if self.use_example_packing:
             if self.compute_multi_directional:
                 x_chunked, tensor_list_chunking = \
                     self.compute_x_chunked_and_tensor_list_chunking_list(x)
-                activations = self.compute_forward_one_directional_from_chunked_input(
+                activations_summed = self.compute_forward_from_chunked_input(
                     x_chunked, tensor_list_chunking)
                 # print("block_strided_convolution - activations[0].size(): " + str(activations[0].size()))
                 # Chunk the list of activations per tensor into a list of activations per tensor
                 # for each direction
-                list_of_activations_lists = TensorUtils.chunk_list_of_tensors_along_dimension(activations, 4, 0)
-                activations_summed = TensorUtils.sum_lists_of_tensor_lists_element_wise(list_of_activations_lists)
+                #list_of_activations_lists = TensorUtils.chunk_list_of_tensors_along_dimension(activations, 4, 0)
+                #activations_summed = TensorUtils.sum_lists_of_tensor_lists_element_wise(list_of_activations_lists)
                 # print("block_strided_convolution - activations_summed[0].size(): "
                 # + str(activations_summed[0].size()))
+
+                # print("Block-strided convolution - Time used for network forward: "
+                #       + str(util.timing.milliseconds_since(time_start_network_forward)))
 
                 return activations_summed
             else:
                 x_chunked, tensor_list_chunking = \
                     self.compute_x_chunked_and_tensor_list_chunking_list(x)
-                activations = self.compute_forward_one_directional_from_chunked_input(
+                activations = self.compute_forward_from_chunked_input(
                     x_chunked, tensor_list_chunking)
                 return activations
         else:

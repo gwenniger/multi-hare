@@ -229,13 +229,35 @@ class ParallelMultipleStateWeightingsComputation(Module):
 
     @staticmethod
     def compute_summed_outputs_every_pair_static(convolution_result_pairs):
+        # Original implementation
         result = list([])
+        # for result_pair in convolution_result_pairs:
+        #     pair_element_one = result_pair[0]
+        #     pair_two_element_shifted = result_pair[1]
+        #     # print("pair two element shifted: " + str(pair_two_element_shifted))
+        #     summed_values = pair_element_one + pair_two_element_shifted
+        #     result.append(summed_values)
+        # return result
+
+        # Implementation with parallelized summation using stacking
+        result_pairs_first_elements = list([])
+        result_pairs_second_elements = list([])
+
         for result_pair in convolution_result_pairs:
             pair_element_one = result_pair[0]
+            # print("pair_element_one.size(): " + str(pair_element_one.size()))
             pair_two_element_shifted = result_pair[1]
-            # print("pair two element shifted: " + str(pair_two_element_shifted))
-            summed_values = pair_element_one + pair_two_element_shifted
-            result.append(summed_values)
+            # print("pair_two_element_shifted.size(): " + str(pair_two_element_shifted.size()))
+            result_pairs_first_elements.append(pair_element_one)
+            result_pairs_second_elements.append(pair_two_element_shifted)
+        first_stack = torch.stack(result_pairs_first_elements, 0)
+        second_stack = torch.stack(result_pairs_second_elements, 0)
+        summed_stacks = first_stack + second_stack
+        result_with_extra_dim = torch.split(summed_stacks, 1, 0)
+        result = list([])
+        for element in result_with_extra_dim:
+            result.append(element.squeeze(0))
+        # print("result[0].size(): " + str(result[0].size()))
         return result
 
     # This method :

@@ -169,7 +169,8 @@ class Trainer:
                                                                  number_of_examples,
                                                                  self.model_properties.width_reduction_factor)
 
-            # print("Time used for ctc loss computation: " + str(util.timing.milliseconds_since(time_start_ctc_loss_computation)))
+            # print("Time used for ctc loss computation: " +
+            # str(util.timing.milliseconds_since(time_start_ctc_loss_computation)))
 
             # See: https://github.com/SeanNaren/deepspeech.pytorch/blob/master/train.py
             # The averaging seems to help learning (but a smaller learning rate
@@ -245,8 +246,8 @@ class Trainer:
                 examples_processed = (i + 1) * batch_size
                 total_examples = len(train_loader.dataset)
                 print("Processed " + str(examples_processed) + " of " + str(total_examples) + " examples in this epoch")
-                print(">>> Time used in current epoch: " +
-                      str(util.timing.time_since_and_expected_remaining_time(time_start, percent)))
+                # print(">>> Time used in current epoch: " +
+                #       str(util.timing.time_since_and_expected_remaining_time(time_start, percent)))
                 sys.stdout.flush()
 
     def get_real_model(self):

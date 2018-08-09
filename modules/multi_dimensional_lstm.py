@@ -235,12 +235,18 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             mdlstm_examples_packing = \
                 MDLSTMExamplesPacking.created_mdlstm_examples_packing(examples, 1)
             if self.compute_multi_directional():
+                # time_start_packing = util.timing.date_time_start()
+
                 skewed_images_variable, mask = mdlstm_examples_packing. \
                     create_vertically_and_horizontally_packed_examples_four_directions_plus_mask(examples)
                 if skewed_images_variable.size(1) != 4 * self.input_channels:
                     raise RuntimeError("Error: expected the 4 images for four directions to be stacked on "
                                        "the second (channel) dimension")
                 number_of_images = 4
+
+                # print("multi_dimensional_lstm - Time used for examples packing: "
+                #      + str(util.timing.milliseconds_since(time_start_packing)))
+
             else:
                 skewed_images_variable, mask = mdlstm_examples_packing.\
                     create_vertically_and_horizontally_packed_examples_and_mask_one_direction(examples)
@@ -356,7 +362,6 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                                                         previous_memory_state_column,
                                                                         valid_entries_selection_mask_previous_column)
 
-
             # Compute convolution on previous state column vector padded with zeros
             # Compute convolution on previous state column vector padded with zeros
             input_hidden_state_column = mdlstm_parameters.get_input_hidden_state_column()
@@ -367,8 +372,6 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             input_state_plus_input = MultiDimensionalRNNBase.\
                 compute_states_plus_input(input_matrices.input_input_matrix, column_index,
                                           input_hidden_state_column)
-
-
 
             # Compute the sum of weighted inputs of the input gate
             input_gate_weighted_states_plus_input = MultiDimensionalLSTM.\
@@ -402,8 +405,6 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
 
             # print("input and input gate combined: " + str(input_and_input_gate_combined))
-
-
 
             memory_states_column_forget_gate_one = previous_memory_state_column
 
@@ -616,11 +617,14 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # print("in loop: previous_hidden_state_column.grad_fn: " + str(previous_hidden_state_column.grad_fn))
 
         if self.use_example_packing:
+            # time_start_unpacking = util.timing.date_time_start()
             activations_unskewed = mdlstm_examples_packing.\
                 extract_unskewed_examples_activations_from_activation_columns(activations)
             # print("len(activations_unskewed: " + str(len(activations_unskewed)))
             # for tensor in activations_unskewed:
             #     print("MDLSTM with packing output activations tensor size: " + str(tensor.size()))
+            # print("multi_dimensional_lstm - Time used for examples unpacking: "
+            #       + str(util.timing.milliseconds_since(time_start_unpacking)))
         else:
             # print(">>> x.size(): " + str(x.size()))
             original_image_columns = x.size(3)
@@ -638,13 +642,15 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         # https://discuss.pytorch.org/t/is-there-a-way-to-parallelize-independent-sequential-steps/3360
 
     def forward_multi_directional_multi_dimensional_lstm(self, x):
+
+        # time_start_network_forward = util.timing.date_time_start()
+
         # # print("list(x.size()): " + str(list(x.size())))
         #
         # # Original order
         # activations_unskewed_direction_one = self.\
         #     compute_multi_dimensional_lstm_one_direction(self.mdlstm_parameters, x)
         #
-        # # Fixme: This does not work with example packing
         #
         # # Flipping 2nd dimension
         # height_flipping = util.tensor_flipping.TensorFlipping.create_tensor_flipping(True, False)
@@ -680,7 +686,12 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         # print("len(activations_unskewed: " + str(len(activations_unskewed)))
         # print("activations_unskewed.size(): " + str(activations_unskewed.size()))
 
-        return MDLSTMExamplesPacking.extract_flipped_back_activations_from_unskewed_activations(activations_unskewed)
+        result = MDLSTMExamplesPacking.extract_flipped_back_activations_from_unskewed_activations(activations_unskewed)
+
+        # print("multi_dimensional_lstm - Time used for network forward: "
+        #       + str(util.timing.milliseconds_since(time_start_network_forward)))
+
+        return result
 
     @staticmethod
     def compute_weighted_input_input_gate(column_number, input_gate_input_matrix, mdlstm_parameters):

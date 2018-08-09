@@ -422,9 +422,86 @@ class ImageInputTransformer:
 
         activations_unskewed = torch.stack(activation_columns_list, 2)
 
-        # activations_unskewed = MultiDimensionalRNNBase.break_activations_unskewed(activations_unskewed)
+        return activations_unskewed
+
+
+    @staticmethod
+    def get_all_activation_rows_concatenated_unskewing_split_list(activations_as_tensor,
+                                                                  original_image_columns: int,
+                                                                  skewed_image_rows: int):
+
+        split_list = list([])
+
+        print("activations_as_tensor.size(): " + str(activations_as_tensor.size()))
+
+        split_list.append(original_image_columns)
+        tail_padding_length = activations_as_tensor.size(3) - original_image_columns
+        if tail_padding_length > 0:
+            split_list.append(tail_padding_length)
+
+        for row_number in range(1, skewed_image_rows):
+            head_padding_length = row_number
+            tail_padding_length = activations_as_tensor.size(3) - original_image_columns - head_padding_length
+            split_list.extend(list([head_padding_length, original_image_columns]))
+            if tail_padding_length > 0:
+                split_list.append(tail_padding_length)
+        return split_list
+
+    @staticmethod
+    def get_activation_and_padding_parts(activations_as_tensor, split_list):
+        activations_as_tensor_rows = torch.split(activations_as_tensor, 1, 2)
+        activations_as_tensor_rows_concatenated = torch.cat(activations_as_tensor_rows, 3)
+        activation_and_padding_parts = torch.split(activations_as_tensor_rows_concatenated,
+                                                   split_list, 3)
+        return activation_and_padding_parts
+
+    @staticmethod
+    def get_activation_parts_from_activation_and_padding_parts_list(activations_as_tensor,
+                                                                    original_image_columns: int,
+                                                                    skewed_image_rows,
+                                                                    activation_and_padding_parts
+                                                                    ):
+        activations_unskewed_cat_list = list([])
+        activations_unskewed_cat_list.append(activation_and_padding_parts[0])
+
+        index = 1
+        tail_padding_length = activations_as_tensor.size(3) - original_image_columns
+        if tail_padding_length > 0:
+            index += 2
+        for row_number in range(1, skewed_image_rows):
+            activations_unskewed_cat_list.append(activation_and_padding_parts[index])
+            index += 3
+        return activations_unskewed_cat_list
+
+
+    """
+    Alternative implementation of extract_unskewed_activations_from_activation_tensor,
+    which avoids slicing, instead concatenating all activation_as_tensor rows in the
+    width direction, splitting this long tensor using a special activation and padding
+    parts split list, and finally extracting the activation parts from the activation
+    and padding parts
+    """
+    @staticmethod
+    def extract_unskewed_activations_from_activation_tensor_alternative(activations_as_tensor,
+                                                                        original_image_columns: int):
+        skewed_image_rows = activations_as_tensor.size(2)
+        split_list = ImageInputTransformer.\
+            get_all_activation_rows_concatenated_unskewing_split_list(activations_as_tensor,
+                                                                      original_image_columns,
+                                                                      skewed_image_rows)
+
+        activation_and_padding_parts = \
+            ImageInputTransformer.get_activation_and_padding_parts(activations_as_tensor, split_list)
+
+        activations_row_tensors = ImageInputTransformer.\
+            get_activation_parts_from_activation_and_padding_parts_list(activations_as_tensor,
+                                                                        original_image_columns,
+                                                                        skewed_image_rows,
+                                                                        activation_and_padding_parts)
+        activations_unskewed = torch.cat(activations_row_tensors, 2)
 
         return activations_unskewed
+
 
     # activation_columns is a list of activation columns
     @staticmethod
