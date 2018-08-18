@@ -34,34 +34,51 @@ class MultiDimensionalLSTMParametersBase(Module):
     def prepare_input_convolutions(self, skewed_images_variable):
         raise RuntimeError("not implemented")
 
-    @abstractmethod
-    def cleanup_input_convolution_results(self):
-        raise RuntimeError("not implemented")
-
     # Needs to be implemented in the subclasses
     @abstractmethod
     def prepare_computation_next_column_functions(self, previous_hidden_state_column,
                                                   previous_memory_state_column):
         raise RuntimeError("not implemented")
 
-    @abstractmethod
-    def get_input_input_matrix(self):
-        raise RuntimeError("not implemented")
+    # @abstractmethod
+    # def get_input_input_matrix(self):
+    #     raise RuntimeError("not implemented")
 
     @abstractmethod
-    def get_input_gate_input_matrix(self):
+    def get_input_input_column(self, column_index):
         raise RuntimeError("not implemented")
 
-    @abstractmethod
-    def get_forget_gate_one_input_matrix(self):
-        raise RuntimeError("not implemented")
+
+    # @abstractmethod
+    # def get_input_gate_input_matrix(self):
+    #     raise RuntimeError("not implemented")
 
     @abstractmethod
-    def get_forget_gate_two_input_matrix(self):
+    def get_input_gate_input_column(self, column_index):
         raise RuntimeError("not implemented")
 
+    # @abstractmethod
+    # def get_forget_gate_one_input_matrix(self):
+    #     raise RuntimeError("not implemented")
+
     @abstractmethod
-    def get_output_gate_input_matrix(self):
+    def get_forget_gate_one_input_column(self, column_index):
+        raise RuntimeError("not implemented")
+
+    # @abstractmethod
+    # def get_forget_gate_two_input_matrix(self):
+    #     raise RuntimeError("not implemented")
+
+    @abstractmethod
+    def get_forget_gate_two_input_column(self, column_index):
+        raise RuntimeError("not implemented")
+
+    # @abstractmethod
+    # def get_output_gate_input_matrix(self):
+    #     raise RuntimeError("not implemented")
+
+    @abstractmethod
+    def get_output_gate_input_column(self, column_index):
         raise RuntimeError("not implemented")
 
 
@@ -140,7 +157,49 @@ class MultiDimensionalLSTMParametersBase(Module):
         raise NotImplementedError
 
 
-class OneDirectionalMultiDimensionalLSTMParametersBase(MultiDimensionalLSTMParametersBase):
+class MDLSTMParametersPrecomputedInputMatricesBase(MultiDimensionalLSTMParametersBase):
+    def __init__(self, hidden_states_size,
+                 input_channels: int, use_dropout: bool):
+        super(MDLSTMParametersPrecomputedInputMatricesBase, self).__init__(
+            hidden_states_size, input_channels, use_dropout)
+
+    @abstractmethod
+    def get_input_input_matrix(self):
+        raise RuntimeError("not implemented")
+
+    def get_input_input_column(self, column_index):
+        return self.get_input_input_matrix()[:, :, :, column_index]
+
+    @abstractmethod
+    def get_input_gate_input_matrix(self):
+        raise RuntimeError("not implemented")
+
+    def get_input_gate_input_column(self, column_index):
+        return self.get_input_gate_input_matrix()[:, :, :, column_index]
+
+    @abstractmethod
+    def get_forget_gate_one_input_matrix(self):
+        raise RuntimeError("not implemented")
+
+    def get_forget_gate_one_input_column(self, column_index):
+        return self.get_forget_gate_one_input_matrix()[:, :, :, column_index]
+
+    @abstractmethod
+    def get_forget_gate_two_input_matrix(self):
+        raise RuntimeError("not implemented")
+
+    def get_forget_gate_two_input_column(self, column_index):
+        return self.get_forget_gate_two_input_matrix()[:, :, :, column_index]
+
+    @abstractmethod
+    def get_output_gate_input_matrix(self):
+        raise RuntimeError("not implemented")
+
+    def get_output_gate_input_column(self, column_index):
+        return self.get_output_gate_input_matrix()[:, :, :, column_index]
+
+
+class OneDirectionalMultiDimensionalLSTMParametersBase(MDLSTMParametersPrecomputedInputMatricesBase):
     def __init__(self, hidden_states_size,
                  input_channels: int, use_dropout: bool):
         super(OneDirectionalMultiDimensionalLSTMParametersBase, self).__init__(
@@ -155,6 +214,7 @@ class OneDirectionalMultiDimensionalLSTMParametersBase(MultiDimensionalLSTMParam
         return StateUpdateBlock.compute_weighted_state_input_state_one(
             self.output_gate_memory_state_convolution,
             previous_memory_state_column)
+
 
 
 class MultiDimensionalLSTMParametersOneDirection(OneDirectionalMultiDimensionalLSTMParametersBase):
@@ -194,6 +254,12 @@ class MultiDimensionalLSTMParametersOneDirection(OneDirectionalMultiDimensionalL
         # Xavier Glorot scheme
         self.initialize_input_convolutions_xavier_glorot()
 
+        self.input_input_matrix = None
+        self.input_gate_input_matrix = None
+        self.forget_gate_one_input_matrix = None
+        self.forget_gate_two_input_matrix = None
+        self.output_gate_input_matrix = None
+
         # TODO: Add dropout to the remaining layers
 
     def initialize_input_convolutions_xavier_glorot(self):
@@ -213,13 +279,15 @@ class MultiDimensionalLSTMParametersOneDirection(OneDirectionalMultiDimensionalL
     def prepare_input_convolutions(self, skewed_images_variable):
         self.skewed_images_variable = skewed_images_variable
 
-    def cleanup_input_convolution_results(self):
-        return
-
     def prepare_computation_next_column_functions(self, previous_hidden_state_column,
                                                   previous_memory_state_column):
         self.previous_hidden_state_column = previous_hidden_state_column
         self.previous_memory_state_column = previous_memory_state_column
+        self.input_input_matrix = self.get_input_input_matrix()
+        self.input_gate_input_matrix = self.get_input_gate_input_matrix()
+        self.forget_gate_one_input_matrix = self.get_forget_gate_one_input_matrix()
+        self.forget_gate_two_input_matrix = self.get_forget_gate_two_input_matrix()
+        self.output_gate_input_matrix = self.get_output_gate_input_matrix()
 
     def get_input_input_matrix(self):
         input_input_matrix = self.input_input_convolution(self.skewed_images_variable)
@@ -357,11 +425,6 @@ class MultiDimensionalLSTMParametersOneDirectionFast(OneDirectionalMultiDimensio
     def prepare_input_convolutions(self, skewed_images_variable):
         self.input_matrices = self.parallel_multiple_input_convolutions_computation.\
             compute_result_and_split_into_output_elements(skewed_images_variable)
-
-    def cleanup_input_convolution_results(self):
-        # Reset the value to None, so that the memory can be cleared,
-        # if there are no other users of these results
-        self.input_matrices = None
 
     def prepare_computation_next_column_functions(self, previous_hidden_state_column,
                                                   previous_memory_state_column,  mask: torch.Tensor):
@@ -517,11 +580,6 @@ class MultiDimensionalLSTMParametersOneDirectionFullyParallel(OneDirectionalMult
         self.input_matrices = self.parallel_multiple_input_convolutions_computation.\
             compute_result_and_split_into_output_elements(skewed_images_variable)
 
-    def cleanup_input_convolution_results(self):
-        # Reset the value to None, so that the memory can be cleared,
-        # if there are no other users of these results
-        self.input_matrices = None
-
     def prepare_computation_next_column_functions(self, previous_hidden_state_column,
                                                   previous_memory_state_column,  mask: torch.Tensor):
 
@@ -629,7 +687,7 @@ class MultiDimensionalLSTMParametersOneDirectionFullyParallel(OneDirectionalMult
 
 
 class MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution(
-     MultiDimensionalLSTMParametersBase):
+     MDLSTMParametersPrecomputedInputMatricesBase):
     NUMBER_OF_INPUT_CONVOLUTIONS_PER_DIRECTION = 5
     NUMBER_OF_PAIRED_HIDDEN_STATE_WEIGHTINGS = 5
     NUMBER_OF_PAIRED_MEMORY_STATE_WEIGHTINGS = 2
@@ -640,9 +698,8 @@ class MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputCon
                  parallel_hidden_and_memory_state_column_computation
 
                  ):
-        super(MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution, self).__init__(hidden_states_size,
-                                                                                                                 input_channels,
-                                                                                                                 use_dropout)
+        super(MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution, self).\
+            __init__(hidden_states_size, input_channels, use_dropout)
         self.number_of_directions = number_of_directions
 
         self.parallel_multiple_input_convolutions_computations = parallel_multiple_input_convolutions_computations
@@ -715,7 +772,8 @@ class MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputCon
         return parallel_multiple_input_convolutions_computations
 
     def prepare_input_convolutions(self, skewed_images_variable):
-        # print("Entered MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.prepare_input_convolutions...")
+        print("Entered MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution."
+              "prepare_input_convolutions...")
 
         if TensorUtils.number_of_dimensions(skewed_images_variable) != 4:
             raise RuntimeError("Error: prepare_input_convolution requires 4 dimensional input")
@@ -767,12 +825,6 @@ class MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputCon
                                    NUMBER_OF_INPUT_CONVOLUTIONS_PER_DIRECTION)
                                )
 
-        # Finally concatenate back the input matrices
-
-    def cleanup_input_convolution_results(self):
-        # Reset the value to None, so that the memory can be cleared,
-        # if there are no other users of these results
-        self.input_matrices = None
 
     """
     This method takes a list of lists of tensors, and pairs the elements with the same 
