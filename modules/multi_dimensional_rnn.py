@@ -315,10 +315,9 @@ class MultiDimensionalRNNBase(torch.nn.Module):
         return state_column
 
     @staticmethod
-    def compute_states_plus_input(input_matrix, column_number, state_columns_combined):
+    def compute_states_plus_input(input_column,  state_columns_combined):
         # print("compute_states_plus_input - input_matrix.size(): " + str(input_matrix.size()))
 
-        input_column = input_matrix[:, :, :, column_number]
         # print("input_column.size(): " + str(input_column.size()))
         # print("state_columns_combined.size(): " + str(state_columns_combined.size()))
         state_plus_input = state_columns_combined + input_column
@@ -389,8 +388,8 @@ class MultiDimensionalRNNAbstract(MultiDimensionalRNNBase):
             state_columns_combined = self._compute_weighted_states_input_summed(previous_hidden_state_column)
 
             # print("state_column.size(): " + str(state_column.size()))
-            state_plus_input = MultiDimensionalRNNBase.compute_states_plus_input(input_matrix,
-                                                                                 column_number,
+            input_column = input_matrix[:, :, :, column_number]
+            state_plus_input = MultiDimensionalRNNBase.compute_states_plus_input(input_column,
                                                                                  state_columns_combined)
             activation_column = self.get_activation_function()(state_plus_input)
             #print("activation column: " + str(activation_column))

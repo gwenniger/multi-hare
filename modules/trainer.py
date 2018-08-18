@@ -246,8 +246,8 @@ class Trainer:
                 examples_processed = (i + 1) * batch_size
                 total_examples = len(train_loader.dataset)
                 print("Processed " + str(examples_processed) + " of " + str(total_examples) + " examples in this epoch")
-                # print(">>> Time used in current epoch: " +
-                #       str(util.timing.time_since_and_expected_remaining_time(time_start, percent)))
+                print(">>> Time used in current epoch: " +
+                      str(util.timing.time_since_and_expected_remaining_time(time_start, percent)))
                 sys.stdout.flush()
 
     def get_real_model(self):

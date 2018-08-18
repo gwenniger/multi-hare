@@ -30,11 +30,10 @@ class MultiDirectionalMDLSTMTest:
         input_channels = 1
         hidden_states_size = 2
 
-        multi_directional_mdlstm = MultiDimensionalLSTM.\
-            create_multi_dimensional_lstm_parallel_with_separate_input_convolution(
-                layer_index=0, input_channels=input_channels, hidden_states_size=hidden_states_size,
-                compute_multi_directional=True, clamp_gradients=False, use_dropout=False,
-                use_example_packing=True, nonlinearity="tanh")
+        multi_directional_mdlstm = MultiDimensionalLSTM.create_multi_dimensional_lstm_fully_parallel(
+            layer_index=0, input_channels=input_channels, hidden_states_size=hidden_states_size,
+            compute_multi_directional=True, clamp_gradients=False, use_dropout=False,
+            use_example_packing=True, nonlinearity="tanh")
 
         return MultiDirectionalMDLSTMTest(multi_directional_mdlstm)
 

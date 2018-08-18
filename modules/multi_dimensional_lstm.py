@@ -11,9 +11,12 @@ from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParame
 from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParametersCreator
 from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParametersCreatorSlow
 from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParametersCreatorFast
-from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParametersCreatorFullyParallel
-from modules.multi_dimensional_lstm_parameters import MultiDirectionalMultiDimensionalLSTMParametersFullyParallel
 from modules.multi_dimensional_lstm_parameters import MultiDirectionalMultiDimensionalLSTMParametersCreatorFullyParallel
+from modules.multi_dimensional_lstm_parameters import MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution
+from modules.multi_dimensional_lstm_parameters import \
+    MultiDirectionalMultiDimensionalLSTMParametersCreatorParallelWithSeparateInputConvolution
+from modules.multi_dimensional_lstm_parameters import \
+    MultiDirectionalMultiDimensionalLSTMParametersFullyParallel
 from util.image_input_transformer import ImageInputTransformer
 from modules.inside_model_gradient_clipping import InsideModelGradientClamping
 from util.tensor_utils import TensorUtils
@@ -176,6 +179,33 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                     nonlinearity)
 
     @staticmethod
+    def create_multi_dimensional_lstm_parallel_with_separate_input_convolution(
+            layer_index: int, input_channels: int, hidden_states_size: int,
+            compute_multi_directional: bool,
+            clamp_gradients: bool,
+            use_dropout: bool,
+            use_example_packing: bool,
+            nonlinearity="tanh"):
+
+        if compute_multi_directional:
+            mult_dimensional_lstm_parameters_creater = \
+                MultiDirectionalMultiDimensionalLSTMParametersCreatorParallelWithSeparateInputConvolution()
+        else:
+            mult_dimensional_lstm_parameters_creater = MultiDimensionalLSTMParametersCreatorFast()
+
+        mdlstm_parameters = MultiDimensionalLSTM.create_mdlstm_paramters(
+            mult_dimensional_lstm_parameters_creater,
+            compute_multi_directional, hidden_states_size, input_channels,
+            use_dropout, clamp_gradients)
+
+        return MultiDimensionalLSTM(layer_index, input_channels, hidden_states_size, compute_multi_directional,
+                                    clamp_gradients, use_dropout,
+                                    True,
+                                    mdlstm_parameters,
+                                    use_example_packing,
+                                    nonlinearity)
+
+    @staticmethod
     def create_multi_dimensional_lstm_fully_parallel(
             layer_index: int, input_channels: int, hidden_states_size: int,
             compute_multi_directional: bool,
@@ -188,7 +218,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             mult_dimensional_lstm_parameters_creater = \
                 MultiDirectionalMultiDimensionalLSTMParametersCreatorFullyParallel()
         else:
-            mult_dimensional_lstm_parameters_creater = MultiDimensionalLSTMParametersCreatorFast()
+            raise RuntimeError("Not implemented")
 
         mdlstm_parameters = MultiDimensionalLSTM.create_mdlstm_paramters(
             mult_dimensional_lstm_parameters_creater,
@@ -205,9 +235,14 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
     def create_one_directional_mdlstms_from_multi_directional_mdlstm(self):
         if not self.compute_multi_directional():
             raise RuntimeError("Error: only allowed for multi-directional MDLSTM")
-        if not isinstance(self.mdlstm_parameters, MultiDirectionalMultiDimensionalLSTMParametersFullyParallel):
+        if not (isinstance(self.mdlstm_parameters,
+                          MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution) \
+                or isinstance(self.mdlstm_parameters,
+                          MultiDirectionalMultiDimensionalLSTMParametersFullyParallel)):
             raise RuntimeError("Error: method only implemented for multi-directional MDSLTM with "
-                               "parameters of type MultiDirectionalMultiDimensionalLSTMParametersFullyParallel")
+                               "parameters of type MultiDirectionalMultiDimensionalLSTMParametersFullyParallel"
+                               "or of type  "
+                               "MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution")
 
         result = list([])
 
@@ -369,13 +404,14 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # print("input_hidden_state_column.size(): " + str(input_hidden_state_column.size()))
             # print("input_hidden_state_column: " + str(input_hidden_state_column))
 
+            input_column = input_matrices.input_input_matrix[:, :, :, column_index]
             input_state_plus_input = MultiDimensionalRNNBase.\
-                compute_states_plus_input(input_matrices.input_input_matrix, column_index,
-                                          input_hidden_state_column)
+                compute_states_plus_input(input_column, input_hidden_state_column)
 
             # Compute the sum of weighted inputs of the input gate
+            input_gate_input_column = input_matrices.input_gate_input_matrix[:, :, :, column_index]
             input_gate_weighted_states_plus_input = MultiDimensionalLSTM.\
-                compute_weighted_input_input_gate(column_index, input_matrices.input_gate_input_matrix,
+                compute_weighted_input_input_gate(input_gate_input_column,
                                                   mdlstm_parameters)
 
             # Clamp before activation functions
@@ -408,10 +444,11 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
             memory_states_column_forget_gate_one = previous_memory_state_column
 
+            forget_gate_one_input_column = input_matrices.forget_gate_one_input_matrix[:, :, :, column_index]
             forget_gate_one_weighted_states_plus_input = self.compute_weighted_input_forget_gate(
                 mdlstm_parameters.get_forget_gate_one_hidden_state_column(),
                 mdlstm_parameters.get_forget_gate_one_memory_state_column(),
-                column_index, input_matrices.forget_gate_one_input_matrix)
+                forget_gate_one_input_column)
 
             if self.clamp_gradients:
                 forget_gate_one_weighted_states_plus_input = \
@@ -441,10 +478,11 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                 get_shifted_column_fast(previous_memory_state_column,
                                         self.clamp_gradients)
 
+            forget_gate_two_input_column = input_matrices.forget_gate_two_input_matrix[:, :, :, column_index]
             forget_gate_two_weighted_states_plus_input = self.compute_weighted_input_forget_gate(
                 mdlstm_parameters.get_forget_gate_two_hidden_state_column(),
                 mdlstm_parameters.get_forget_gate_two_memory_state_column(),
-                column_index, input_matrices.forget_gate_two_input_matrix)
+                forget_gate_two_input_column)
 
             if self.clamp_gradients:
                 forget_gate_two_weighted_states_plus_input = \
@@ -537,10 +575,10 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
 
             # Compute the sum of weighted inputs of the ouput gate
+            output_gate_input_column = input_matrices.output_gate_input_matrix[:, :, :, column_index]
             output_gate_weighted_states_plus_input = self. \
                 compute_weighted_input_output_gate(mdlstm_parameters, new_memory_state,
-                                                   column_index,
-                                                   input_matrices.output_gate_input_matrix)
+                                                   output_gate_input_column)
 
             if self.clamp_gradients:
                 output_gate_weighted_states_plus_input = \
@@ -694,8 +732,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         return result
 
     @staticmethod
-    def compute_weighted_input_input_gate(column_number, input_gate_input_matrix, mdlstm_parameters):
-        input_gate_input_column = input_gate_input_matrix[:, :, :, column_number]
+    def compute_weighted_input_input_gate(input_gate_input_column, mdlstm_parameters):
         input_gate_hidden_state_column = mdlstm_parameters.get_input_gate_hidden_state_column()
         input_gate_memory_state_column = mdlstm_parameters.get_input_gate_memory_state_column()
         input_gate_weighted_states_plus_weighted_input = input_gate_input_column + \
@@ -704,7 +741,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
     def compute_weighted_input_output_gate(self, mdlstm_parameters,
                                            previous_memory_state_column,
-                                           column_number, output_gate_input_matrix):
+                                           output_gate_input_column):
 
         if self.use_dropout:
             output_gate_memory_state_column = \
@@ -724,14 +761,13 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         return self.compute_weighted_input_forget_gate(
                 mdlstm_parameters.get_output_gate_hidden_state_column(),
                 output_gate_memory_state_column,
-                column_number, output_gate_input_matrix)
+                output_gate_input_column)
 
     @staticmethod
     def compute_weighted_input_forget_gate(forget_gate_hidden_state_column,
                                            forget_gate_memory_state_column,
-                                           column_number, forget_gate_input_matrix):
+                                           forget_gate_input_column):
 
-        forget_gate_input_column = forget_gate_input_matrix[:, :, :, column_number]
         forget_gate_weighted_states_plus_weighted_input = forget_gate_input_column + forget_gate_hidden_state_column + \
             forget_gate_memory_state_column
 
