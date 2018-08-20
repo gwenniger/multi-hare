@@ -1,7 +1,7 @@
 from modules.state_update_block import StateUpdateBlock
 from modules.parallel_multiple_state_weightings_computation import ParallelMultipleStateWeightingsComputation
 from modules.parallel_multiple_state_weightings_computation import \
-    ParallelMultipleStateWeightingsAndInputWeightingsComputation
+    ParallelMultipleInputWeightingsComputation
 from modules.parallel_multiple_input_convolutions_computation import ParallelMultipleInputConvolutionsComputation
 from abc import abstractmethod
 import torch.nn as nn
@@ -865,8 +865,10 @@ class MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputCon
 
     @staticmethod
     def num_paired_hidden_and_memory_state_weightings():
-        return MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution.NUMBER_OF_PAIRED_HIDDEN_STATE_WEIGHTINGS + \
-               MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution.NUMBER_OF_PAIRED_MEMORY_STATE_WEIGHTINGS
+        return MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution.\
+                   NUMBER_OF_PAIRED_HIDDEN_STATE_WEIGHTINGS + \
+                   MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution.\
+                   NUMBER_OF_PAIRED_MEMORY_STATE_WEIGHTINGS
 
     def get_next_node_hidden_state_columns(self, node_hidden_and_memory_state_columns):
 
@@ -1029,12 +1031,14 @@ class MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputCon
         return forget_gate_memory_state_column
 
     def number_of_hidden_and_memory_state_weights_per_direction(self):
-        return self.hidden_states_size * 2 * MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution.\
-            num_paired_hidden_and_memory_state_weightings()
+        return self.hidden_states_size * 2 * \
+               MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution.\
+               num_paired_hidden_and_memory_state_weightings()
 
     def number_of_input_weighting_weights_per_direction(self):
-        return self.hidden_states_size * MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution.\
-            NUMBER_OF_INPUT_CONVOLUTIONS_PER_DIRECTION
+        return self.hidden_states_size * \
+               MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution.\
+               NUMBER_OF_INPUT_CONVOLUTIONS_PER_DIRECTION
 
     def set_bias_forget_gates_hidden_states_input(self):
         relative_start_index = self.hidden_states_size * 2 * 2
@@ -1168,15 +1172,19 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
 
     def __init__(self, hidden_states_size, input_channels,
                  use_dropout: bool, number_of_directions: int,
-                 parallel_input_and_hidden_and_memory_state_column_computation
+                 parallel_hidden_and_memory_state_column_computation,
+                 parallel_input_column_computation
                  ):
         super(MultiDirectionalMultiDimensionalLSTMParametersFullyParallel, self).__init__(hidden_states_size,
                                                                                                                  input_channels,
                                                                                                                  use_dropout)
         self.number_of_directions = number_of_directions
 
-        self.parallel_input_and_hidden_and_memory_state_column_computation = \
-            parallel_input_and_hidden_and_memory_state_column_computation
+        self.parallel_hidden_and_memory_state_column_computation = \
+            parallel_hidden_and_memory_state_column_computation
+
+        self.parallel_input_column_computation = \
+            parallel_input_column_computation
 
         # Memory state convolutions
         self.output_gate_memory_state_convolution = nn.Conv1d(self.hidden_states_size * number_of_directions,
@@ -1184,49 +1192,72 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
                                                               groups=number_of_directions)
         nn.init.xavier_uniform_(self.output_gate_memory_state_convolution.weight)
 
-        self.input_matrices = None
+        self.input_columns = None
         self.node_hidden_state_columns = None
         self.node_memory_state_columns = None
         self.previous_memory_state_column = None
+        self.next_input_column_index = 0
+        self.skewed_images_variable = None
 
     @staticmethod
     def create_multi_directional_multi_dimensional_lstm_parameters_fully_parallel(
             hidden_states_size, input_channels, clamp_gradients: bool, use_dropout: bool, number_of_directions: int):
         print(">>>create_multi_directional_multi_dimensional_lstm_parameters_fully_parallel...")
 
-        parallel_input_and_hidden_and_memory_state_column_computation = \
+        parallel_hidden_and_memory_state_column_computation = \
             MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.\
-            create_parallel_input_and_hidden_and_memory_state_column_computation(hidden_states_size, clamp_gradients,
+            create_parallel_hidden_and_memory_state_column_computation(hidden_states_size, clamp_gradients,
                                                                                  use_dropout, number_of_directions)
+
+        parallel_input_column_computation = \
+            MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.\
+            create_parallel_input_column_computation(hidden_states_size, clamp_gradients,
+                                                     use_dropout, number_of_directions,
+                                                     input_channels)
+
 
         return MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
             hidden_states_size, input_channels, use_dropout, number_of_directions,
-            parallel_input_and_hidden_and_memory_state_column_computation)
+            parallel_hidden_and_memory_state_column_computation,
+            parallel_input_column_computation)
 
     @staticmethod
-    def create_parallel_input_and_hidden_and_memory_state_column_computation(
+    def create_parallel_input_column_computation(
+            hidden_states_size: int, clamp_gradients: bool,
+            use_dropout: bool, number_of_directions: int, input_channels: int):
+        number_of_single_input_weightings_per_group = list([])
+        for i in range(0, number_of_directions):
+            number_of_single_input_weightings_per_group.extend(list([
+                MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution.
+                    NUMBER_OF_INPUT_CONVOLUTIONS_PER_DIRECTION
+            ]))
+
+        parallel_input_column_computation = \
+            ParallelMultipleInputWeightingsComputation. \
+            create_parallel_multiple_input_weighting_computation(
+                    input_channels, hidden_states_size, number_of_single_input_weightings_per_group,
+                    clamp_gradients, use_dropout
+                )
+        return parallel_input_column_computation
+
+    @staticmethod
+    def create_parallel_hidden_and_memory_state_column_computation(
             hidden_states_size: int, clamp_gradients: bool,
             use_dropout: bool, number_of_directions: int):
         number_of_paired_input_weightings_per_group = list([])
-        number_of_single_input_weightings_per_group = list([])
         for i in range(0, number_of_directions):
             number_of_paired_input_weightings_per_group.extend(
                 list([MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution.
                      NUMBER_OF_PAIRED_HIDDEN_STATE_WEIGHTINGS,
                       MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution.
                       NUMBER_OF_PAIRED_MEMORY_STATE_WEIGHTINGS]))
-            number_of_single_input_weightings_per_group.extend(list([
-                    MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution.
-                    NUMBER_OF_INPUT_CONVOLUTIONS_PER_DIRECTION
-            ]))
 
-        parallel_input_and_hidden_and_memory_state_column_computation = \
-            ParallelMultipleStateWeightingsAndInputWeightingsComputation.\
-            create_parallel_multiple_state_weighting_and_input_weighting_computation(
+        parallel_hidden_and_memory_state_column_computation = \
+            ParallelMultipleStateWeightingsComputation.\
+            create_parallel_multiple_state_weighting_computation_multiple_groups(
                 hidden_states_size, number_of_paired_input_weightings_per_group,
-                clamp_gradients, use_dropout,
-                number_of_single_input_weightings_per_group)
-        return parallel_input_and_hidden_and_memory_state_column_computation
+                clamp_gradients, use_dropout)
+        return parallel_hidden_and_memory_state_column_computation
 
     @staticmethod
     def num_paired_hidden_and_memory_state_weightings():
@@ -1268,7 +1299,26 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
         return MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution. \
             concatenate_elements_list_of_lists_of_tuples_along_dimension(node_memory_state_columns_lists, 1)
 
+    def get_next_input_columns(self, input_columns):
+
+        input_columns_lists = list([])
+
+        number_of_input_convolutions_per_direction = MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution. \
+            NUMBER_OF_INPUT_CONVOLUTIONS_PER_DIRECTION
+
+        for i in range(0, self.number_of_directions):
+            offset = number_of_input_convolutions_per_direction * i
+            input_columns_for_direction = \
+                input_columns[offset:offset + number_of_input_convolutions_per_direction]
+            input_columns_lists.append(input_columns_for_direction)
+
+        return MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution. \
+            concatenate_elements_list_of_lists_along_dimension(input_columns_lists, 1)
+
     def prepare_input_convolutions(self, skewed_images_variable):
+        self.skewed_images_variable = skewed_images_variable
+        # print("self.skewed_images_variable.size(): " +
+        #       str(self.skewed_images_variable.size()))
         return
 
     def prepare_computation_next_column_functions(self, previous_hidden_state_column,
@@ -1290,6 +1340,11 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
                                                                        self.number_of_directions, 1)
         previous_memory_state_columns_split_by_direction = torch.chunk(previous_memory_state_column,
                                                                        self.number_of_directions, 1)
+        input_column = self.skewed_images_variable[:, :, :, self.next_input_column_index]
+
+        # print("prepare_computation_next_column_functions - input_column: " + str(input_column))
+        input_columns_split_by_direction = torch.chunk(input_column,
+                                                       self.number_of_directions, 1)
 
         computation_arguments_list = list([])
         for i in range(0, self.number_of_directions):
@@ -1297,25 +1352,37 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
             computation_arguments_list.append(previous_memory_state_columns_split_by_direction[i])
 
         node_hidden_and_memory_state_columns = \
-            self.parallel_input_and_hidden_and_memory_state_column_computation.\
+            self.parallel_hidden_and_memory_state_column_computation.\
             compute_result_and_split_into_pairs_with_second_pair_element_shifted_multiple_groups(
-                computation_arguments_list, mask)
+                computation_arguments_list,
+                mask)
+
+        input_convolution_result_columns = \
+            self.parallel_input_column_computation.\
+            compute_result_and_split_into_columns_multiple_groups(
+                    input_columns_split_by_direction)
 
         # Sanity check that the number of output pairs is as expected
         if len(node_hidden_and_memory_state_columns) != (MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution.
                                                          num_paired_hidden_and_memory_state_weightings() *
                                                          self.number_of_directions):
             raise RuntimeError("Error: there are " + str(self.number_of_directions) + " directions, " +
-                               "therefore expected " + MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution.
-                               num_paired_hidden_and_memory_state_weightings() + " * " + str(self.number_of_directions) +
-                               " output pairs")
+                               "therefore expected " +
+                               str(MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution.
+                                   num_paired_hidden_and_memory_state_weightings()) + " * " +
+                               str(self.number_of_directions) + " output pairs, but got" +
+                               str(len(node_hidden_and_memory_state_columns)))
 
         self.node_hidden_state_columns = self.get_next_node_hidden_state_columns(node_hidden_and_memory_state_columns)
         self.node_memory_state_columns = self.get_next_node_memory_state_columns(node_hidden_and_memory_state_columns)
+        self.input_columns = self.get_next_input_columns(input_convolution_result_columns)
 
         self.previous_memory_state_column = previous_memory_state_column
 
         # print("finished prepare_computation_next_column_functions")
+
+        # Increment the next input column index
+        self.next_input_column_index += 1
 
     def compute_output_gate_memory_state_weighted_input(self, previous_memory_state_column):
         if TensorUtils.number_of_dimensions(previous_memory_state_column) != 3:
@@ -1347,20 +1414,23 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
 
         return result_catted_on_channel_dimension
 
-    def get_input_input_matrix(self):
-        return self.input_matrices[0]
+    def get_input_input_column(self, column_index):
+        result =  self.input_columns[0]
+        # print("get_input_input_colum - result" + str(result))
+        # print("get_input_input_colum - result.size()" + str(result.size()))
+        return result
 
-    def get_input_gate_input_matrix(self):
-        return self.input_matrices[1]
+    def get_input_gate_input_column(self, column_index):
+        return self.input_columns[1]
 
-    def get_forget_gate_one_input_matrix(self):
-        return self.input_matrices[2]
+    def get_forget_gate_one_input_column(self, column_index):
+        return self.input_columns[2]
 
-    def get_forget_gate_two_input_matrix(self):
-        return self.input_matrices[3]
+    def get_forget_gate_two_input_column(self, column_index):
+        return self.input_columns[3]
 
-    def get_output_gate_input_matrix(self):
-        return self.input_matrices[4]
+    def get_output_gate_input_column(self, column_index):
+        return self.input_columns[4]
 
     def get_input_hidden_state_column(self):
         return self.node_hidden_state_columns[0]
@@ -1414,7 +1484,7 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
             offset = self.number_of_hidden_and_memory_state_weights_per_direction() * direction_index
 
             for index in range(offset + relative_start_index, offset + relative_end_index):
-                self.parallel_input_and_hidden_and_memory_state_column_computation.parallel_convolution.bias.data[index] = \
+                self.parallel_hidden_and_memory_state_column_computation.parallel_convolution.bias.data[index] = \
                     OneDirectionalMultiDimensionalLSTMParametersBase.FORGET_GATE_BIAS_INIT
             # print("after: self.parallel_hidden_state_column_computation.parallel_convolution.bias.data: " +
             #      str(self.parallel_hidden_state_column_computation.parallel_convolution.bias.data))
@@ -1433,7 +1503,7 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
             offset = self.number_of_hidden_and_memory_state_weights_per_direction() * direction_index
 
             for index in range(offset + relative_start_index, offset + relative_end_index):
-                self.parallel_input_and_hidden_and_memory_state_column_computation.parallel_convolution.bias.data[index] = \
+                self.parallel_hidden_and_memory_state_column_computation.parallel_convolution.bias.data[index] = \
                     OneDirectionalMultiDimensionalLSTMParametersBase.FORGET_GATE_BIAS_INIT
             # print("after: self.parallel_memory_state_column_computation.parallel_convolution.bias.data: " +
             #      str(self.parallel_memory_state_column_computation.parallel_convolution.bias.data))
@@ -1444,7 +1514,7 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
         self.set_bias_forget_gates_hidden_states_input()
 
     def set_training(self, training):
-        self.parallel_input_and_hidden_and_memory_state_column_computation.set_training(training)
+        self.parallel_hidden_and_memory_state_column_computation.set_training(training)
 
     def forward(self, x):
         raise NotImplementedError
@@ -1460,71 +1530,68 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
                 self.number_of_hidden_and_memory_state_weights_per_direction() * direction_index
             mdlstm_parameters_one_direction.parallel_hidden_and_memory_state_column_computation.\
                 parallel_convolution.bias.data[one_directional_mdlstm_index] =\
-                self.parallel_input_and_hidden_and_memory_state_column_computation.\
+                self.parallel_hidden_and_memory_state_column_computation.\
                 parallel_convolution.bias.data[multi_directional_mdlstm_index]
             mdlstm_parameters_one_direction.parallel_hidden_and_memory_state_column_computation.\
                 parallel_convolution.weight.data[one_directional_mdlstm_index, :, :] = \
-                self.parallel_input_and_hidden_and_memory_state_column_computation.parallel_convolution.\
+                self.parallel_hidden_and_memory_state_column_computation.parallel_convolution.\
                 weight.data[multi_directional_mdlstm_index, :, :]
 
     def copy_parallel_multiple_input_convolutions_computation_to_one_directional_mdlstm_parameters(
             self, mdlstm_parameters_one_direction, direction_index):
 
+        # print(">>> copy_parallel_multiple_input_convolutions_computation_to_one_directional_mdlstm_parameters...")
+
         # mdlstm_parameters_one_direction.parallel_multiple_input_convolutions_computation = \
         #                 self.parallel_multiple_input_convolutions_computations[direction_index]
 
+        # print(">>> direction_index: " + str(direction_index))
+        # print(">>>  self.number_of_input_weighting_weights_per_direction(): "
+        #       + str(self.number_of_input_weighting_weights_per_direction()))
 
-        print(">>> direction_index: " + str(direction_index))
-        print(">>>  self.number_of_input_weighting_weights_per_direction(): "
-              + str(self.number_of_input_weighting_weights_per_direction()))
-
-        initial_offset = self.number_of_hidden_and_memory_state_weights_per_direction() * 4
-
-        hidden_states_size = self.parallel_input_and_hidden_and_memory_state_column_computation.hidden_states_size
         relative_start_index = 0
-        relative_end_index = int(self.number_of_input_weighting_weights_per_direction() / hidden_states_size)
+        relative_end_index = self.number_of_input_weighting_weights_per_direction()
         for one_directional_mdlstm_index in range(relative_start_index, relative_end_index):
             multi_directional_mdlstm_index = \
                 one_directional_mdlstm_index + \
-                self.number_of_input_weighting_weights_per_direction() * direction_index + \
-                initial_offset
+                self.number_of_input_weighting_weights_per_direction() * direction_index
             mdlstm_parameters_one_direction.parallel_multiple_input_convolutions_computation.\
                 parallel_convolution.bias.data[one_directional_mdlstm_index] = \
-                self.parallel_input_and_hidden_and_memory_state_column_computation.\
+                self.parallel_input_column_computation.\
                 parallel_convolution.bias.data[multi_directional_mdlstm_index]
 
-            begin_index = (one_directional_mdlstm_index * hidden_states_size)
-            end_index = ((one_directional_mdlstm_index + 1) * hidden_states_size)
+            # print("one_directional_mdlstm_index: " + str(one_directional_mdlstm_index))
+            # print("multi_directional_mdlstm_index: " + str(multi_directional_mdlstm_index))
+            #
+            # print(" mdlstm_parameters_one_direction.parallel_hidden_and_memory_state_column_computation.\
+            #                         parallel_convolution.weight.data.size()" +
+            #       str(mdlstm_parameters_one_direction.parallel_hidden_and_memory_state_column_computation.\
+            #           parallel_convolution.weight.data.size()))
+            # print(" mdlstm_parameters_one_direction.parallel_multiple_input_convolutions_computation.\
+            #                 parallel_convolution.weight.data.size()" +
+            #       str(mdlstm_parameters_one_direction.parallel_multiple_input_convolutions_computation. \
+            #           parallel_convolution.weight.data.size()))
+            # print(" mdlstm_parameters_one_direction.parallel_multiple_input_convolutions_computation.\
+            #     parallel_convolution.weight.data[one_directional_mdlstm_index, :, :].size()" +
+            #       str( mdlstm_parameters_one_direction.parallel_multiple_input_convolutions_computation.\
+            #     parallel_convolution.weight.data[one_directional_mdlstm_index, :, :].size()))
+            # print("self.parallel_input_and_hidden_and_memory_state_column_computation.parallel_convolution. \
+            #     weight.data[multi_directional_mdlstm_index, :, :].size(): " +
+            #       str(self.parallel_hidden_and_memory_state_column_computation.parallel_convolution. \
+            #         weight.data[multi_directional_mdlstm_index, :, :].size()))
 
-            print("begin_index: " + str(begin_index))
-            print("end_index: " + str(end_index))
+            # print(" mdlstm_parameters_one_direction.parallel_multiple_input_convolutions_computation.\
+            #     parallel_convolution.weight.data[begin_index:end_index, :, :, :].size()" +
+            #       str(mdlstm_parameters_one_direction.parallel_multiple_input_convolutions_computation.\
+            #     parallel_convolution.weight.data[begin_index:end_index, :, :, :].size()))
 
-
-            print("multi_directional_mdlstm_index: " + str(multi_directional_mdlstm_index))
-
-            print(" mdlstm_parameters_one_direction.parallel_multiple_input_convolutions_computation.\
-                parallel_convolution.weight.data[one_directional_mdlstm_index, :, :].size()" +
-                  str( mdlstm_parameters_one_direction.parallel_multiple_input_convolutions_computation.\
-                parallel_convolution.weight.data[one_directional_mdlstm_index, :, :].size()))
-            print("self.parallel_input_and_hidden_and_memory_state_column_computation.parallel_convolution. \
-                weight.data[multi_directional_mdlstm_index, :, :].size(): " +
-                  str(self.parallel_input_and_hidden_and_memory_state_column_computation.parallel_convolution. \
-                    weight.data[multi_directional_mdlstm_index, :, :].size()))
-
-            print(" mdlstm_parameters_one_direction.parallel_multiple_input_convolutions_computation.\
-                parallel_convolution.weight.data[begin_index:end_index, :, :, :].size()" +
-                  str(mdlstm_parameters_one_direction.parallel_multiple_input_convolutions_computation.\
-                parallel_convolution.weight.data[begin_index:end_index, :, :, :].size()))
-
-            print("self.parallel_input_and_hidden_and_memory_state_column_computation.parallel_convolution. \
-                weight.data.size(): " + str(self.parallel_input_and_hidden_and_memory_state_column_computation.parallel_convolution. \
-                weight.data.size()))
-
-
+            # print("self.parallel_input_column_computation.parallel_convolution.\
+            #     weight.data.size(): " + str(self.parallel_input_column_computation.
+            #                                 parallel_convolution.weight.data.size()))
 
             mdlstm_parameters_one_direction.parallel_multiple_input_convolutions_computation.\
-                parallel_convolution.weight.data[begin_index:end_index, :, 0, 0] = \
-                self.parallel_input_and_hidden_and_memory_state_column_computation.parallel_convolution. \
+                parallel_convolution.weight.data[one_directional_mdlstm_index, :, 0, 0] = \
+                self.parallel_input_column_computation.parallel_convolution. \
                 weight.data[multi_directional_mdlstm_index, :, :]
 
     def copy_output_gate_memory_state_convolution_to_one_directional_mdlstm_parameters(

@@ -29,6 +29,7 @@ class MultiDirectionalMDLSTMTest:
     def create_multi_directional_mdlstm_test():
         input_channels = 1
         hidden_states_size = 2
+        # hidden_states_size = 1
 
         multi_directional_mdlstm = MultiDimensionalLSTM.create_multi_dimensional_lstm_fully_parallel(
             layer_index=0, input_channels=input_channels, hidden_states_size=hidden_states_size,
@@ -103,36 +104,50 @@ class MultiDirectionalMDLSTMTest:
     @staticmethod
     def assert_input_convolution_weights_are_equal(multi_directional_mdlstm, one_directional_mdlstm,
                                                    direction_index: int):
-        multi_directional_mdlstm_input_convolution_computation =\
-            multi_directional_mdlstm.mdlstm_parameters. \
-            parallel_multiple_input_convolutions_computations[direction_index]
+        multi_directional_mdlstm_parallel_input_column_computation = \
+            multi_directional_mdlstm.mdlstm_parameters.parallel_input_column_computation
 
-        #parallel_multiple_input_convolutions_computations
-        #
-        # out_channels_size = multi_directional_mdlstm_input_convolution_computation.\
-        #     parallel_convolution.weight.size(0)
-        # out_channels_per_direction = out_channels_size / 4
-        # start_index = int(out_channels_per_direction * direction_index)
-        # end_index = int(out_channels_per_direction * (direction_index + 1))
-        #
-        # one_directional_weight_from_multi_directional =\
-        #     multi_directional_mdlstm_input_convolution_computation.parallel_convolution.weight[start_index:end_index,
-        #                                                                                        :, :, :]
+        full_size = multi_directional_mdlstm_parallel_input_column_computation.\
+            parallel_convolution.weight.size(0)
 
-        # one_directional_bias_from_multi_directional =\
-        #     multi_directional_mdlstm_input_convolution_computation.parallel_convolution.bias[start_index:end_index]
+        out_channels_size = full_size
+        out_channels_per_direction = int(out_channels_size / 4)
+        print("out_channels_per_direction: " + str(out_channels_per_direction))
+        start_index = int(out_channels_per_direction * direction_index)
+        end_index = int(out_channels_per_direction * (direction_index + 1))
+
+        print("start_index: " + str(start_index))
+        print("end_index: " + str(end_index))
+
+        multi_directional_mdlstm_weight_for_direction = \
+            multi_directional_mdlstm_parallel_input_column_computation.\
+            parallel_convolution.weight[start_index:end_index, :, :].unsqueeze(2)
+
+        multi_directional_mdlstm_bias_for_direction = \
+            multi_directional_mdlstm_parallel_input_column_computation.\
+            parallel_convolution.bias[start_index:end_index]
 
         one_directional_mdlstm_input_convolution_computation =\
             one_directional_mdlstm.mdlstm_parameters.parallel_multiple_input_convolutions_computation
 
+        print("multi_directional_mdlstm_weight_for_direction.size()" +
+              str(multi_directional_mdlstm_weight_for_direction.size()))
+
+        print("one_directional_mdlstm_input_convolution_computation.parallel_convolution.weight.size()" +
+              str(one_directional_mdlstm_input_convolution_computation.parallel_convolution.weight.size()))
+
         if not TensorUtils.tensors_are_equal(
-                multi_directional_mdlstm_input_convolution_computation.parallel_convolution.weight,
+                multi_directional_mdlstm_weight_for_direction,
                 one_directional_mdlstm_input_convolution_computation.parallel_convolution.weight):
-                raise RuntimeError("Error: the weight matrices for the input convolution computation for " +
-                                   "multi-directional MDLSTM and the corresponding one-directional MDLSTM" +
-                                   "are not the same")
+                raise RuntimeError("Error:  for direction " + str(direction_index) +
+                                   " the weight matrices for the input convolution computation for " +
+                                   "multi-directional MDLSTM" +
+                                   str(multi_directional_mdlstm_weight_for_direction) +
+                                   " and the corresponding one-directional MDLSTM" +
+                                   str(one_directional_mdlstm_input_convolution_computation.parallel_convolution.weight)
+                                   + "are not the same")
         if not TensorUtils.tensors_are_equal(
-                multi_directional_mdlstm_input_convolution_computation.parallel_convolution.bias,
+                multi_directional_mdlstm_bias_for_direction,
                 one_directional_mdlstm_input_convolution_computation.parallel_convolution.bias):
             raise RuntimeError("Error: the bias matrices for the input convolution computation for " +
                                "multi-directional MDLSTM and the corresponding one-directional MDLSTM" +
@@ -176,11 +191,11 @@ class MultiDirectionalMDLSTMTest:
     def assert_parallel_hidden_and_memory_state_column_computation_weights_are_equal(
             multi_directional_mdlstm, one_directional_mdlstm, direction_index: int):
         multi_directional_mdlstm_parallel_hidden_and_memory_state_column_computation = \
-            multi_directional_mdlstm.mdlstm_parameters. \
-                parallel_hidden_and_memory_state_column_computation
+            multi_directional_mdlstm.mdlstm_parameters.parallel_hidden_and_memory_state_column_computation
 
-        out_channels_size = multi_directional_mdlstm_parallel_hidden_and_memory_state_column_computation.\
-            parallel_convolution.weight.size(0)
+        out_channels_size = \
+            multi_directional_mdlstm_parallel_hidden_and_memory_state_column_computation.\
+            get_paired_input_weightings_output_size()
         out_channels_per_direction = out_channels_size / 4
         start_index = int(out_channels_per_direction * direction_index)
         end_index = int(out_channels_per_direction * (direction_index + 1))
