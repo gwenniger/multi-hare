@@ -9,7 +9,13 @@ import matplotlib.pyplot as plt
 import torch.nn.functional as F
 
 class HandwritingCenteringAndClipping:
-    TEST_IMAGE_PATH = "/datastore/data/handwriting-recognition/IAM-database/data/lines/a01/a01-000u/a01-000u-00.png"
+    #TEST_IMAGE_PATH = "/datastore/data/handwriting-recognition/IAM-database/data/lines/a01/a01-000u/a01-000u-00.png"
+    # TEST_IMAGE_PATH = "/datastore/data/handwriting-recognition/IAM-database/data/lines/a01/a01-000u/a01-000u-06.png"
+    # TEST_IMAGE_PATH = "/datastore/data/handwriting-recognition/IAM-database/data/" \
+    #                   "sentences/n03/n03-120/n03-120-s00-00.png"
+    TEST_IMAGE_PATH = "/datastore/data/handwriting-recognition/IAM-database/data/" \
+                      "sentences/n03/n03-120/n03-120-s00-04.png"
+#
 
     def __init__(self):
         return
@@ -36,6 +42,21 @@ class HandwritingCenteringAndClipping:
         return result
 
     @staticmethod
+    def find_first_index_with_higher_or_equal_value(one_dimensional_tensor: torch.Tensor,
+                                                    value):
+        for i in range(0, one_dimensional_tensor.size(0)):
+            if one_dimensional_tensor[i] >= value:
+                return i
+        return -1
+
+    @staticmethod
+    def find_first_index_with_higher_or_equal_value_back_to_front(one_dimensional_tensor: torch.Tensor,
+                                                                  value):
+        for i in range(one_dimensional_tensor.size(0) - 1, 0, -1):
+            if one_dimensional_tensor[i] >= value:
+                return i
+
+    @staticmethod
     def get_smoothed_ink_density_center_index(image_tensor: torch.Tensor):
         unsmoothed_ink_density = HandwritingCenteringAndClipping.\
             compute_unsmoothed_ink_density_for_image(image_tensor)
@@ -44,12 +65,34 @@ class HandwritingCenteringAndClipping:
         smoothed_density = HandwritingCenteringAndClipping.smooth_density(unsmoothed_ink_density)
         # HandwritingCenteringAndClipping.plot_density(smoothed_density)
         # https://discuss.pytorch.org/t/argmax-with-pytorch/1528
-        max, index =  torch.max(smoothed_density, 0)
+        smoothed_ink_density_max, index = torch.max(smoothed_density, 0)
+        print("highest ink density: " + str(smoothed_ink_density_max))
         print("row index highest ink density: " + str(index))
         image_tensor_with_marked_center = image_tensor.clone()
         image_tensor_with_marked_center[index, :] = 0
         print("The marked ink density center:")
         util.image_visualization.imshow_tensor_2d(image_tensor_with_marked_center.cpu())
+
+        smoothed_density_mean = np.mean(smoothed_density.numpy())
+        smoothed_density_std = np.std(smoothed_density.numpy())
+        print("Smoothed density standard mean: " + str(smoothed_density_mean))
+        print("Smoothed density standard deviation: " + str(smoothed_density_std))
+
+        min_accepted_ink_density = smoothed_ink_density_max - 2.9 * smoothed_density_std
+
+        clipping_bottom_index = HandwritingCenteringAndClipping.\
+            find_first_index_with_higher_or_equal_value(smoothed_density, min_accepted_ink_density)
+        clipping_top_index = HandwritingCenteringAndClipping. \
+            find_first_index_with_higher_or_equal_value_back_to_front(smoothed_density, min_accepted_ink_density)
+
+        image_tensor_with_marked_center_and_clipping = image_tensor_with_marked_center.clone()
+        image_tensor_with_marked_center_and_clipping[clipping_bottom_index, :] = 0
+        image_tensor_with_marked_center_and_clipping[clipping_top_index, :] = 0
+        print("The marked clipping borders:")
+        util.image_visualization.imshow_tensor_2d(image_tensor_with_marked_center_and_clipping.cpu())
+        print("The clipped image:")
+        clipped_image = image_tensor[clipping_bottom_index:clipping_top_index, :]
+        util.image_visualization.imshow_tensor_2d(clipped_image.cpu())
 
 
     @staticmethod
