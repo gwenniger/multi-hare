@@ -597,8 +597,8 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
     # device_ids should include device!
     # device_ids lists all the gpus that may be used for parallelization
     # device is the initial device the model will be put on
-    device_ids = [0, 1]
-    # device_ids = [0]
+    # device_ids = [0, 1]
+    device_ids = [0]
 
     # assert compute_multi_directional
 
@@ -804,7 +804,7 @@ def iam_line_recognition(model_opt, checkpoint):
         # With the improved padding, the height of the images is 128,
         # and memory usage is less, so batch_size 30 instead of 20 is possible,
         # but it is only slightly faster (GPU usage appears to be already maxed out)
-        batch_size = 30
+        batch_size = 4
 
         #lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
         lines_file_path = model_opt.iam_database_lines_file_path
@@ -829,12 +829,19 @@ def iam_line_recognition(model_opt, checkpoint):
         permutation_save_or_load_file_path = opt.data_permutation_file_path
 
         image_input_is_unsigned_int = False
+        minimize_vertical_padding = True
+        minimize_horizontal_padding = True
+        perform_horizontal_batch_padding_in_data_loader = False
         train_loader, validation_loader, test_loader = iam_lines_dataset.\
             get_random_train_set_validation_set_test_set_data_loaders(batch_size, train_examples_fraction,
                                                                       validation_examples_fraction,
                                                                       test_examples_fraction,
                                                                       permutation_save_or_load_file_path,
-                                                                      image_input_is_unsigned_int)
+                                                                      minimize_vertical_padding,
+                                                                      minimize_horizontal_padding,
+                                                                      image_input_is_unsigned_int,
+                                                                      perform_horizontal_batch_padding_in_data_loader
+                                                                      )
         print("Loading IAM dataset: DONE")
 
         # test_mdrnn_cell()
@@ -849,7 +856,7 @@ def iam_line_recognition(model_opt, checkpoint):
         # Possibly a batch size of 128 leads to more instability in training?
         #batch_size = 128
 
-        compute_multi_directional = False
+        compute_multi_directional = True
         # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
         use_dropout = False
 
@@ -859,11 +866,18 @@ def iam_line_recognition(model_opt, checkpoint):
         # https://discuss.pytorch.org/t/about-torch-nn-utils-clip-grad-norm/13873
         # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191
 
-        input_size = SizeTwoDimensional.create_size_two_dimensional(input_height, input_width)
+        use_example_packing = True
+        use_block_mdlstm = opt.use_block_mdlstm
         #with torch.autograd.profiler.profile(use_cuda=False) as prof:
-        train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels, input_size, hidden_states_size,
+        train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels,
+                        hidden_states_size,
                         batch_size, compute_multi_directional, use_dropout, vocab_list, blank_symbol,
-                        image_input_is_unsigned_int, "IAM")
+                        image_input_is_unsigned_int, "IAM",
+                        minimize_horizontal_padding,
+                        use_example_packing,
+                        use_block_mdlstm,
+                        perform_horizontal_batch_padding_in_data_loader
+                        )
 
 
 def iam_word_recognition(model_opt, checkpoint):
@@ -944,6 +958,9 @@ def iam_word_recognition(model_opt, checkpoint):
                     use_example_packing,
                     use_block_mdlstm,
                     perform_horizontal_batch_padding_in_data_loader)
+
+
+
     # train_mdrnn_no_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
     #                 compute_multi_directional, use_dropout, vocab_list)
 

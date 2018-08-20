@@ -772,8 +772,8 @@ class MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputCon
         return parallel_multiple_input_convolutions_computations
 
     def prepare_input_convolutions(self, skewed_images_variable):
-        print("Entered MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution."
-              "prepare_input_convolutions...")
+        # print("Entered MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution."
+        #       "prepare_input_convolutions...")
 
         if TensorUtils.number_of_dimensions(skewed_images_variable) != 4:
             raise RuntimeError("Error: prepare_input_convolution requires 4 dimensional input")

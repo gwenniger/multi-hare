@@ -4,6 +4,7 @@ class StringToIndexMappingTable:
 
     #    BLANK_SYMBOL = "<BLANK>"
     BLANK_SYMBOL = "_"
+    WORD_KEY_SEPARATOR = "|||"
 
     def __init__(self, string_to_index_map: dict, index_to_string_table: list, last_added_index: int):
         self.string_to_index_map = string_to_index_map
@@ -64,7 +65,7 @@ class StringToIndexMappingTable:
         print("Saving string to index mapping table to file: " + table_output_file_path + " ...")
         with open(table_output_file_path, "w") as output_file:
             for index in range(0, len(self.index_to_string_table)):
-                output_file.write(str(index) + " " + self.index_to_string_table[index] + "\n")
+                output_file.write(str(index) + StringToIndexMappingTable.WORD_KEY_SEPARATOR + self.index_to_string_table[index] + "\n")
             output_file.close()
         print("Done")
 
@@ -79,11 +80,16 @@ class StringToIndexMappingTable:
 
         with open(input_file_path) as f:
             content = f.readlines()
+
+            # https://stackoverflow.com/questions/12330522/reading-a-file-without-newlines
+            new_line_stripped_lines = [line.rstrip('\n') for line in content]
+
             line_index = 0
-            for line in content:
+            for line in new_line_stripped_lines:
                 if len(line.strip()) > 0:
 
-                    parts = line.split(" ")
+                    parts = line.split(StringToIndexMappingTable.WORD_KEY_SEPARATOR)
+                    print("read_string_to_index_mapping_table_from_file - parts: " + str(parts))
                     # print("line: " + line)
                     index = int(parts[0])
 
@@ -93,9 +99,7 @@ class StringToIndexMappingTable:
                                            " , expected one index and one word per line, starting from index 0")
 
                     word = parts[1]
-                    # Strip word, but only if it is not itself a whitespace character
-                    if len(word.strip()) > 0:
-                        word = word.strip()
+                    print("read_string_to_index_mapping_table_from_file - word: " + str(word))
 
                     result.add_string(word)
                     line_index += 1
