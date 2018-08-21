@@ -707,7 +707,7 @@ class MDLSTMExamplesPacking:
         # print("mask_result: " + str(mask_result))
         # print("result: " + str(result))
 
-        print("result.size(): " + str(result.size()))
+        # print("result.size(): " + str(result.size()))
         # Extract just the first channel, i.e. for direction one
         # packed_examples_2d = result[:, 0, :, :]
         # packed_examples_2d = packed_examples_2d.squeeze(0)

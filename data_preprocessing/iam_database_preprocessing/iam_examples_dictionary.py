@@ -98,6 +98,7 @@ class IamWordInformation(IamDataPointInformation):
 
 
 class IamLineInformation(IamDataPointInformation):
+    WORD_SEPARATOR_SYMBOL = "|"
 
     def __init__(self, line_id: str, ok: bool, gray_level: int, bounding_box,
                 number_of_components: int, words: list):
@@ -135,7 +136,7 @@ class IamLineInformation(IamDataPointInformation):
         for i in range(1, len(words_parts)):
             word_parts_as_single_string = word_parts_as_single_string + " " + words_parts[i]
 
-        words = word_parts_as_single_string.split("|")
+        words = word_parts_as_single_string.split(IamLineInformation.WORD_SEPARATOR_SYMBOL)
 
         return line_id, ok, gray_level, number_of_components, bounding_box, words
 
@@ -168,9 +169,15 @@ class IamLineInformation(IamDataPointInformation):
     def get_characters(self):
         result = list([])
 
-        for word in self.words:
+        last_word_index = len(self.words)-1
+        for word in self.words[0:last_word_index]:
             for letter in word:
                 result.append(letter)
+            # Add a word separator symbol
+            result.append(IamLineInformation.WORD_SEPARATOR_SYMBOL)
+        # Add the letters of the last word
+        for letter in self.words[last_word_index]:
+            result.append(letter)
         return result
 
 
