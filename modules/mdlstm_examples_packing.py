@@ -709,10 +709,10 @@ class MDLSTMExamplesPacking:
 
         print("result.size(): " + str(result.size()))
         # Extract just the first channel, i.e. for direction one
-        packed_examples_2d = result[:, 0, :, :].squeeze(1)
-        packed_examples_2d = packed_examples_2d.squeeze(0)
-        util.image_visualization.imshow_tensor_2d(mask_result.cpu())
-        util.image_visualization.imshow_tensor_2d(packed_examples_2d.cpu())
+        # packed_examples_2d = result[:, 0, :, :]
+        # packed_examples_2d = packed_examples_2d.squeeze(0)
+        # util.image_visualization.imshow_tensor_2d(mask_result.cpu())
+        # util.image_visualization.imshow_tensor_2d(packed_examples_2d.cpu())
 
         # Sanity check to see that the result and the mask are of the same height and
         # width

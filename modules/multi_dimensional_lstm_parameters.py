@@ -687,7 +687,7 @@ class MultiDimensionalLSTMParametersOneDirectionFullyParallel(OneDirectionalMult
 
 
 class MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution(
-     MDLSTMParametersPrecomputedInputMatricesBase):
+     MultiDimensionalLSTMParametersBase):
     NUMBER_OF_INPUT_CONVOLUTIONS_PER_DIRECTION = 5
     NUMBER_OF_PAIRED_HIDDEN_STATE_WEIGHTINGS = 5
     NUMBER_OF_PAIRED_MEMORY_STATE_WEIGHTINGS = 2
@@ -712,7 +712,8 @@ class MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputCon
                                                               groups=number_of_directions)
         nn.init.xavier_uniform_(self.output_gate_memory_state_convolution.weight)
 
-        self.input_matrices = None
+        self.input_columns = None
+        self.input_column_lists = None
         self.node_hidden_state_columns = None
         self.node_memory_state_columns = None
         self.previous_memory_state_column = None
@@ -771,6 +772,32 @@ class MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputCon
 
         return parallel_multiple_input_convolutions_computations
 
+    """
+    This method extracts a list of lists of input columns from input matrices.
+    The motivation is that by storing lists of columns, and "consuming" these 
+    columns during the column-by column MDLSTM computation, removing them from th 
+    lists using the list "pop" method, the memory can be freed up as soon as possible.
+    Otherwise the entire matrices must be kept in memory for ten entire computation, 
+    when they are no longer required.
+    """
+    @staticmethod
+    def extract_input_column_list_of_lists_from_input_matrices(input_matrices: list):
+        input_column_lists = list([])
+        for i in range(0, len(input_matrices)):
+            column_list_for_matrix = list([])
+            input_matrix = input_matrices[i]
+            # print(">>> input_matrix.size(): " + str(input_matrix.size()))
+            # Add elements in inverted order so that later on the "pop" method
+            # can be used to obtain methods in front to back order
+            for j in range(input_matrix.size(3) - 1, -1, -1):
+                # print("j: " + str(j))
+                column = input_matrix[:, :, :, j]
+                column_list_for_matrix.append(column)
+
+            input_column_lists.append(column_list_for_matrix)
+
+        return input_column_lists
+
     def prepare_input_convolutions(self, skewed_images_variable):
         # print("Entered MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution."
         #       "prepare_input_convolutions...")
@@ -815,10 +842,17 @@ class MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputCon
 
         # print(">>> len(input_matrices_lists_grouped_by_index_concatenated): " +
         #       str(len(input_matrices_lists_grouped_by_index_concatenated)))
-        self.input_matrices = input_matrices_lists_grouped_by_index_concatenated
 
-        if len(self.input_matrices) != \
-                MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution.NUMBER_OF_INPUT_CONVOLUTIONS_PER_DIRECTION:
+        self.input_column_lists = \
+            MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution.\
+            extract_input_column_list_of_lists_from_input_matrices(
+                    input_matrices_lists_grouped_by_index_concatenated)
+
+        # self.input_column_lists = input_matrices_lists_grouped_by_index_concatenated
+
+        if len(self.input_column_lists) != \
+                MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution.\
+                        NUMBER_OF_INPUT_CONVOLUTIONS_PER_DIRECTION:
             raise RuntimeError("Error: length of input_matrices after merging matrices for multiple" +
                                " directions should still be " +
                                str(MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution.
@@ -869,6 +903,16 @@ class MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputCon
                    NUMBER_OF_PAIRED_HIDDEN_STATE_WEIGHTINGS + \
                    MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution.\
                    NUMBER_OF_PAIRED_MEMORY_STATE_WEIGHTINGS
+
+    """
+    Get the next input columns, removing them from the input columns list
+    (So that the memory for them can be freed when they are no longer used)
+    """
+    def get_next_input_columns(self):
+        input_columns = list([])
+        for input_columns_list in self.input_column_lists:
+            input_columns.append(input_columns_list.pop())
+        return input_columns
 
     def get_next_node_hidden_state_columns(self, node_hidden_and_memory_state_columns):
 
@@ -944,6 +988,7 @@ class MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputCon
                                num_paired_hidden_and_memory_state_weightings() + " * " + str(self.number_of_directions) +
                                " output pairs")
 
+        self.input_columns = self.get_next_input_columns()
         self.node_hidden_state_columns = self.get_next_node_hidden_state_columns(node_hidden_and_memory_state_columns)
         self.node_memory_state_columns = self.get_next_node_memory_state_columns(node_hidden_and_memory_state_columns)
 
@@ -981,20 +1026,35 @@ class MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputCon
 
         return result_catted_on_channel_dimension
 
-    def get_input_input_matrix(self):
-        return self.input_matrices[0]
+    # def get_input_input_matrix(self):
+    #     return self.input_column_lists[0]
+    #
+    # def get_input_gate_input_matrix(self):
+    #     return self.input_column_lists[1]
+    #
+    # def get_forget_gate_one_input_matrix(self):
+    #     return self.input_column_lists[2]
+    #
+    # def get_forget_gate_two_input_matrix(self):
+    #     return self.input_column_lists[3]
+    #
+    # def get_output_gate_input_matrix(self):
+    #     return self.input_column_lists[4]
+    #
+    def get_input_input_column(self, column_index):
+        return self.input_columns[0]
 
-    def get_input_gate_input_matrix(self):
-        return self.input_matrices[1]
+    def get_input_gate_input_column(self, column_index):
+        return self.input_columns[1]
 
-    def get_forget_gate_one_input_matrix(self):
-        return self.input_matrices[2]
+    def get_forget_gate_one_input_column(self, column_index):
+        return self.input_columns[2]
 
-    def get_forget_gate_two_input_matrix(self):
-        return self.input_matrices[3]
+    def get_forget_gate_two_input_column(self, column_index):
+        return self.input_columns[3]
 
-    def get_output_gate_input_matrix(self):
-        return self.input_matrices[4]
+    def get_output_gate_input_column(self, column_index):
+        return self.input_columns[4]
 
     def get_input_hidden_state_column(self):
         return self.node_hidden_state_columns[0]
@@ -1415,7 +1475,7 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
         return result_catted_on_channel_dimension
 
     def get_input_input_column(self, column_index):
-        result =  self.input_columns[0]
+        result = self.input_columns[0]
         # print("get_input_input_colum - result" + str(result))
         # print("get_input_input_colum - result.size()" + str(result.size()))
         return result

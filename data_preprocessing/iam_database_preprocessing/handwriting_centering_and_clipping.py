@@ -4,7 +4,6 @@ import torch
 import util.image_visualization
 from data_preprocessing.iam_database_preprocessing.iam_dataset import IamLinesDataset
 import numpy as np
-import matplotlib.mlab as mlab
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 
@@ -52,7 +51,7 @@ class HandwritingCenteringAndClipping:
     @staticmethod
     def find_first_index_with_higher_or_equal_value_back_to_front(one_dimensional_tensor: torch.Tensor,
                                                                   value):
-        for i in range(one_dimensional_tensor.size(0) - 1, 0, -1):
+        for i in range(one_dimensional_tensor.size(0) - 1, -1, -1):
             if one_dimensional_tensor[i] >= value:
                 return i
 

@@ -160,6 +160,38 @@ class BlockStridedConvolution(Module):
                                                                                            SizeTwoDimensional(1, 1))
         return result
 
+    """
+    This implementation splits the chunk tensor into portions that are processed consecutively,
+    to exploit the fact that in the summation the convolution results for the different 
+    directions are collapsed. This would be expected to save memory, since only the summed
+    sub-tensors need to be saved till the end of the loop. Whether this also plays out 
+    given the dependencies for the back-propagation has to be seen  
+    """
+    def compute_forward_from_chunked_input_using_portions(self, x_chunked, tensor_list_chunking):
+
+        # Sum the results for multiple directions contained in chunks of the result
+        if self.compute_multi_directional:
+
+            cat_list = list([])
+            data_portions = torch.chunk(x_chunked, 4, 0)
+            for data_portion in data_portions:
+                data_portion_conv_result = self.compute_forward_one_directional(data_portion)
+                data_portion_results_per_direction = torch.chunk(data_portion_conv_result, 4, 1)
+                data_portion_result = torch.sum(torch.stack(data_portion_results_per_direction, 0), 0)
+                cat_list.append(data_portion_result)
+            result = torch.cat(cat_list, 0)
+        else:
+            result = self.compute_forward_one_directional(x_chunked)
+
+        if self.use_example_packing:
+            # print("block_strided_convolution - use example packing")
+            result = tensor_list_chunking. \
+                dechunk_block_tensor_concatenated_along_batch_dimension_changed_block_size(result,
+                                                                                           SizeTwoDimensional(1, 1))
+        return result
+
+
+
     def compute_x_chunked_and_tensor_list_chunking_list(self, x):
         # Tensor list chunking expects a list of 3-D tensors as input, but x
         # obtained from MDLSTM is a list of 4-D tensors, so must convert
@@ -190,7 +222,9 @@ class BlockStridedConvolution(Module):
             if self.compute_multi_directional:
                 x_chunked, tensor_list_chunking = \
                     self.compute_x_chunked_and_tensor_list_chunking_list(x)
-                activations_summed = self.compute_forward_from_chunked_input(
+                # activations_summed = self.compute_forward_from_chunked_input(
+                #     x_chunked, tensor_list_chunking)
+                activations_summed = self.compute_forward_from_chunked_input_using_portions(
                     x_chunked, tensor_list_chunking)
                 # print("block_strided_convolution - activations[0].size(): " + str(activations[0].size()))
                 # Chunk the list of activations per tensor into a list of activations per tensor

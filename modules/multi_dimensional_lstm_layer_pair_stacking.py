@@ -314,6 +314,68 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
                                                      pair_three_specific_parameters])
         return layer_pairs_specific_parameters_list
 
+
+    """
+    The structure and number of hidden units per layer are inspired on 
+    "Dropout improves Recurrent Neural Networks for Handwriting Recognition"
+    (Pham et.al, 2015). The crucial architectural choice of this network 
+    is to start the first MDLSTM layers for the four directions with only 
+    2 hidden units per direction.
+    Since the resolution for the following layers decreases rapidly with 
+    4 times 2 BlockStridedConvolution blocks, it is cheaper to have a higher 
+    number of channels for the following layers, but expensive to have it 
+    for the first layer. Note that this network is still not exactly identical 
+    in structure to the one described in (Pham et.al, 2015), since in that 
+    network the third BlockStridedConvolution layer is missing and replaced 
+    by a fully connected layer . Ideally, both structures should be tested 
+    to see if there's any difference in performance. 
+    """
+    @staticmethod
+    def create_three_layer_pair_network_parameters_with_two_channels_per_direction_first_mdlstm_layer(
+            input_channels,
+            mdlstm_block_size: SizeTwoDimensional,
+            block_strided_convolution_block_size: SizeTwoDimensional,
+            parameter_creation_function):
+
+        # Layer pair one
+        # number_of_elements_reduction_factor = block_strided_convolution_block_size.width * \
+        #                                      block_strided_convolution_block_size.height
+        # output_channels = number_of_elements_reduction_factor * first_mdlstm_hidden_states_size_per_direction
+        first_mdlstm_hidden_states_size_per_direction = 2
+        output_channels = 6
+
+        pair_one_specific_parameters = parameter_creation_function(
+            input_channels, first_mdlstm_hidden_states_size_per_direction, output_channels, mdlstm_block_size,
+            block_strided_convolution_block_size)
+
+        # Layer pair two
+        input_channels = output_channels
+        # Here the number of mdstlm_hidden_states and output channels are increased with a factor that is
+        # equal to the layer number
+        second_mdlstm_hidden_states_size_per_direction = 10
+        output_channels = 20
+
+        pair_two_specific_parameters = parameter_creation_function(
+            input_channels, second_mdlstm_hidden_states_size_per_direction,
+            output_channels, mdlstm_block_size,
+            block_strided_convolution_block_size)
+
+        # Layer pair three
+        input_channels = output_channels
+        # Here the number of mdstlm_hidden_states and output channels are increased with a factor that is
+        # equal to the layer number
+        third_mdlstm_hidden_states_size_per_direction = 50
+        output_channels = 50
+
+        pair_three_specific_parameters = parameter_creation_function(
+            input_channels, third_mdlstm_hidden_states_size_per_direction, output_channels, mdlstm_block_size,
+            block_strided_convolution_block_size)
+
+        layer_pairs_specific_parameters_list = list([pair_one_specific_parameters, pair_two_specific_parameters,
+                                                     pair_three_specific_parameters])
+        return layer_pairs_specific_parameters_list
+
+
     # Creates a network of three layer pairs, each pair consisting of a block-MDLSTM layer
     # followed by a block-strided convolution layer.
     # This is the old version of the network that does not work well, presumably
@@ -376,6 +438,37 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
                                                         use_example_packing,
                                                         nonlinearity)
 
+        # Creates a network of three layer pairs, each pair consisting of a MDLSTM layer
+        # followed by a block-strided convolution layer. This is the improved version
+        # that follows the more typical architecture used for handwriting recognition.
+        # Crucially the MDLSTM layers in this version of the network compute over the
+        # entire layer and are not restricted to within-block computation
+
+    @staticmethod
+    def create_mdlstm_three_layer_pair_network_with_two_channels_per_direction_first_mdlstm_layer(
+            input_channels,
+            block_strided_convolution_block_size: SizeTwoDimensional,
+            compute_multi_directional: bool,
+            clamp_gradients: bool, use_dropout: bool,
+            use_bias_with_block_strided_convolution: bool,
+            use_example_packing: bool):
+
+        nonlinearity = "tanh"
+        layer_pairs_specific_parameters_list = MultiDimensionalLSTMLayerPairStacking. \
+            create_three_layer_pair_network_parameters_with_two_channels_per_direction_first_mdlstm_layer(
+                input_channels, None,
+                block_strided_convolution_block_size,
+                MultiDimensionalLSTMLayerPairStacking.mdlstm_parameter_creation_function)
+        print("layers_pairs_specific_parameters_list: " + str(layer_pairs_specific_parameters_list))
+
+        return MultiDimensionalLSTMLayerPairStacking. \
+            create_multi_dimensional_lstm_pair_stacking(layer_pairs_specific_parameters_list,
+                                                        compute_multi_directional,
+                                                        clamp_gradients,
+                                                        use_dropout,
+                                                        use_bias_with_block_strided_convolution,
+                                                        use_example_packing,
+                                                        nonlinearity)
 
     @staticmethod
     def create_one_layer_pair_plus_second_block_convolution_layer_network(

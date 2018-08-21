@@ -384,11 +384,17 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
         #         compute_multi_directional,clamp_gradients, use_dropout, opt.use_bias_in_block_strided_convolution)
 
         # Create network with MDLSTM layers instead of block-MDLSTM layers
+        # multi_dimensional_rnn = MultiDimensionalLSTMLayerPairStacking. \
+        #     create_mdlstm_three_layer_pair_network_linear_parameter_size_increase(
+        #         input_channels, hidden_states_size, block_strided_convolution_block_size,
+        #         compute_multi_directional, clamp_gradients, use_dropout, opt.use_bias_in_block_strided_convolution,
+        #         use_example_packing)
         multi_dimensional_rnn = MultiDimensionalLSTMLayerPairStacking. \
-            create_mdlstm_three_layer_pair_network_linear_parameter_size_increase(
-                input_channels, hidden_states_size, block_strided_convolution_block_size,
+            create_mdlstm_three_layer_pair_network_with_two_channels_per_direction_first_mdlstm_layer(
+                input_channels, block_strided_convolution_block_size,
                 compute_multi_directional, clamp_gradients, use_dropout, opt.use_bias_in_block_strided_convolution,
                 use_example_packing)
+
 
     else:
         raise RuntimeError("Error: \"" + str(data_set_name) + "\" is an unrecognized dataset name")
@@ -597,8 +603,8 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
     # device_ids should include device!
     # device_ids lists all the gpus that may be used for parallelization
     # device is the initial device the model will be put on
-    # device_ids = [0, 1]
-    device_ids = [0]
+    device_ids = [0, 1]
+    # device_ids = [0]
 
     # assert compute_multi_directional
 
@@ -804,7 +810,7 @@ def iam_line_recognition(model_opt, checkpoint):
         # With the improved padding, the height of the images is 128,
         # and memory usage is less, so batch_size 30 instead of 20 is possible,
         # but it is only slightly faster (GPU usage appears to be already maxed out)
-        batch_size = 4
+        batch_size = 24  # 14 gives out of memory error with initial hidden states size 8
 
         #lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
         lines_file_path = model_opt.iam_database_lines_file_path
@@ -960,10 +966,8 @@ def iam_word_recognition(model_opt, checkpoint):
                     perform_horizontal_batch_padding_in_data_loader)
 
 
-
     # train_mdrnn_no_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
     #                 compute_multi_directional, use_dropout, vocab_list)
-
 
 def main():
     # Load checkpoint if we resume from a previous training.
