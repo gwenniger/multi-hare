@@ -810,7 +810,9 @@ def iam_line_recognition(model_opt, checkpoint):
         # With the improved padding, the height of the images is 128,
         # and memory usage is less, so batch_size 30 instead of 20 is possible,
         # but it is only slightly faster (GPU usage appears to be already maxed out)
-        batch_size = 40  # 14 gives out of memory error with initial hidden states size 8
+        # 14 gives out of memory error with initial hidden states size 8 (12 seems to work)
+        # 40 gives out of memory error with initial hidden states size 2
+        batch_size = 32
 
         #lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
         lines_file_path = model_opt.iam_database_lines_file_path

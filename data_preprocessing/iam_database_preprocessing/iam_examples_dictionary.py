@@ -166,7 +166,13 @@ class IamLineInformation(IamDataPointInformation):
                    (self.bounding_box == other.bounding_box) and \
                    (self.words == other.words)
 
-    def get_characters(self):
+    """
+        This method collects and adds all the characters of the words including the 
+        word separator between words. It is not entirely clear whether the word separator 
+        should be added or not. From the point of character prediction perhaps not. At the 
+        same time, how about ambiguous sequences like "backingate"
+    """
+    def get_characters_with_word_separator(self):
         result = list([])
 
         last_word_index = len(self.words)-1
@@ -178,6 +184,14 @@ class IamLineInformation(IamDataPointInformation):
         # Add the letters of the last word
         for letter in self.words[last_word_index]:
             result.append(letter)
+        return result
+
+    def get_characters(self):
+        result = list([])
+
+        for word in self.words:
+            for letter in word:
+                result.append(letter)
         return result
 
 
