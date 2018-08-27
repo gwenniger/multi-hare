@@ -1,4 +1,5 @@
 import evaluation_metrics.levenshtein_distance as ld
+from data_preprocessing.iam_database_preprocessing.iam_examples_dictionary import IamLineInformation
 
 """
 The character error rate (CER is depfined based upon the
@@ -21,25 +22,25 @@ substitutions s an deletions d required to transform the reference text into the
 """
 
 
-def character_error_rate_single_output_reference_pair(symbol_list_output: list, symbol_list_reference: list):
+def word_error_rate_single_output_reference_pair(symbol_list_output: list, symbol_list_reference: list):
     """
     Computes the character error rate for a single [output,reference] pair. This method should
     not be used in the typical case when there are multiple [output,reference] pairs; in this case
     the method "character_error_rate_list_of_output_reference_pairs" is appropriate.
     """
     distance = ld.levenshtein_distance(symbol_list_output, symbol_list_reference)
-    print("distance = " + str(distance))
+    # print("distance = " + str(distance))
     reference_length = len(symbol_list_reference)
-    print("reference_length: " + str(reference_length))
+    # print("reference_length: " + str(reference_length))
     result = distance / reference_length
-    print("result: " + str(result))
+    # print("result: " + str(result))
     return result
 
 
-def compute_character_error_rate_for_list_of_output_reference_pairs(outputs_as_strings: list,
-                                                                    references_as_strings: list):
+def compute_word_error_rate_for_list_of_output_reference_pairs(outputs_as_strings: list,
+                                                               references_as_strings: list):
     """
-    When computing the character error rate for a list of [output,reference] pairs,
+    When computing the word error rate for a list of [output,reference] pairs,
     one should sum the Levensthein distances for the pairs and divide the result by the total
     summed reference lengths.
     https://sites.google.com/site/textdigitisation/qualitymeasures/computingerrorrates
@@ -51,13 +52,13 @@ def compute_character_error_rate_for_list_of_output_reference_pairs(outputs_as_s
     thus be wrong.
     """
 
-    outputs_as_char_lists = create_character_sequences_from_strings(outputs_as_strings)
-    references_as_char_lists = create_character_sequences_from_strings(references_as_strings)
+    outputs_as_word_lists = create_word_sequences_from_strings(outputs_as_strings)
+    references_as_word_lists = create_word_sequences_from_strings(references_as_strings)
 
     total_distance = 0
     total_reference_length = 0
 
-    for symbol_list_output, symbol_list_reference in zip(outputs_as_char_lists, references_as_char_lists):
+    for symbol_list_output, symbol_list_reference in zip(outputs_as_word_lists, references_as_word_lists):
         distance = ld.levenshtein_distance(symbol_list_output, symbol_list_reference)
         # print("distance = " + str(distance))
         reference_length = len(symbol_list_reference)
@@ -70,60 +71,64 @@ def compute_character_error_rate_for_list_of_output_reference_pairs(outputs_as_s
     return result
 
 
-def test_character_error_rate(char_sequence_one_as_string: str,
-                              char_seq_two_as_string: str,
-                              expected_character_error_rate: int):
-    character_sequence_one = ld.create_character_sequence_from_string(
-        char_sequence_one_as_string)
-    character_sequence_two = ld.create_character_sequence_from_string(
-        char_seq_two_as_string)
-    cer = character_error_rate_single_output_reference_pair(character_sequence_one, character_sequence_two)
+def test_word_error_rate(word_sequence_one_as_string: str,
+                         word_seq_two_as_string: str,
+                         expected_character_error_rate: int):
+    word_sequence_one = create_word_sequence_from_string(
+        word_sequence_one_as_string)
+    word_sequence_two = create_word_sequence_from_string(
+        word_seq_two_as_string)
+    wer = word_error_rate_single_output_reference_pair(word_sequence_one, word_sequence_two)
 
-    if not cer == expected_character_error_rate:
-        raise RuntimeError("Error: expected a character error rate of : "
+    if not wer == expected_character_error_rate:
+        raise RuntimeError("Error: expected a word error rate of : "
                            + str(expected_character_error_rate) + " between: \"" +
-                           char_sequence_one_as_string + "\" and \"" +
-                           char_seq_two_as_string + "\" , but got: " + str(cer))
+                           word_sequence_one_as_string + "\" and \"" +
+                           word_seq_two_as_string + "\" , but got: " + str(wer))
 
 
-def create_character_sequences_from_strings(strings: list):
+def create_word_sequence_from_string(strings: list):
+    return strings.split(IamLineInformation.WORD_SEPARATOR_SYMBOL)
+
+
+def create_word_sequences_from_strings(strings: list):
     result = list([])
     for string in strings:
-        result.append(ld.create_character_sequence_from_string(string))
+        result.append(create_word_sequence_from_string(string))
     return result
 
 
-def test_character_error_rate_list_of_output_reference_pairs(
+def test_word_error_rate_list_of_output_reference_pairs(
         outputs_as_strings: list, references_as_strings: list,
-        expected_character_error_rate: int):
+        expected_word_error_rate: int):
 
-    cer = compute_character_error_rate_for_list_of_output_reference_pairs(
+    cer = compute_word_error_rate_for_list_of_output_reference_pairs(
         outputs_as_strings, references_as_strings)
 
-    if not cer == expected_character_error_rate:
-        raise RuntimeError("Error: expected a character error rate of : "
-                           + str(expected_character_error_rate) + " between: \"" +
-                           outputs_as_strings + "\" and \"" +
-                           references_as_strings + "\" , but got: " + str(cer))
+    if not cer == expected_word_error_rate:
+        raise RuntimeError("Error: expected a word error rate of : "
+                           + str(expected_word_error_rate) + " between: \"" +
+                           str(outputs_as_strings) + "\" and \"" +
+                           str(references_as_strings) + "\" , but got: " + str(cer))
 
 
-def test_cer_one():
+def test_wer_one():
     # a 	b 	c 	d 	e 	f 	g
     # a 	b 	  	d 	  	f 	h
-    char_seq_one_as_string = "abcdefg"
-    char_seq_two_as_string = "abdfh"
-    test_character_error_rate(char_seq_one_as_string, char_seq_two_as_string, 0.6)
+    char_seq_one_as_string = "aa|bb|cc|dd|ee|ff|g"
+    char_seq_two_as_string = "aa|bb|dd|ff|h"
+    test_word_error_rate(char_seq_one_as_string, char_seq_two_as_string, 0.6)
 
 
-def test_cer_two():
+def test_wer_two():
     # a 	b 	c 	d 	e 	f 	g
     # a 	b 	  	d 	  	f 	h
-    char_seq_one_as_string = "abcdefg"
-    char_seq_one_reference_as_string = "abdfh"
+    char_seq_one_as_string = "aa|bb|cc|d|e|f|g"
+    char_seq_one_reference_as_string = "aa|bb|d|f|h"
     expected_levenshtein_distance_pair_one = 3
 
-    char_seq_two_as_string = "abcdefg"
-    char_seq_two_reference_as_string = "ab"
+    char_seq_two_as_string = "aa|bb|cc|d|e|f|g"
+    char_seq_two_reference_as_string = "aa|bb"
     expected_levenshtein_distance_pair_two = 5
 
     outputs = list([char_seq_one_as_string, char_seq_two_as_string])
@@ -131,14 +136,16 @@ def test_cer_two():
 
     expected_total_levenshtein_distance = (expected_levenshtein_distance_pair_one +
                                            expected_levenshtein_distance_pair_two)
-    total_summed_reference_lengths = len(char_seq_one_reference_as_string) + len(char_seq_two_reference_as_string)
+    total_summed_reference_lengths = \
+        len(char_seq_one_reference_as_string.split(IamLineInformation.WORD_SEPARATOR_SYMBOL)) + \
+        len(char_seq_two_reference_as_string.split(IamLineInformation.WORD_SEPARATOR_SYMBOL))
     expected_result = expected_total_levenshtein_distance / total_summed_reference_lengths
-    test_character_error_rate_list_of_output_reference_pairs(outputs, references, expected_result)
+    test_word_error_rate_list_of_output_reference_pairs(outputs, references, expected_result)
 
 
 def main():
-    test_cer_one()
-    test_cer_two()
+    test_wer_one()
+    test_wer_two()
 
 
 if __name__ == "__main__":

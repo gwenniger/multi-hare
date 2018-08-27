@@ -57,12 +57,12 @@ def levenshtein_distance(symbol_list_one: list, symbol_list_two: list):
                           d[i][j-1] + 1,                    # insertion
                           d[i-1][j-1] + substitution_cost)  # substitution
 
-    print(str(symbol_list_one))
-    print(str(symbol_list_two))
-    print_matrix_array(d)
-
+    # print(str(symbol_list_one))
+    # print(str(symbol_list_two))
+    # print_matrix_array(d)
+    #
     result = d[m-1][n-1]
-    print("Levenshtein distance: " + str(result))
+    # print("Levenshtein distance: " + str(result))
     return result
 
 
