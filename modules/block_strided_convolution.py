@@ -172,8 +172,8 @@ class BlockStridedConvolution(Module):
         # Sum the results for multiple directions contained in chunks of the result
         if self.compute_multi_directional:
 
-            print("compute_forward_from_chunked_input_using_portions - x_chunked.size(): " +
-                  str(x_chunked.size()))
+            # print("compute_forward_from_chunked_input_using_portions - x_chunked.size(): " +
+            #       str(x_chunked.size()))
 
             cat_list = list([])
             data_portions = torch.chunk(x_chunked, 4, 0)
@@ -223,10 +223,10 @@ class BlockStridedConvolution(Module):
             if self.compute_multi_directional:
                 x_chunked, tensor_list_chunking = \
                     self.compute_x_chunked_and_tensor_list_chunking_list(x)
-                activations_summed = self.compute_forward_from_chunked_input(
-                    x_chunked, tensor_list_chunking)
-                # activations_summed = self.compute_forward_from_chunked_input_using_portions(
+                # activations_summed = self.compute_forward_from_chunked_input(
                 #     x_chunked, tensor_list_chunking)
+                activations_summed = self.compute_forward_from_chunked_input_using_portions(
+                    x_chunked, tensor_list_chunking)
                 # print("block_strided_convolution - activations[0].size(): " + str(activations[0].size()))
                 # Chunk the list of activations per tensor into a list of activations per tensor
                 # for each direction

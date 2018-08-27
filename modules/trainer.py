@@ -133,7 +133,7 @@ class Trainer:
             # Labels must remain on CPU for warp-ctc loss
             # labels = labels.to(device)
 
-            print("inputs: " + str(inputs))
+            # print("inputs: " + str(inputs))
 
             # forward + backward + optimize
             # outputs = multi_dimensional_rnn(Variable(inputs))  # For "Net" (Le Net)
@@ -149,12 +149,12 @@ class Trainer:
             # print(">>> outputs.size(): " + str(outputs.size()))
 
             # print(">>> labels.size() : " + str(labels.size()))
-            print("labels: " + str(labels))
+            # print("labels: " + str(labels))
             # warp_ctc_loss_interface.
             # print(">>> labels_one_dimensional.size() : " + str(labels_one_dimensional.size()))
             # print("labels_one_dimensional: " + str(labels_one_dimensional))
 
-            print("outputs: " + str(outputs))
+            # print("outputs: " + str(outputs))
             # print("outputs.size(): " + str(outputs.size()))
             # print("labels: " + str(labels))
             if inputs_is_list:
@@ -185,7 +185,7 @@ class Trainer:
             else:
                 loss_value = loss.item()
 
-            print("loss: " + str(loss))
+            # print("loss: " + str(loss))
             # loss = criterion(outputs, labels)
 
             time_start_loss_backward = util.timing.date_time_start()

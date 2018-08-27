@@ -755,7 +755,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     batch_size = 256
     # batch_size = 1024
     min_num_digits = 1
-    max_num_digits = 1
+    max_num_digits = 3
     # In MNIST there are the digits 0-9, and we also add a symbol for blanks
     # This vocab_list will be used by the decoder
     vocab_list = list(['_', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'])
@@ -777,7 +777,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     # Possibly a batch size of 128 leads to more instability in training?
     #batch_size = 128
 
-    compute_multi_directional = False
+    compute_multi_directional = True
     # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
     use_dropout = False
 
@@ -792,7 +792,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     image_input_is_unsigned_int = False
     use_block_mdlstm = False
     perform_horizontal_batch_padding_in_data_loader = False
-    use_example_packing = False
+    use_example_packing = True
     train_mdrnn_ctc(model_opt, checkpoint, train_loader, test_loader,
                     test_loader, input_channels,
                     hidden_states_size, batch_size,
