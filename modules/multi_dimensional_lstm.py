@@ -372,7 +372,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # print("input_hidden_state_column: " + str(input_hidden_state_column))
 
             input_state_plus_input = MultiDimensionalRNNBase.\
-                compute_states_plus_input(mdlstm_parameters.get_input_input_column(column_index), input_hidden_state_column)
+                compute_states_plus_input(mdlstm_parameters.get_input_input_column(column_index),
+                                          input_hidden_state_column)
 
             # Compute the sum of weighted inputs of the input gate
             input_gate_input_column = mdlstm_parameters.get_input_gate_input_column(column_index)

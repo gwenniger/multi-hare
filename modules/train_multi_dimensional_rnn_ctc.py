@@ -755,7 +755,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     batch_size = 256
     # batch_size = 1024
     min_num_digits = 1
-    max_num_digits = 3
+    max_num_digits = 1
     # In MNIST there are the digits 0-9, and we also add a symbol for blanks
     # This vocab_list will be used by the decoder
     vocab_list = list(['_', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'])
@@ -777,7 +777,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     # Possibly a batch size of 128 leads to more instability in training?
     #batch_size = 128
 
-    compute_multi_directional = True
+    compute_multi_directional = False
     # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
     use_dropout = False
 
@@ -792,7 +792,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     image_input_is_unsigned_int = False
     use_block_mdlstm = False
     perform_horizontal_batch_padding_in_data_loader = False
-    use_example_packing = True
+    use_example_packing = False
     train_mdrnn_ctc(model_opt, checkpoint, train_loader, test_loader,
                     test_loader, input_channels,
                     hidden_states_size, batch_size,
@@ -984,14 +984,14 @@ def main():
         model_opt = opt
 
     # mnist_recognition_fixed_length()
-    # mnist_recognition_variable_length(model_opt, checkpoint,)
+    mnist_recognition_variable_length(model_opt, checkpoint,)
 
-    if opt.iam_database_data_type == "lines":
-        iam_line_recognition(model_opt, checkpoint)
-    elif opt.iam_database_data_type == "words":
-        iam_word_recognition(model_opt, checkpoint)
-    else:
-        raise RuntimeError("Unrecognized data type")
+    # if opt.iam_database_data_type == "lines":
+    #     iam_line_recognition(model_opt, checkpoint)
+    # elif opt.iam_database_data_type == "words":
+    #     iam_word_recognition(model_opt, checkpoint)
+    # else:
+    #     raise RuntimeError("Unrecognized data type")
     # #cifar_ten_basic_recognition()
 
 

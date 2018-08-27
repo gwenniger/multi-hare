@@ -60,7 +60,7 @@ class IamLinesDataset(Dataset):
         string_to_index_mapping_table = StringToIndexMappingTable.create_string_to_index_mapping_table()
         # print("examples_line_information: \n" + str(examples_line_information))
         for iam_line_information in examples_line_information:
-            letters = iam_line_information.get_characters()
+            letters = iam_line_information.get_characters_with_word_separator()
             string_to_index_mapping_table.add_strings(letters)
 
         string_to_index_mapping_table.\
@@ -71,7 +71,7 @@ class IamLinesDataset(Dataset):
     def create_iam_dataset(iam_lines_dictionary: IamExamplesDictionary,
                            save_word_to_string_mapping_table_path: str,
                            example_types: str = EXAMPLE_TYPES_OK,
-                           transformation=None,
+                           transformation=None
                            ):
         examples_line_information = IamLinesDataset.get_examples_line_information(iam_lines_dictionary, example_types)
 
@@ -469,7 +469,7 @@ class IamLinesDataset(Dataset):
         image_file_path = self.iam_lines_dictionary.get_image_file_path(line_information)
         # print("image_file_path: " + str(image_file_path))
 
-        characters = line_information.get_characters()
+        characters = line_information.get_characters_with_word_separator()
         indices = self.string_to_index_mapping_table.get_indices(characters)
 
         indices_array = numpy.ndarray((len(indices)), buffer=numpy.array(indices), dtype=int)

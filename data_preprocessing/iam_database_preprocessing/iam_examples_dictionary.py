@@ -96,6 +96,9 @@ class IamWordInformation(IamDataPointInformation):
             result.append(letter)
         return result
 
+    def get_characters_with_word_separator(self):
+        return self.get_characters()
+
 
 class IamLineInformation(IamDataPointInformation):
     WORD_SEPARATOR_SYMBOL = "|"

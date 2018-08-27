@@ -6,6 +6,9 @@ import ctcdecode
 from data_preprocessing.iam_database_preprocessing.iam_dataset import IamLinesDataset
 from modules.validation_stats import ValidationStats
 from modules.network_to_softmax_network import NetworkToSoftMaxNetwork
+import evaluation_metrics.character_error_rate
+import evaluation_metrics.word_error_rate
+
 
 class Evaluator:
 
@@ -102,18 +105,21 @@ class Evaluator:
 
                 total += labels.size(0)
 
+                output_strings = list([])
+                reference_labels_strings = list([])
+
                 for example_index in range(0, beam_results.size(0)):
                     beam_results_sequence = beam_results[example_index][0]
                     # print("beam_results_sequence: \"" + str(beam_results_sequence) + "\"")
-                    output_string = Evaluator.convert_to_string(beam_results_sequence,
-                                                      vocab_list, out_seq_len[example_index][0])
+                    output_string = Evaluator.convert_to_string(
+                        beam_results_sequence, vocab_list, out_seq_len[example_index][0])
                     example_labels_with_padding = labels[example_index]
                     # Extract the real example labels, removing the padding labels
                     reference_labels = example_labels_with_padding[0:label_sizes[example_index]]
 
                     # print(">>> evaluate_mdrnn  - reference_labels: " + str(reference_labels))
-                    reference_labels_string = Evaluator.convert_labels_tensor_to_string(reference_labels, vocab_list,
-                                                                              blank_symbol)
+                    reference_labels_string = Evaluator.convert_labels_tensor_to_string(
+                        reference_labels, vocab_list, blank_symbol)
 
                     if reference_labels_string == output_string:
                         # print("Yaaaaah, got one correct!!!")
@@ -126,11 +132,28 @@ class Evaluator:
                           "\nreference: \"" + reference_labels_string + "\" --- "
                           + correct_string)
 
+                    output_strings.append(output_string)
+                    reference_labels_strings.append(reference_labels_string)
+
             # correct += (predicted == labels).sum()
 
         total_examples = len(test_loader.dataset)
         validation_stats = ValidationStats(total_examples, correct)
         # https://stackoverflow.com/questions/3395138/using-multiple-arguments-for-string-formatting-in-python-e-g-s-s
-        print("Accuracy of the network on the {} test inputs: {:.2f} % accuracy".format(total_examples,
-                                                                                         validation_stats.accuracy()))
+        print("Accuracy of the network on the {} test inputs: {:.2f} % accuracy".format(
+            total_examples, validation_stats.accuracy()))
+
+        cer = evaluation_metrics.character_error_rate.\
+            compute_character_error_rate_for_list_of_output_reference_pairs(
+                output_strings, reference_labels_strings)
+
+        wer = evaluation_metrics.word_error_rate. \
+            compute_word_error_rate_for_list_of_output_reference_pairs(
+                output_strings, reference_labels_strings)
+
+        print("Character Error Rate (CER) of the network on the {} test inputs: {:.3f}  CER".format(
+            total_examples, cer))
+        print("Word Error Rate (WER) of the network on the {} test inputs: {:.3f}  WER".format(
+            total_examples, wer))
+
         return validation_stats

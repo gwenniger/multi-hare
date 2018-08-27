@@ -1275,7 +1275,6 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
                                                      use_dropout, number_of_directions,
                                                      input_channels)
 
-
         return MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
             hidden_states_size, input_channels, use_dropout, number_of_directions,
             parallel_hidden_and_memory_state_column_computation,
