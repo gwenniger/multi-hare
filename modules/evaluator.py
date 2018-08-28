@@ -137,23 +137,23 @@ class Evaluator:
 
             # correct += (predicted == labels).sum()
 
-        total_examples = len(test_loader.dataset)
-        validation_stats = ValidationStats(total_examples, correct)
-        # https://stackoverflow.com/questions/3395138/using-multiple-arguments-for-string-formatting-in-python-e-g-s-s
-        print("Accuracy of the network on the {} test inputs: {:.2f} % accuracy".format(
-            total_examples, validation_stats.accuracy()))
-
-        cer_including_word_separators = evaluation_metrics.character_error_rate.\
-            compute_character_error_rate_for_list_of_output_reference_pairs(
+        cer_including_word_separators = evaluation_metrics.character_error_rate. \
+            compute_character_error_rate_for_list_of_output_reference_pairs_fast(
                 output_strings, reference_labels_strings, True)
 
-        cer_excluding_word_separators = evaluation_metrics.character_error_rate.\
-            compute_character_error_rate_for_list_of_output_reference_pairs(
+        cer_excluding_word_separators = evaluation_metrics.character_error_rate. \
+            compute_character_error_rate_for_list_of_output_reference_pairs_fast(
                 output_strings, reference_labels_strings, False)
 
         wer = evaluation_metrics.word_error_rate. \
             compute_word_error_rate_for_list_of_output_reference_pairs(
                 output_strings, reference_labels_strings)
+
+        total_examples = len(test_loader.dataset)
+        validation_stats = ValidationStats(total_examples, correct, cer_excluding_word_separators, wer)
+        # https://stackoverflow.com/questions/3395138/using-multiple-arguments-for-string-formatting-in-python-e-g-s-s
+        print("Accuracy of the network on the {} test inputs: {:.2f} % accuracy".format(
+            total_examples, validation_stats.get_accuracy()))
 
         print("Character Error Rate (CER) of the network on the {} test inputs, "
               "including word separators: {:.3f}  CER".format(

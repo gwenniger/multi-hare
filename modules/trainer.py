@@ -282,5 +282,7 @@ class Trainer:
             'optim': self.optimizer,
         }
         torch.save(checkpoint,
-                   '%s_acc_%.2f_e%d.pt'
-                   % (opt.save_model, valid_stats.accuracy(), epoch))
+                   '%s_acc_%.2f_cer_%.3f_wer_%.3f_e%d.pt'
+                   % (opt.save_model, valid_stats.get_accuracy(),
+                      valid_stats.get_character_error_rate(),
+                      valid_stats.get_word_error_rate(), epoch))

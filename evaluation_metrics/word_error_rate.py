@@ -1,6 +1,7 @@
 import evaluation_metrics.levenshtein_distance as ld
 from data_preprocessing.iam_database_preprocessing.iam_examples_dictionary import IamLineInformation
 
+
 """
 The character error rate (CER is depfined based upon the
 Levenshtein distance, the total of insertions, substitutions and deletions
@@ -60,7 +61,7 @@ def compute_word_error_rate_for_list_of_output_reference_pairs(outputs_as_string
 
     for symbol_list_output, symbol_list_reference in zip(outputs_as_word_lists, references_as_word_lists):
         distance = ld.levenshtein_distance(symbol_list_output, symbol_list_reference)
-        # print("distance = " + str(distance))
+        print("compute_word_error_rate_for_list_of_output_reference_pairs - distance = " + str(distance))
         reference_length = len(symbol_list_reference)
         # print("reference_length: " + str(reference_length))
         total_distance += distance

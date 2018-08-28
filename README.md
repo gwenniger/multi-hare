@@ -6,6 +6,13 @@ This README would normally document whatever steps are necessary to get your app
 
 This repository is for implementing Multidimensional Long Short Term Memory and neural networks for handwriting recogntion.
 
+For running the pipeline code, you may need to execute:
+" export PYTHONPATH='.' "
+in the console where you are running the script, to avoid "no module named X"
+type of errors.
+Furthermore, this repository is written for python version3, you may need to 
+use a virtual environment to use it.
+
 
 * Quick summary
 * Version
