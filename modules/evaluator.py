@@ -143,16 +143,24 @@ class Evaluator:
         print("Accuracy of the network on the {} test inputs: {:.2f} % accuracy".format(
             total_examples, validation_stats.accuracy()))
 
-        cer = evaluation_metrics.character_error_rate.\
+        cer_including_word_separators = evaluation_metrics.character_error_rate.\
             compute_character_error_rate_for_list_of_output_reference_pairs(
-                output_strings, reference_labels_strings)
+                output_strings, reference_labels_strings, True)
+
+        cer_excluding_word_separators = evaluation_metrics.character_error_rate.\
+            compute_character_error_rate_for_list_of_output_reference_pairs(
+                output_strings, reference_labels_strings, False)
 
         wer = evaluation_metrics.word_error_rate. \
             compute_word_error_rate_for_list_of_output_reference_pairs(
                 output_strings, reference_labels_strings)
 
-        print("Character Error Rate (CER) of the network on the {} test inputs: {:.3f}  CER".format(
-            total_examples, cer))
+        print("Character Error Rate (CER) of the network on the {} test inputs, "
+              "including word separators: {:.3f}  CER".format(
+                total_examples, cer_including_word_separators))
+        print("Character Error Rate (CER) of the network on the {} test inputs, "
+              "excluding word separators: {:.3f}  CER".format(
+                total_examples, cer_excluding_word_separators))
         print("Word Error Rate (WER) of the network on the {} test inputs: {:.3f}  WER".format(
             total_examples, wer))
 

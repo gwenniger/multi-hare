@@ -1,4 +1,5 @@
 import evaluation_metrics.levenshtein_distance as ld
+from data_preprocessing.iam_database_preprocessing.iam_examples_dictionary import IamLineInformation
 
 """
 The character error rate (CER is depfined based upon the
@@ -36,8 +37,8 @@ def character_error_rate_single_output_reference_pair(symbol_list_output: list, 
     return result
 
 
-def compute_character_error_rate_for_list_of_output_reference_pairs(outputs_as_strings: list,
-                                                                    references_as_strings: list):
+def compute_character_error_rate_for_list_of_output_reference_pairs(
+        outputs_as_strings: list, references_as_strings: list, include_word_separators: bool):
     """
     When computing the character error rate for a list of [output,reference] pairs,
     one should sum the Levensthein distances for the pairs and divide the result by the total
@@ -51,8 +52,8 @@ def compute_character_error_rate_for_list_of_output_reference_pairs(outputs_as_s
     thus be wrong.
     """
 
-    outputs_as_char_lists = create_character_sequences_from_strings(outputs_as_strings)
-    references_as_char_lists = create_character_sequences_from_strings(references_as_strings)
+    outputs_as_char_lists = create_character_sequences_from_strings(outputs_as_strings, include_word_separators)
+    references_as_char_lists = create_character_sequences_from_strings(references_as_strings, include_word_separators)
 
     total_distance = 0
     total_reference_length = 0
@@ -86,10 +87,15 @@ def test_character_error_rate(char_sequence_one_as_string: str,
                            char_seq_two_as_string + "\" , but got: " + str(cer))
 
 
-def create_character_sequences_from_strings(strings: list):
+def create_character_sequences_from_strings(strings: list, include_word_separators: bool):
     result = list([])
     for string in strings:
-        result.append(ld.create_character_sequence_from_string(string))
+        if include_word_separators:
+            string_to_add = string
+        else:
+            # Remove the word separators from the string
+            string_to_add = string.replace(IamLineInformation.WORD_SEPARATOR_SYMBOL, "")
+        result.append(ld.create_character_sequence_from_string(string_to_add))
     return result
 
 
@@ -98,7 +104,7 @@ def test_character_error_rate_list_of_output_reference_pairs(
         expected_character_error_rate: int):
 
     cer = compute_character_error_rate_for_list_of_output_reference_pairs(
-        outputs_as_strings, references_as_strings)
+        outputs_as_strings, references_as_strings, True)
 
     if not cer == expected_character_error_rate:
         raise RuntimeError("Error: expected a character error rate of : "
