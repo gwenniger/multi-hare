@@ -101,7 +101,9 @@ def compute_character_error_rate_for_list_of_output_reference_pairs_fast(
     for output, reference in zip(outputs_as_strings, references_as_strings):
         if not include_word_separators:
             output = output.replace(IamLineInformation.WORD_SEPARATOR_SYMBOL, "")
-            reference = output.replace(IamLineInformation.WORD_SEPARATOR_SYMBOL, "")
+            reference = reference.replace(IamLineInformation.WORD_SEPARATOR_SYMBOL, "")
+            # print("output: " + str(output))
+            # print("reference: " + str(reference))
         distance = Levenshtein.distance(output, reference)
         # print("distance = " + str(distance))
         reference_length = len(reference)
@@ -172,18 +174,18 @@ def test_character_error_rate_list_of_output_reference_pairs(
 
 def test_character_error_rate_list_of_output_reference_pairs_fast(
         outputs_as_strings: list, references_as_strings: list,
-        expected_character_error_rate: int):
+        expected_character_error_rate: int, include_word_separators: bool):
 
     cer = compute_character_error_rate_for_list_of_output_reference_pairs_fast(
-        outputs_as_strings, references_as_strings, True)
+        outputs_as_strings, references_as_strings, include_word_separators)
 
     print("test_character_error_rate_list_of_output_reference_pairs_fast - cer: " + str(cer))
 
     if not cer == expected_character_error_rate:
         raise RuntimeError("Error: expected a character error rate of : "
                            + str(expected_character_error_rate) + " between: \"" +
-                           outputs_as_strings + "\" and \"" +
-                           references_as_strings + "\" , but got: " + str(cer))
+                           str(outputs_as_strings) + "\" and \"" +
+                           str(references_as_strings) + "\" , but got: " + str(cer))
 
 
 def test_cer_one():
@@ -228,16 +230,24 @@ def test_cer_two():
     test_character_error_rate_list_of_output_reference_pairs(outputs, references, expected_result)
 
 
-def test_cer_two_fast():
+def test_cer_two_fast_include_word_separators():
     outputs, references, expected_result = test_cer_two_elements()
-    test_character_error_rate_list_of_output_reference_pairs_fast(outputs, references, expected_result)
+    test_character_error_rate_list_of_output_reference_pairs_fast(outputs, references, expected_result,
+                                                                  True)
+
+
+def test_cer_two_fast_exclude_word_separators():
+    outputs, references, expected_result = test_cer_two_elements()
+    test_character_error_rate_list_of_output_reference_pairs_fast(outputs, references, expected_result,
+                                                                  False)
 
 
 def main():
     test_cer_one()
     test_cer_one_fast()
     test_cer_two()
-    test_cer_two_fast()
+    test_cer_two_fast_include_word_separators()
+    test_cer_two_fast_exclude_word_separators()
 
 
 if __name__ == "__main__":
