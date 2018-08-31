@@ -6,6 +6,7 @@ class TestLanguageModelCreator:
     LANGUAGE_MODEL_OUTPUT_DIR_SUFFIX = "tests/language_models/"
     LANGUAGE_MODEL_TRAIN_FILE_NAME = "language_model_train_file.txt"
     LANGUAGE_MODEL_ARPA_FILE_NAME = "test_language_model.arpa"
+    LANGUAGE_MODEL_BINARY_FILE_NAME = "test_language_model_binary"
     LANGUAGE_MODEL_TEXT = "Klaas maakt een keuken met een kraan .\n" \
                           "De kraan die hij maakt is aan de kant van de " \
                           "muur .\nDe kraan is duur , maar niet te huur .\n" \
@@ -15,11 +16,13 @@ class TestLanguageModelCreator:
 
     def __init__(self, handwriting_recognition_root_dir: str,
                  language_model_output_directory: str, language_model_train_file_name: str,
-                 language_model_arpa_file_name: str):
+                 language_model_arpa_file_name: str,
+                 language_model_binary_file_name: str):
         self.handwriting_recognition_root_dir = handwriting_recognition_root_dir
         self.language_model_output_directory = language_model_output_directory
         self.language_model_train_file_name = language_model_train_file_name
         self.language_model_arpa_file_name = language_model_arpa_file_name
+        self.language_model_binary_file_name = language_model_binary_file_name
 
     @staticmethod
     def create_test_language_model_creator(handwriting_recognition_root_dir):
@@ -29,13 +32,17 @@ class TestLanguageModelCreator:
 
         return TestLanguageModelCreator(handwriting_recognition_root_dir,
                                         language_model_output_directory, language_model_train_file_name,
-                                        TestLanguageModelCreator.LANGUAGE_MODEL_ARPA_FILE_NAME)
+                                        TestLanguageModelCreator.LANGUAGE_MODEL_ARPA_FILE_NAME,
+                                        TestLanguageModelCreator.LANGUAGE_MODEL_BINARY_FILE_NAME)
 
     def get_language_model_train_file_path(self):
         return self.language_model_output_directory + self.language_model_train_file_name
 
     def get_language_model_arpa_file_path(self):
         return self.language_model_output_directory + self.language_model_arpa_file_name
+
+    def get_language_model_binary_file_path(self):
+        return self.language_model_output_directory + self.language_model_binary_file_name
 
     def create_language_model_train_file(self, language_model_text: str):
         with open(self.get_language_model_train_file_path(), "w") as text_file:
@@ -44,8 +51,14 @@ class TestLanguageModelCreator:
     def create_language_model_arpa_file(self, ngram_order: int):
         kenlm_interface = KenlmInterface.create_kenlm_interface(
             self.handwriting_recognition_root_dir)
-        kenlm_interface.create_language_model_for_file(
+        kenlm_interface.create_arpa_language_model_for_file(
             ngram_order, self.get_language_model_train_file_path(), self.get_language_model_arpa_file_path())
+
+    def create_language_model_binary_file(self):
+        kenlm_interface = KenlmInterface.create_kenlm_interface(
+            self.handwriting_recognition_root_dir)
+        kenlm_interface.build_binary_language_model_for_file(
+            self.get_language_model_arpa_file_path(), self.get_language_model_binary_file_path())
 
 
 class TestCTCDecodeWithLanguageModel:
@@ -60,6 +73,7 @@ def create_test_language_model(handwriting_recognition_root_dir: str):
     test_language_model_creator.create_language_model_train_file(TestLanguageModelCreator.LANGUAGE_MODEL_TEXT)
     # For a higher order language model a bigger, non-artificial training set may be required.
     test_language_model_creator.create_language_model_arpa_file(1)
+    test_language_model_creator.create_language_model_binary_file()
 
 
 def main():
