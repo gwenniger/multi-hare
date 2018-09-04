@@ -94,8 +94,9 @@ class Evaluator:
                 label_sizes = WarpCTCLossInterface. \
                     create_sequence_lengths_specification_tensor_different_lengths(labels)
 
-                sequence_lengths = WarpCTCLossInterface.create_probabilities_lengths_specification_tensor_different_lengths(
-                    labels, horizontal_reduction_factor, probabilities)
+                sequence_lengths = WarpCTCLossInterface.\
+                    create_probabilities_lengths_specification_tensor_different_lengths(
+                        labels, horizontal_reduction_factor, probabilities)
                 # print(">>> evaluate_mdrnn  -  sequence lengths: " + str(sequence_lengths))
                 # print("probabilities.data.size(): " + str(probabilities.data.size()))
                 beam_results, beam_scores, timesteps, out_seq_len = \

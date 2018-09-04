@@ -21,7 +21,6 @@ class KenlmInterface:
     def kenlm_build_language_model_command_arguments(self, ngram_order: int):
         return list(["-o", str(ngram_order), "-S", "20%"])
 
-
     def kenlm_build_arpa_language_model_command(self, ngram_order: int):
         program_arguments = self.kenlm_build_language_model_command_arguments(ngram_order)
         result = list([self.kenlm_bin_dir() + KenlmInterface.BUILD_ARPA_LANGUAGE_MODEL_PROGRAM_NAME])
@@ -42,9 +41,13 @@ class KenlmInterface:
             input_file_path)
 
     def build_binary_language_model_for_file(self, arpa_language_model_file_path, binary_output_file_path):
+        command = self.kenlm_build_binar_language_model_command()
+        command.append(arpa_language_model_file_path)
+        command.append(binary_output_file_path)
+        print("Build binary language model command: " + str(command))
         LinuxInteractor.execute_external_command_and_show_output(
-            self.kenlm_build_binar_language_model_command(),
+            command,
             self.kenlm_bin_dir(),
-            binary_output_file_path,
-            arpa_language_model_file_path)
+            None,
+            None)
 
