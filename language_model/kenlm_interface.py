@@ -1,5 +1,5 @@
 from util.linux_interactor import LinuxInteractor
-
+import sys
 
 class KenlmInterface:
     KEN_LM_ROOT_DIR_SUFFIX = "libraries/ctcdecode/third_party/kenlm"
@@ -19,6 +19,7 @@ class KenlmInterface:
         return self.kenlm_root_dir + KenlmInterface.BIN_SUFFIX
 
     def kenlm_build_language_model_command_arguments(self, ngram_order: int):
+        #return list(["-o", str(ngram_order), "-S", "20%", "--discount_fallback"])
         return list(["-o", str(ngram_order), "-S", "20%"])
 
     def kenlm_build_arpa_language_model_command(self, ngram_order: int):
@@ -51,3 +52,39 @@ class KenlmInterface:
             None,
             None)
 
+
+def get_arpa_output_file_path_from_prefix(language_model_file_prefix):
+    return language_model_file_prefix + ".arpa"
+
+
+def get_binary_output_file_path_from_prefix(language_model_file_prefix):
+    return language_model_file_prefix + ".binary"
+
+
+def main():
+
+    if len(sys.argv) != 5:
+        raise RuntimeError("Error - usage: "
+                           "kenlm_build_language_model HANDWRITING_RECOGNITION_ROOT_DIR "
+                           "LANGUAGE_MODEL_INPUT_FILE_PATH OUTPUT_FILE_PATH_PREFIX NGRAM_ORDER")
+
+    handwriting_recognition_root_dir = sys.argv[1]
+    input_file_path = sys.argv[2]
+    output_file_path_prefix = sys.argv[3]
+    ngram_order = int(sys.argv[4])
+
+    kenlm_interface = KenlmInterface.create_kenlm_interface(handwriting_recognition_root_dir)
+    arpa_file_path = get_arpa_output_file_path_from_prefix(
+                                                            output_file_path_prefix
+                                                        )
+    kenlm_interface.create_arpa_language_model_for_file(ngram_order, input_file_path,
+                                                        arpa_file_path
+                                                        )
+    binary_file_path = get_binary_output_file_path_from_prefix(
+        output_file_path_prefix
+    )
+    kenlm_interface.build_binary_language_model_for_file(arpa_file_path, binary_file_path)
+
+
+if __name__ == "__main__":
+    main()

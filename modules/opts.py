@@ -118,6 +118,23 @@ def train_opts(parser):
                        help="""If training from a checkpoint then this is the
                        path to the pretrained model's state_dict.""")
 
+    # Language model options
+    group = parser.add_argument_group('language-model')
+    group.add_argument('-language_model_file_path', type=str,
+                       help="Path to (binary) kenlm language model file",
+                       required=True)
+    group.add_argument('-language_model_weight', type=float,
+                       help='The weight of the language model (also known as '
+                            'the decoder parameter \"alpha\")', required=True)
+    group.add_argument('-word_insertion_penalty', type=float,
+                       help='The word insertion penalty (also known as '
+                            'the decoder parameter \"beta\")', required=True)
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('-use_language_model', dest='use_language_model',
+                       action='store_true')
+    group.add_argument('-no_language_model', dest='use_language_model',
+                       action='store_false')
+
     # Optimization options
     group = parser.add_argument_group('Optimization- Type')
     group.add_argument('-batch_size', type=int, default=64,

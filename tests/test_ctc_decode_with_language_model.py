@@ -307,8 +307,6 @@ def main():
         test_decoder_without_active_language_model_artificial_data_two(handwriting_recognition_root_dir)
 
 
-
-
 if __name__ == "__main__":
     main()
 

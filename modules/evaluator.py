@@ -10,15 +10,31 @@ import evaluation_metrics.character_error_rate
 import evaluation_metrics.word_error_rate
 
 
+class LanguageModelParameters:
+
+    def __init__(self, language_model_file_path: str,
+                 language_model_weight: float,
+                 word_insertion_penalty: float):
+        self.language_model_file_path = language_model_file_path
+        self.language_model_weight = language_model_weight
+        self.word_insertion_penalty = word_insertion_penalty
+
+
 class Evaluator:
 
     # Note that if seq_len=0 then the result will always be the empty String
     @staticmethod
-    def convert_to_string(tokens, vocab, seq_len):
+    def convert_to_string(tokens, vocab, seq_len, use_language_model_in_decoder: bool):
         # print("convert_to_string - tokens: " + str(tokens))
         # print("convert_to_string - vocab: " + str(vocab))
         # print("convert_to_string - seq_len: " + str(seq_len))
+
         result = ''.join([vocab[x] for x in tokens[0:seq_len]])
+
+        # The decoder that uses the language model produces tokens including white spaces
+        if use_language_model_in_decoder:
+            result = result.replace(" ", "|")
+
         # print("convert_to_string - result: " + str(result))
         return result
 
@@ -42,9 +58,32 @@ class Evaluator:
         return result
 
     @staticmethod
+    def create_decoder(vocab_list: list, beam_size, blank_symbol,
+                       language_model_parameters: LanguageModelParameters):
+        if language_model_parameters is not None:
+
+            print("Creating decoder with language model loaded from " +
+                  str(language_model_parameters.language_model_file_path))
+
+            decoder = ctcdecode.\
+                CTCBeamDecoder(
+                    vocab_list, model_path=language_model_parameters.language_model_file_path,
+                    beam_width=beam_size, alpha=language_model_parameters.language_model_weight,
+                    beta=language_model_parameters.word_insertion_penalty,
+                    blank_id=vocab_list.index(blank_symbol),
+                    num_processes=16)
+        else:
+
+            decoder = ctcdecode.CTCBeamDecoder(vocab_list, beam_width=beam_size,
+                                               blank_id=vocab_list.index(blank_symbol),
+                                               num_processes=16)
+        return decoder
+
+    @staticmethod
     def evaluate_mdrnn(test_loader, multi_dimensional_rnn, device,
                        vocab_list: list, blank_symbol: str, horizontal_reduction_factor: int,
-                       image_input_is_unsigned_int: bool, minimize_horizontal_padding: bool):
+                       image_input_is_unsigned_int: bool, minimize_horizontal_padding: bool,
+                       language_model_parameters: LanguageModelParameters):
 
         correct = 0
         total = 0
@@ -88,9 +127,8 @@ class Evaluator:
 
                 beam_size = 20
                 print(">>> evaluate_mdrnn  - len(vocab_list): " + str(len(vocab_list)))
-                decoder = ctcdecode.CTCBeamDecoder(vocab_list, beam_width=beam_size,
-                                                   blank_id=vocab_list.index(blank_symbol),
-                                                   num_processes=16)
+                decoder = Evaluator.create_decoder(vocab_list, beam_size, blank_symbol,
+                                                   language_model_parameters)
                 label_sizes = WarpCTCLossInterface. \
                     create_sequence_lengths_specification_tensor_different_lengths(labels)
 
@@ -112,8 +150,10 @@ class Evaluator:
                 for example_index in range(0, beam_results.size(0)):
                     beam_results_sequence = beam_results[example_index][0]
                     # print("beam_results_sequence: \"" + str(beam_results_sequence) + "\"")
+                    use_language_model_in_decoder = language_model_parameters is not None
                     output_string = Evaluator.convert_to_string(
-                        beam_results_sequence, vocab_list, out_seq_len[example_index][0])
+                        beam_results_sequence, vocab_list, out_seq_len[example_index][0],
+                        use_language_model_in_decoder)
                     example_labels_with_padding = labels[example_index]
                     # Extract the real example labels, removing the padding labels
                     reference_labels = example_labels_with_padding[0:label_sizes[example_index]]

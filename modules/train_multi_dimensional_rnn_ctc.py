@@ -23,6 +23,7 @@ import torch.optim as optim
 from modules.trainer import ModelProperties
 from modules.trainer import Trainer
 from modules.evaluator import Evaluator
+from modules.evaluator import LanguageModelParameters
 from modules.optim import Optim
 import os
 import opts
@@ -690,7 +691,7 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
         real_model.set_training(False)  # When using DataParallel
         validation_stats = Evaluator.evaluate_mdrnn(validation_loader, network, device, vocab_list, blank_symbol,
                                                     width_reduction_factor, image_input_is_unsigned_int,
-                                                    perform_horizontal_batch_padding
+                                                    perform_horizontal_batch_padding, None
                                                     )
         real_model.set_training(True)  # When using DataParallel
         print("</validation evaluation epoch " + str(epoch) + " >")
@@ -701,14 +702,19 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
 
     print('Evaluation on test set...')
 
-    print("<test evaluation epoch " + str(epoch) + " >")
+    print("<test evaluation, model epoch " + str(opt.epochs) + " >")
     # Run evaluation
     # multi_dimensional_rnn.set_training(False) # Normal case
+
     network.module.set_training(False)  # When using DataParallel
     Evaluator.evaluate_mdrnn(test_loader, network, device, vocab_list, blank_symbol,
-                             width_reduction_factor, image_input_is_unsigned_int)
+                             width_reduction_factor, image_input_is_unsigned_int,
+                             perform_horizontal_batch_padding,
+                             LanguageModelParameters(opt.language_model_file_path,
+                                                     opt.language_model_weight,
+                                                     opt.word_insertion_penalty))
     network.module.set_training(True)  # When using DataParallel
-    print("</test evaluation epoch " + str(epoch) + " >")
+    print("</test evaluation, model epoch " + str(opt.epochs) + " >")
 
 
 def mnist_recognition_fixed_length():
@@ -806,6 +812,8 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
 
 
 def iam_line_recognition(model_opt, checkpoint):
+        print("opt.language_model_file_path: " + str(opt.language_model_file_path))
+
 
         # With the improved padding, the height of the images is 128,
         # and memory usage is less, so batch_size 30 instead of 20 is possible,
