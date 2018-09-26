@@ -8,6 +8,7 @@ from modules.validation_stats import ValidationStats
 from modules.network_to_softmax_network import NetworkToSoftMaxNetwork
 import evaluation_metrics.character_error_rate
 import evaluation_metrics.word_error_rate
+import re
 
 
 class LanguageModelParameters:
@@ -21,6 +22,7 @@ class LanguageModelParameters:
 
 
 class Evaluator:
+    WORD_SEPARATOR_SYMBOL = "|"
 
     # Note that if seq_len=0 then the result will always be the empty String
     @staticmethod
@@ -34,6 +36,24 @@ class Evaluator:
         # The decoder that uses the language model produces tokens including white spaces
         if use_language_model_in_decoder:
             result = result.replace(" ", "|")
+            # In case the word separator is included in the language model token, the decoder
+            # can produce double separators (one from the above replacement and one from the
+            # word separator appended to the 2nd till nth word).
+            # If the word separator is a separate language model token, the model can even produce
+            # long sequences of word separators with no characters in between.
+            # To counter this, replacing
+            # the repeated word separators by single separators is necessary.
+            print("result before: " + str(result))
+
+            # replace two or more "|" with a single one
+            result = re.sub('\|\|+', '|', result)
+            # result = result.replace("||", "|")
+
+            # If the result starts with a word separator, that should be removed for the final result
+            if result.startswith("|"):
+                result = result[1:]
+            print("result after: " + str(result))
+
 
         # print("convert_to_string - result: " + str(result))
         return result
@@ -80,6 +100,37 @@ class Evaluator:
         return decoder
 
     @staticmethod
+    def append_preceding_word_separator_to_probabilities(probabilities: torch.Tensor,
+                                                         vocab_list: list, word_separator_symbol: str):
+        """
+        The goal of this method is to add artificial probabilities 1 for the word separator symbol
+        as an extra symbol probabilities column in probabilities. This is to allow the decoder
+        to find a word separator symbol, which is not actually in the original probabilities, but which is
+        needed to allow the language model to be trained with a word separator symbol pre-pended at the
+        beginning of each word.
+
+        """
+        print("probabilities.size(): " + str(probabilities.size()))
+        batch_size = probabilities.size(0)
+        number_of_symbols_including_blank = probabilities.size(2)
+        extra_probabilities_slice = torch.zeros([batch_size, number_of_symbols_including_blank],
+                                                device=probabilities.get_device())
+        word_separator_index = vocab_list.index(word_separator_symbol)
+        extra_probabilities_slice[:, word_separator_index] = 1
+        extra_probabilities_slice = extra_probabilities_slice.unsqueeze(1)
+        print("extra_probabilities_slice: " + str(extra_probabilities_slice))
+        probabilities_with_artificial_preceding_word_separator = \
+            torch.cat((extra_probabilities_slice, probabilities), 1)
+        return probabilities_with_artificial_preceding_word_separator
+
+    @staticmethod
+    def increase_sequence_lengths_by_one(sequence_lengths: torch.Tensor):
+        print("sequence_lengths: " + str(sequence_lengths))
+        sequence_lengths = sequence_lengths + torch.ones_like(sequence_lengths)
+        print("sequence_lengths after: " + str(sequence_lengths))
+        return sequence_lengths
+
+    @staticmethod
     def evaluate_mdrnn(test_loader, multi_dimensional_rnn, device,
                        vocab_list: list, blank_symbol: str, horizontal_reduction_factor: int,
                        image_input_is_unsigned_int: bool, minimize_horizontal_padding: bool,
@@ -121,11 +172,15 @@ class Evaluator:
                 # be applied to the outputs
                 probabilities = torch.nn.functional. \
                     softmax(outputs, probabilities_sum_to_one_dimension)
+                probabilities = Evaluator.append_preceding_word_separator_to_probabilities(
+                    probabilities, vocab_list, Evaluator.WORD_SEPARATOR_SYMBOL)
 
                 print(">>> evaluate_mdrnn  - outputs.size: " + str(outputs.size()))
                 print(">>> evaluate_mdrnn  - probabilities.size: " + str(probabilities.size()))
 
-                beam_size = 20
+                # beam_size = 20   # This is the problem perhaps...
+                beam_size = 100  # The normal default is 100
+                # beam_size = 1000  # Larger value to see if it further improves results
                 print(">>> evaluate_mdrnn  - len(vocab_list): " + str(len(vocab_list)))
                 decoder = Evaluator.create_decoder(vocab_list, beam_size, blank_symbol,
                                                    language_model_parameters)
@@ -135,6 +190,7 @@ class Evaluator:
                 sequence_lengths = WarpCTCLossInterface.\
                     create_probabilities_lengths_specification_tensor_different_lengths(
                         labels, horizontal_reduction_factor, probabilities)
+                sequence_lengths = Evaluator.increase_sequence_lengths_by_one(sequence_lengths)
                 # print(">>> evaluate_mdrnn  -  sequence lengths: " + str(sequence_lengths))
                 # print("probabilities.data.size(): " + str(probabilities.data.size()))
                 beam_results, beam_scores, timesteps, out_seq_len = \
