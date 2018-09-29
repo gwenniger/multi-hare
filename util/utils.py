@@ -27,3 +27,6 @@ class Utils:
             tensor_list_on_device.append(element)
         return tensor_list_on_device
 
+    @staticmethod
+    def str2bool(v):
+        return v.lower() in ("yes", "true", "t", "1")

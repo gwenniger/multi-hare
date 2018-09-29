@@ -204,7 +204,8 @@ class IamLinesDataset(Dataset):
     def get_data_loader_with_appropriate_padding(self, data_set, max_image_height,
                                                  max_image_width, max_labels_length,
                                                  batch_size: int, padding_strategy: PaddingStrategy,
-                                                 keep_unsigned_int_format: bool):
+                                                 keep_unsigned_int_format: bool,
+                                                 shuffle: bool):
         to_tensor = ToTensor()
 
         train_set_pairs = list([])
@@ -371,8 +372,9 @@ class IamLinesDataset(Dataset):
                 last_percentage_complete = percentage_complete
             sample_index += 1
 
-        train_loader = padding_strategy.create_train_loader(train_set_pairs, batch_size)
-        return train_loader
+        data_loader = padding_strategy.create_data_loader(train_set_pairs, batch_size,
+                                                           shuffle)
+        return data_loader
 
     @staticmethod
     def check_fractions_add_up_to_one(fractions: list):
@@ -418,18 +420,21 @@ class IamLinesDataset(Dataset):
         print("Prepare IAM data train loader...")
         train_loader = self.get_data_loader_with_appropriate_padding(train_set, max_image_height, max_image_width,
                                                                      max_labels_length, batch_size, padding_strategy,
-                                                                     keep_unsigned_int_format)
+                                                                     keep_unsigned_int_format,
+                                                                     shuffle=True)
 
         print("Prepare IAM data validation loader...")
         validation_loader = self.get_data_loader_with_appropriate_padding(validation_set, max_image_height,
                                                                           max_image_width,
                                                                           max_labels_length, batch_size,
-                                                                          padding_strategy, keep_unsigned_int_format)
+                                                                          padding_strategy, keep_unsigned_int_format,
+                                                                          shuffle=False)
 
         print("Prepare IAM data test loader...")
         test_loader = self.get_data_loader_with_appropriate_padding(test_set, max_image_height, max_image_width,
                                                                     max_labels_length, batch_size,
-                                                                    padding_strategy, keep_unsigned_int_format)
+                                                                    padding_strategy, keep_unsigned_int_format,
+                                                                    shuffle=False)
 
         return train_loader, validation_loader, test_loader
 

@@ -24,7 +24,8 @@ class PaddingStrategy(ABC):
         raise RuntimeError("not implemented")
 
     @abstractmethod
-    def create_train_loader(self, train_set_pairs, batch_size):
+    def create_data_loader(self, train_set_pairs, batch_size,
+                           shuffle: bool):
         raise RuntimeError("not implemented")
 
     @staticmethod
@@ -67,12 +68,13 @@ class FullPaddingStrategy(PaddingStrategy):
     def get_columns_padding_required(self, image_width, max_image_width):
         return max_image_width - image_width
 
-    def create_train_loader(self, train_set_pairs, batch_size):
+    def create_data_loader(self, train_set_pairs, batch_size,
+                           shuffle: bool):
 
         train_loader = torch.utils.data.DataLoader(
             dataset=train_set_pairs,
             batch_size=batch_size,
-            shuffle=True)
+            shuffle=shuffle)
         return train_loader
 
 
@@ -117,12 +119,13 @@ class MinimalHorizontalPaddingStrategyBase(PaddingStrategy):
         # a simple custom collate function
 
     # https://discuss.pytorch.org/t/how-to-create-a-dataloader-with-variable-size-input/8278/3
-    def create_train_loader(self, train_set_pairs, batch_size):
+    def create_data_loader(self, train_set_pairs, batch_size,
+                           shuffle: bool):
 
         train_loader = torch.utils.data.DataLoader(
             dataset=train_set_pairs,
             batch_size=batch_size,
-            shuffle=True,
+            shuffle=shuffle,
             collate_fn=self.get_collate_function(),
             pin_memory=False)
 

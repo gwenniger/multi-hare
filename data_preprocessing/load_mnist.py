@@ -192,7 +192,7 @@ def get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_dig
         #plt.show()
         i += sequence_length
 
-    train_loader = padding_strategy.create_train_loader(train_set_pairs, batch_size)
+    train_loader = padding_strategy.create_data_loader(train_set_pairs, batch_size, True)
     return train_loader
 
 
