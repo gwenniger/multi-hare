@@ -139,6 +139,9 @@ class Evaluator:
         correct = 0
         total = 0
 
+        output_strings = list([])
+        reference_labels_strings = list([])
+
         for data in test_loader:
             inputs, labels = data
 
@@ -199,9 +202,6 @@ class Evaluator:
                 # print(">>> evaluate_mdrnn  - beam_results: " + str(beam_results))
 
                 total += labels.size(0)
-
-                output_strings = list([])
-                reference_labels_strings = list([])
 
                 for example_index in range(0, beam_results.size(0)):
                     beam_results_sequence = beam_results[example_index][0]

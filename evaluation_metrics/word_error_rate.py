@@ -67,6 +67,9 @@ def compute_word_error_rate_for_list_of_output_reference_pairs(outputs_as_string
         total_distance += distance
         total_reference_length += reference_length
 
+    print("compute_word_error_rate_for_list_of_output_reference_pairs - total_distance: " +
+          str(total_distance) + " total reference length: " + str(total_reference_length))
+
     result = total_distance / total_reference_length
     # print("result: " + str(result))
     return result
