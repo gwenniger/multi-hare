@@ -1,4 +1,5 @@
 import sys
+from util.utils import Utils
 
 
 class LinesWithExplicitWordSeparatorFileCreator:
@@ -15,15 +16,11 @@ class LinesWithExplicitWordSeparatorFileCreator:
         self.integrate_word_separator_with_words = integrate_word_separator_with_words
 
     @staticmethod
-    def str2bool(v):
-        return v.lower() in ("yes", "true", "t", "1")
-
-    @staticmethod
     def create_lines_with_explicit_word_separator_file_creator(input_file_path: str,
                                                                output_file_path: str,
                                                                integrate_word_separator_with_words_string: str):
 
-        integrate_word_separator_with_words = LinesWithExplicitWordSeparatorFileCreator.str2bool(
+        integrate_word_separator_with_words = Utils.str2bool(
             integrate_word_separator_with_words_string)
 
         return LinesWithExplicitWordSeparatorFileCreator(

@@ -2,6 +2,7 @@ from abc import abstractmethod
 import sys
 from collections import OrderedDict
 
+
 class WordCasingGrouping:
 
     @abstractmethod
@@ -73,6 +74,7 @@ class WordFrequencyTable:
         #       + str(word_frequency_table.word_groups_sorted_by_count))
         print("\nword_frequency_table.word_group_frequency_rank_table: "
               + str(word_frequency_table.word_group_frequency_rank_table))
+
 
 def main():
 

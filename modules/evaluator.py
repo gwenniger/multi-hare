@@ -182,8 +182,8 @@ class Evaluator:
                 print(">>> evaluate_mdrnn  - probabilities.size: " + str(probabilities.size()))
 
                 # beam_size = 20   # This is the problem perhaps...
-                beam_size = 100  # The normal default is 100
-                # beam_size = 1000  # Larger value to see if it further improves results
+                # beam_size = 100  # The normal default is 100
+                beam_size = 1000  # Larger value to see if it further improves results
                 print(">>> evaluate_mdrnn  - len(vocab_list): " + str(len(vocab_list)))
                 decoder = Evaluator.create_decoder(vocab_list, beam_size, blank_symbol,
                                                    language_model_parameters)
