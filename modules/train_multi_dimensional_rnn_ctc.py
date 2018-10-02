@@ -827,20 +827,14 @@ def iam_line_recognition(model_opt, checkpoint):
         # iam_database_line_images_root_folder_path = "/datastore/data/iam-database/lines"
         iam_database_line_images_root_folder_path = model_opt.iam_database_line_images_root_folder_path
 
-        print("Loading IAM dataset...")
-        iam_lines_dicionary = IamExamplesDictionary.\
-            create_iam_lines_dictionary(lines_file_path, iam_database_line_images_root_folder_path, True)
-        iam_lines_dataset = IamLinesDataset.create_iam_dataset(iam_lines_dicionary,
-                                                               opt.vocabulary_file_path,
-                                                               "ok", None)
+        iam_lines_dataset = IamLinesDataset.create_iam_lines_dataset_from_input_files(
+            lines_file_path, iam_database_line_images_root_folder_path, opt.vocabulary_file_path)
 
         # This vocab_list will be used by the decoder
         vocab_list = iam_lines_dataset.get_vocabulary_list()
         blank_symbol = iam_lines_dataset.get_blank_symbol()
 
-        train_examples_fraction = 0.80
-        validation_examples_fraction = 0.10
-        test_examples_fraction = 0.10
+
 
         permutation_save_or_load_file_path = opt.data_permutation_file_path
 
@@ -849,9 +843,10 @@ def iam_line_recognition(model_opt, checkpoint):
         minimize_horizontal_padding = True
         perform_horizontal_batch_padding_in_data_loader = False
         train_loader, validation_loader, test_loader = iam_lines_dataset.\
-            get_random_train_set_validation_set_test_set_data_loaders(batch_size, train_examples_fraction,
-                                                                      validation_examples_fraction,
-                                                                      test_examples_fraction,
+            get_random_train_set_validation_set_test_set_data_loaders(batch_size,
+                                                                      IamLinesDataset.TRAIN_EXAMPLES_FRACTION,
+                                                                      IamLinesDataset.VALIDATION_EXAMPLES_FRACTION,
+                                                                      IamLinesDataset.TEST_EXAMPLES_FRACTION,
                                                                       permutation_save_or_load_file_path,
                                                                       minimize_vertical_padding,
                                                                       minimize_horizontal_padding,

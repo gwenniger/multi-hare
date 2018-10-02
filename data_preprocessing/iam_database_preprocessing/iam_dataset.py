@@ -13,11 +13,17 @@ import os.path
 from data_preprocessing.padding_strategy import PaddingStrategy
 from data_preprocessing.last_minute_padding import LastMinutePadding
 
+
 class IamLinesDataset(Dataset):
     EXAMPLE_TYPES_OK = "ok"
     EXAMPLE_TYPES_ERROR = "error"
     EXAMPLE_TYPES_ALL = "all"
     UINT8_WHITE_VALUE = 255
+
+    # Fractions examples train, validation and test set. Hard-coded for now
+    TRAIN_EXAMPLES_FRACTION = 0.80
+    VALIDATION_EXAMPLES_FRACTION = 0.10
+    TEST_EXAMPLES_FRACTION = 0.10
 
     def __init__(self, iam_lines_dictionary: IamExamplesDictionary,
                  examples_line_information: list,
@@ -87,6 +93,20 @@ class IamLinesDataset(Dataset):
         return IamLinesDataset(iam_lines_dictionary, examples_line_information, string_to_index_mapping_table,
                                height_required_per_network_output_row, width_required_per_network_output_column,
                                transformation)
+
+    @staticmethod
+    def create_iam_lines_dataset_from_input_files(
+            iam_database_lines_file_path: str, iam_database_line_images_root_folder_path: str,
+            vocabulary_file_path: str, example_types: str = EXAMPLE_TYPES_OK,
+                           transformation=None):
+        print("Loading IAM dataset...")
+        iam_lines_dicionary = IamExamplesDictionary. \
+            create_iam_lines_dictionary(iam_database_lines_file_path,
+                                        iam_database_line_images_root_folder_path, True)
+        iam_lines_dataset = IamLinesDataset.create_iam_dataset(iam_lines_dicionary,
+                                                               vocabulary_file_path,
+                                                               example_types, transformation)
+        return iam_lines_dataset
 
     def split_random_train_set_validation_set_and_test_set(self,
                                                            train_examples_fraction,
@@ -555,6 +575,12 @@ class IamLinesDataset(Dataset):
             max_length = max(max_length, length)
 
         return max_length
+
+    def split_random_train_set_validation_set_and_test_set_default_subset_size_fractions(
+            self, permutation_save_or_load_file_path: str):
+        return self.split_random_train_set_validation_set_and_test_set(
+            IamLinesDataset.TRAIN_EXAMPLES_FRACTION, IamLinesDataset.VALIDATION_EXAMPLES_FRACTION,
+            permutation_save_or_load_file_path)
 
 
 class Rescale(object):
