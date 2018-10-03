@@ -834,8 +834,6 @@ def iam_line_recognition(model_opt, checkpoint):
         vocab_list = iam_lines_dataset.get_vocabulary_list()
         blank_symbol = iam_lines_dataset.get_blank_symbol()
 
-
-
         permutation_save_or_load_file_path = opt.data_permutation_file_path
 
         image_input_is_unsigned_int = False
@@ -844,12 +842,15 @@ def iam_line_recognition(model_opt, checkpoint):
         perform_horizontal_batch_padding_in_data_loader = False
 
         if opt.use_split_files_specified_data_split:
+            # Load the data and divide into train/dev/test using data-split specification files
             train_loader, validation_loader, test_loader = \
                 iam_lines_dataset.get_train_set_validation_set_test_set_data_loaders_using_split_specification_files(
                     batch_size, opt.train_split_file_path, opt.dev_split_file_path, opt.test_split_file_path,
                     minimize_vertical_padding, minimize_horizontal_padding, image_input_is_unsigned_int,
                     perform_horizontal_batch_padding_in_data_loader)
         else:
+            # Load the data and divide into train/dev/test using hard-coded fractions and a loaded data permutation
+            # file
             train_loader, validation_loader, test_loader = iam_lines_dataset.\
                 get_random_train_set_validation_set_test_set_data_loaders(
                     batch_size, IamLinesDataset.TRAIN_EXAMPLES_FRACTION, IamLinesDataset.VALIDATION_EXAMPLES_FRACTION,
