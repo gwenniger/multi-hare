@@ -135,6 +135,23 @@ def train_opts(parser):
     group.add_argument('-no_language_model', dest='use_language_model',
                        action='store_false')
 
+    # Data split options
+    group = parser.add_argument_group('data-split')
+    group.add_argument('-train_split_file_path', type=str,
+                       help="Path to file specifying the train split",
+                       required=False)
+    group.add_argument('-dev_split_file_path', type=str,
+                       help="Path to file specifying the dev split",
+                       required=False)
+    group.add_argument('-test_split_file_path', type=str,
+                       help="Path to file specifying the dev split",
+                       required=False)
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('-use_split_files_specified_data_split', dest='use_split_files_specified_data_split',
+                       action='store_true')
+    group.add_argument('-use_fractions_based_data_split', dest='use_split_files_specified_data_split',
+                       action='store_false')
+
     # Optimization options
     group = parser.add_argument_group('Optimization- Type')
     group.add_argument('-batch_size', type=int, default=64,

@@ -163,11 +163,11 @@ class LobOriginalPreprocessor:
             lob_part_id_to_lines_map = self.process_lob_original_files()
 
             for part_id in lob_part_id_to_lines_map.keys():
-                output_file.write("\n<part-id-" + part_id + ">")
+                # output_file.write("\n<part-id-" + part_id + ">")
                 lines = lob_part_id_to_lines_map[part_id]
                 for line in lines:
-                    output_file.write("\n" + line)
-                output_file.write("\n</part-id-" + part_id + ">")
+                    output_file.write(line + "\n")
+                # output_file.write("\n</part-id-" + part_id + ">")
             # output_file.close()
 
 

@@ -407,29 +407,19 @@ class IamLinesDataset(Dataset):
             raise RuntimeError("Error: fractions" + str(fractions) +
                                " must sum up to one")
 
-    def get_random_train_set_validation_set_test_set_data_loaders(
-            self, batch_size: int, train_examples_fraction: float,
-            validation_examples_fraction: float, test_examples_fraction: float,
-            permutation_save_or_load_file_path: str, minimize_vertical_padding: bool,
+    def get_train_set_validation_set_test_set_data_loaders(
+            self, batch_size: int, train_set, validation_set, test_set,
+            minimize_vertical_padding: bool,
             minimize_horizontal_padding: bool, keep_unsigned_int_format: bool,
             perform_horizontal_batch_padding_in_data_loader_: bool):
 
         print("Entered get_random_train_set_validation_set_test_set_data_loaders...")
-
-        IamLinesDataset.check_fractions_add_up_to_one(list([train_examples_fraction,
-                                                           validation_examples_fraction,
-                                                           test_examples_fraction]))
 
         max_image_height, max_image_width = self.get_max_image_dimension()
         # print("max image height: " + str(max_image_height))
         # print("max image width: " + str(max_image_width))
         max_labels_length = self.get_max_labels_length()
         # print("max labels length: " + str(max_labels_length))
-
-        train_set, validation_set, test_set = self.\
-            split_random_train_set_validation_set_and_test_set(train_examples_fraction,
-                                                               validation_examples_fraction,
-                                                               permutation_save_or_load_file_path)
 
         padding_strategy = PaddingStrategy.create_padding_strategy(self.height_required_per_network_output_row,
                                                                    self.width_required_per_network_output_column,
@@ -457,6 +447,132 @@ class IamLinesDataset(Dataset):
                                                                     shuffle=False)
 
         return train_loader, validation_loader, test_loader
+
+    def get_random_train_set_validation_set_test_set_data_loaders(
+            self, batch_size: int, train_examples_fraction: float,
+            validation_examples_fraction: float, test_examples_fraction: float,
+            permutation_save_or_load_file_path: str, minimize_vertical_padding: bool,
+            minimize_horizontal_padding: bool, keep_unsigned_int_format: bool,
+            perform_horizontal_batch_padding_in_data_loader: bool):
+
+        IamLinesDataset.check_fractions_add_up_to_one(list([train_examples_fraction,
+                                                            validation_examples_fraction,
+                                                            test_examples_fraction]))
+
+        train_set, validation_set, test_set = self. \
+            split_random_train_set_validation_set_and_test_set(train_examples_fraction,
+                                                               validation_examples_fraction,
+                                                               permutation_save_or_load_file_path)
+
+        return self.get_train_set_validation_set_test_set_data_loaders(
+                batch_size, train_set, validation_set, test_set,
+                minimize_vertical_padding,
+                minimize_horizontal_padding, keep_unsigned_int_format,
+                perform_horizontal_batch_padding_in_data_loader)
+
+    @staticmethod
+    def get_iam_example_ids_set_from_split_file(split_file_path: str):
+        result = set([])
+        with open(split_file_path, "r") as file:
+            for line in file:
+                example_id = line.strip()
+                result.add(example_id)
+        print("get_iam_example_ids_set_from_split_file - split_file_path: " +
+              split_file_path + " result:\n" + str(result))
+        return result
+
+    @staticmethod
+    def get_set_containing_element_and_check_it_is_unique(sets: list, element):
+        """
+        Method that finds the set that contains the element from a list of sets,
+        prints a warning if the set is not found,and raises an error if  is not unique.
+
+        :param sets:
+        :param element:
+        :return:
+        """
+        matching_set = None
+        for i in range(0, len(sets)):
+            current_set = sets[i]
+            if element in current_set:
+                if matching_set is not None:
+                    raise RuntimeError("Error: found multiple matching sets for :" + str(element))
+                matching_set = current_set
+        if matching_set is None:
+            print("WARNING: found no matching set for: " + str(element))
+        return matching_set
+
+    @staticmethod
+    def get_relevant_part_line_id(iam_line_information):
+        line_id_parts = iam_line_information.line_id.split("-")
+        relevant_part_line_id = line_id_parts[0] + "-" + line_id_parts[1]
+        return relevant_part_line_id
+
+    def split_specified_train_set_validation_set_and_test_set(
+            self, train_example_ids_set: set, dev_example_ids_set: set,
+            test_example_ids_set: set):
+
+        print("Entered split_specified_train_set_validation_set_and_test_set...")
+
+        # print("last_train_index: " + str(last_train_index))
+        examples_line_information_train = list([])
+        examples_line_information_validation = list([])
+        examples_line_information_test = list([])
+
+        sets_list = list([train_example_ids_set, dev_example_ids_set, test_example_ids_set])
+        number_of_omitted_examples = 0
+        for iam_line_information in self.examples_line_information:
+            relevant_part_line_id = \
+                IamLinesDataset.get_relevant_part_line_id(iam_line_information)
+            set_containing_id = IamLinesDataset.get_set_containing_element_and_check_it_is_unique(
+                sets_list, relevant_part_line_id)
+            if set_containing_id is train_example_ids_set:
+                print("Assigning example with id" + str(iam_line_information.line_id) + " to training set")
+                examples_list = examples_line_information_train
+            elif set_containing_id is dev_example_ids_set:
+                print("Assigning example with id" + str(iam_line_information.line_id) + " to validation set")
+                examples_list = examples_line_information_validation
+            elif set_containing_id is test_example_ids_set:
+                print("Assigning example with id" + str(iam_line_information.line_id) + " to test set")
+                examples_list = examples_line_information_test
+            else:
+                print("Warning: did not find a valid ids set for the example " + iam_line_information.line_id +
+                      " - omitting this example ")
+                number_of_omitted_examples += 1
+            examples_list.append(iam_line_information)
+        print(">>> number of training examples: " + str(len(examples_line_information_train)))
+        print(">>> number of development examples: " + str(len(examples_line_information_validation)))
+        print(">>> number of test examples: " + str(len(examples_line_information_test)))
+        print(">>> number of omitted examples: " + str(number_of_omitted_examples))
+
+        train_set = IamLinesDataset(self.iam_lines_dictionary, examples_line_information_train,
+                                    self.string_to_index_mapping_table, 64, 8, self.transform)
+        validation_set = IamLinesDataset(self.iam_lines_dictionary, examples_line_information_validation,
+                                         self.string_to_index_mapping_table, 64, 8, self.transform)
+        test_set = IamLinesDataset(self.iam_lines_dictionary, examples_line_information_test,
+                                   self.string_to_index_mapping_table, 64, 8, self.transform)
+
+        return train_set, validation_set, test_set
+
+    def get_train_set_validation_set_test_set_data_loaders_using_split_specification_files(
+            self, batch_size: int, train_examples_split_file_path: str,
+            dev_examples_split_file_path: str, test_examples_split_file_path: str,
+            minimize_vertical_padding: bool,
+            minimize_horizontal_padding: bool, keep_unsigned_int_format: bool,
+            perform_horizontal_batch_padding_in_data_loader: bool):
+
+        train_example_ids_set = IamLinesDataset.get_iam_example_ids_set_from_split_file(train_examples_split_file_path)
+        dev_example_ids_set = IamLinesDataset.get_iam_example_ids_set_from_split_file(dev_examples_split_file_path)
+        test_example_ids_set = IamLinesDataset.get_iam_example_ids_set_from_split_file(test_examples_split_file_path)
+
+        train_set, validation_set, test_set = self.split_specified_train_set_validation_set_and_test_set(
+            train_example_ids_set, dev_example_ids_set, test_example_ids_set)
+
+        return self.get_train_set_validation_set_test_set_data_loaders(
+            batch_size, train_set, validation_set, test_set,
+            minimize_vertical_padding,
+            minimize_horizontal_padding, keep_unsigned_int_format,
+            perform_horizontal_batch_padding_in_data_loader)
 
     def __len__(self):
         return len(self.examples_line_information)
