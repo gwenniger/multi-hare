@@ -712,7 +712,7 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
                              perform_horizontal_batch_padding,
                              LanguageModelParameters(opt.language_model_file_path,
                                                      opt.language_model_weight,
-                                                     opt.word_insertion_penalty))
+                                                     opt.word_insertion_penalty), None, epoch)
     network.module.set_training(True)  # When using DataParallel
     print("</test evaluation, model epoch " + str(opt.epochs) + " >")
 

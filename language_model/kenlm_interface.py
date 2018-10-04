@@ -64,6 +64,9 @@ def get_binary_output_file_path_from_prefix(language_model_file_prefix):
 def main():
 
     if len(sys.argv) != 5:
+        for argument in sys.argv[1:]:
+            print("program argument: " + argument)
+
         raise RuntimeError("Error - usage: "
                            "kenlm_build_language_model HANDWRITING_RECOGNITION_ROOT_DIR "
                            "LANGUAGE_MODEL_INPUT_FILE_PATH OUTPUT_FILE_PATH_PREFIX NGRAM_ORDER")

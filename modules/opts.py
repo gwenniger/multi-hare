@@ -97,7 +97,7 @@ def train_opts(parser):
                        <save_model>_epochN_accuracy.pt where PPL is the
                        validation accuracy""")
 
-    group.add_argument("-save_scores_table_file_path", type=str,
+    group.add_argument("-save_score_table_file_path", type=str,
                        help="path to the file used for saving the development scores in a table format",
                        required=True)
 
