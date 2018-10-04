@@ -85,6 +85,8 @@ def compute_character_error_rate_for_list_of_output_reference_pairs(
         total_reference_length += reference_length
 
     result = total_distance / total_reference_length
+    # Multiply by 100 to make it a percentage
+    result *= 100
     # print("result: " + str(result))
     return result
 
@@ -112,6 +114,8 @@ def compute_character_error_rate_for_list_of_output_reference_pairs_fast(
         total_reference_length += reference_length
 
     result = total_distance / total_reference_length
+    # Multiply by 100 to make it a percentage
+    result *= 100
     # print("result: " + str(result))
     return result
 

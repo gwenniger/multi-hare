@@ -96,6 +96,11 @@ def train_opts(parser):
                        help="""Model filename (the model will be saved as
                        <save_model>_epochN_accuracy.pt where PPL is the
                        validation accuracy""")
+
+    group.add_argument("-save_scores_table_file_path", type=str,
+                       help="path to the file used for saving the development scores in a table format",
+                       required=True)
+
     # GPU
     group.add_argument('-gpuid', default=[], nargs='+', type=int,
                        help="Use CUDA on the listed devices.")

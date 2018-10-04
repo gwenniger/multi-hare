@@ -35,6 +35,8 @@ def word_error_rate_single_output_reference_pair(symbol_list_output: list, symbo
     # print("reference_length: " + str(reference_length))
     result = distance / reference_length
     # print("result: " + str(result))
+    # Multiply by 100 to make it a percentage
+    result *= 100
     return result
 
 
@@ -72,6 +74,8 @@ def compute_word_error_rate_for_list_of_output_reference_pairs(outputs_as_string
 
     result = total_distance / total_reference_length
     # print("result: " + str(result))
+    # Multiply by 100 to make it a percentage
+    result *= 100
     return result
 
 

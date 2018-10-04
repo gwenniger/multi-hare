@@ -9,6 +9,7 @@ from modules.network_to_softmax_network import NetworkToSoftMaxNetwork
 import evaluation_metrics.character_error_rate
 import evaluation_metrics.word_error_rate
 import re
+import os
 
 
 class LanguageModelParameters:
@@ -131,10 +132,26 @@ class Evaluator:
         return sequence_lengths
 
     @staticmethod
+    def score_table_header(dev_set_size: int):
+        result = "Scores on the development set of size: " + str(dev_set_size) +"\n"
+        result += "\nepoch_number,total_correct,accuracy,CER_including_word_separators[%]," \
+                  "CER_excluding_word_separators[%],WER[%]\n"
+        return result
+
+    @staticmethod
+    def score_table_line(epoch_number: int, total_correct: int, accuracy: float,
+                         cer_including_word_separators: float, cer_excluding_word_separator: float,
+                         wer: float):
+        result = str(epoch_number) + "," + str(total_correct) + "," + str(accuracy) + "," +\
+                 str(cer_including_word_separators) + "," + str(cer_excluding_word_separator) + "," + str(wer)
+        return result
+
+    @staticmethod
     def evaluate_mdrnn(test_loader, multi_dimensional_rnn, device,
                        vocab_list: list, blank_symbol: str, horizontal_reduction_factor: int,
                        image_input_is_unsigned_int: bool, minimize_horizontal_padding: bool,
-                       language_model_parameters: LanguageModelParameters):
+                       language_model_parameters: LanguageModelParameters,
+                       save_score_table_file_path: str, epoch_number: int):
 
         correct = 0
         total = 0
@@ -252,13 +269,26 @@ class Evaluator:
         print("Accuracy of the network on the {} test inputs: {:.2f} % accuracy".format(
             total_examples, validation_stats.get_accuracy()))
 
-        print("Character Error Rate (CER) of the network on the {} test inputs, "
+        print("Character Error Rate (CER)[%] of the network on the {} test inputs, "
               "including word separators: {:.3f}  CER".format(
                 total_examples, cer_including_word_separators))
-        print("Character Error Rate (CER) of the network on the {} test inputs, "
+        print("Character Error Rate (CER)[%] of the network on the {} test inputs, "
               "excluding word separators: {:.3f}  CER".format(
                 total_examples, cer_excluding_word_separators))
-        print("Word Error Rate (WER) of the network on the {} test inputs: {:.3f}  WER".format(
+        print("Word Error Rate (WER)[%] of the network on the {} test inputs: {:.3f}  WER".format(
             total_examples, wer))
+
+        if save_score_table_file_path is not None:
+            score_file_existed = os.path.exists(save_score_table_file_path)
+            # Opens the file in append-mode, create if it doesn't exists
+            with open(save_score_table_file_path, "a") as scores_table_file:
+                if not score_file_existed:
+                    scores_table_file.write(Evaluator.score_table_header(total_examples))
+                scores_table_file.write(Evaluator.score_table_line(epoch_number, correct,
+                                                                   validation_stats.get_accuracy(),
+                                                                   cer_including_word_separators,
+                                                                   cer_excluding_word_separators,
+                                                                   wer) + "\n")
+
 
         return validation_stats

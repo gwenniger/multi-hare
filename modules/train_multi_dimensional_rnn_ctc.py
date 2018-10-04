@@ -691,8 +691,8 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
         real_model.set_training(False)  # When using DataParallel
         validation_stats = Evaluator.evaluate_mdrnn(validation_loader, network, device, vocab_list, blank_symbol,
                                                     width_reduction_factor, image_input_is_unsigned_int,
-                                                    perform_horizontal_batch_padding, None
-                                                    )
+                                                    perform_horizontal_batch_padding, None,
+                                                    opt.save_score_table_file_path, epoch)
         real_model.set_training(True)  # When using DataParallel
         print("</validation evaluation epoch " + str(epoch) + " >")
 
