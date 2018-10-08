@@ -83,6 +83,50 @@ class LobOriginalPreprocessor:
             self.process_lob_original_file_lines(lob_origial_file_path, lob_part_id_to_lines_map)
         return lob_part_id_to_lines_map
 
+    @staticmethod
+    def perform_iam_specific_apostrophe_re_tokenization(line: str):
+        """
+        This function performs iam-specific apostrophe tokenization,
+        to get certain apostrophe-containing constructions in the language model
+        training data to be the same as in the iam dataset. Specifically
+        iam uses at least the following set of somewhat alternative
+        tokenizations:
+
+        |‘ll|   (probably because it's short for "will")
+        |‘ve|   (probably because it's short for "have")
+        |‘d|    (probably because it's short for "would")
+        |‘re|   (probably because it's short for "are")
+        I|‘m|   (probably because it's short for "am")
+        It|’s|  (probably because it's short for "is")
+        That|’s| (probably because it's short for "is")
+        she|‘s|  (probably because it's short for "is")
+
+
+        :param line:
+        :return:
+        """
+        result = line
+        # Make "'ll" a separate token
+        result = result.replace("'ll", " 'll")
+        # Make "'ve" a separate token
+        result = result.replace("'ve", " 've")
+        # Make "'d" a separate token
+        result = result.replace("'d", " 'd")
+        # Make "'re" a separate token
+        result = result.replace("'re", " 're")
+        # Make "'m" a separate token
+        result = result.replace("'m", " 'm")
+        # Make "'s" in "It's" a separate token
+        result = result.replace("It's", "It 's")
+        # Make "'s" in "That's" a separate token
+        result = result.replace("That's", "That 's")
+        # Make "'s" in "she's" a separate token
+        result = result.replace(" she's", " she 's")
+        # Make "'s" in "he's" a separate token
+        result = result.replace(" he's", " he 's")
+
+        return result
+
     def perform_final_punctuation_correction(self, line: str):
         # print("perform_final_punctuation_correction - line: \n\"" +
         #      line + "\"\n")
@@ -118,6 +162,11 @@ class LobOriginalPreprocessor:
             result = result[0:len(result) - 2] + " . \""
         # Replace comma followed by quotation
         result = result.replace(",\"", ", \"")
+
+        # Do some apostrophe re-tokenization mimic the weird tokenization used in the
+        # iam dataset of apostrophes in verbs
+        result = LobOriginalPreprocessor.perform_iam_specific_apostrophe_re_tokenization(result)
+
         return result
 
     def process_lob_original_file_lines(self, lob_input_file_path: str, lob_part_id_to_lines_map: OrderedDict):
