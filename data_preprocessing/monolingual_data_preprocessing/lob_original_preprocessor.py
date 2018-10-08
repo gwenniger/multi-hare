@@ -145,10 +145,12 @@ class LobOriginalPreprocessor:
                             result)
         else:
             result = result.replace(LobOriginalPreprocessor.TEMPORARY_NEWLINE_MARKER, "")
-        # Add a whitespace before a comma, question mark and quotation sign to make
-        # them separate tokens
+        # Add a whitespace before a comma, question mark,
+        # exclamation sign and quotation sign to make them separate tokens
         result = result.replace(",", " ,")
         result = result.replace("?", " ?")
+        result = result.replace("!", " !")
+        result = result.replace("!\"", " ! \"")
         # https://stackoverflow.com/questions/3926451/how-to-match-but-not-capture-part-of-a-regex?rq=1
         # look ahead: next character is letter
         result = re.sub("\"(?=\w)", "\" ", result)
