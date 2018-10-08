@@ -2,6 +2,7 @@ import sys
 import re
 from data_preprocessing.iam_database_preprocessing.iam_dataset import IamLinesDataset
 from data_preprocessing.monolingual_data_preprocessing.lob_original_preprocessor import LobOriginalPreprocessor
+from util.utils import Utils
 
 
 class FilteredLobCorpusCreator:
@@ -22,12 +23,14 @@ class FilteredLobCorpusCreator:
     def create_filterd_lob_corpus_creator(
             iam_database_lines_file_path: str, iam_database_line_images_root_folder_path: str,
             permutation_save_or_load_file_path: str, vocabulary_file_path: str,
-            lob_input_files_directory: str, corpus_output_file_path: str):
+            lob_input_files_directory: str, corpus_output_file_path: str,
+            keep_newlines_within_fragments: bool):
         validation_and_test_set_iam_ids = \
             FilteredLobCorpusCreator.create_iam_validation_and_test_set_iam_fragment_ids_set(
                 iam_database_lines_file_path, iam_database_line_images_root_folder_path,
                 vocabulary_file_path, permutation_save_or_load_file_path)
-        lob_original_preprocessor = LobOriginalPreprocessor.create_lob_original_preprocessor(lob_input_files_directory)
+        lob_original_preprocessor = LobOriginalPreprocessor.create_lob_original_preprocessor(
+            lob_input_files_directory, keep_newlines_within_fragments)
         return FilteredLobCorpusCreator(validation_and_test_set_iam_ids, lob_original_preprocessor,
                                         corpus_output_file_path)
 
@@ -71,15 +74,19 @@ class FilteredLobCorpusCreator:
 
 def main():
 
-    if len(sys.argv) != 7:
+    for i, arg in enumerate(sys.argv[1:]):
+        print("sys.argv[" + str(i+1) + "]: " + arg)
+
+    if len(sys.argv) != 8:
         print("number of arguments: " + str(len(sys.argv)))
         raise RuntimeError("Error - usage: "
-                           "iam_database_fragments_remover IAM_LINES_FILE_PHAT " 
+                           "iam_database_fragments_remover IAM_LINES_FILE_PATH " 
                            "IAM_DATABASE_LINE_IMAGES_ROOT_FOLDER_PATH "
                            "IAM_ORIGINAL_FILES_DIRECTORY_PATH "
                            "CORPUS_OUTPUT_FILE_PATH "
-                           "PERMUTATION_FILE_PATH"
-                           "VOCABULARY_FILE_PATH")
+                           "PERMUTATION_FILE_PATH "
+                           "VOCABULARY_FILE_PATH "
+                           "KEEP_NEWLINES_WITHIN_FRAGMENTS")
 
     iam_lines_file_path = sys.argv[1]
     print("iam_lines_file_path: " + iam_lines_file_path)
@@ -89,12 +96,15 @@ def main():
     corpus_output_file_path = sys.argv[4]
     permutation_file_path = sys.argv[5]
     vocabulary_file_path = sys.argv[6]
+    keep_newlines_within_fragments_string = sys.argv[7]
+    keep_newlines_within_fragments = Utils.str2bool(keep_newlines_within_fragments_string)
     filtered_lob_corpus_creator = FilteredLobCorpusCreator.create_filterd_lob_corpus_creator(
         iam_lines_file_path, iam_database_line_images_root_folder_path,
         permutation_file_path,
         vocabulary_file_path,
         iam_original_files_directory_path,
-        corpus_output_file_path
+        corpus_output_file_path,
+        keep_newlines_within_fragments
     )
     filtered_lob_corpus_creator.create_iam_validation_and_test_fragments_filtered_output_file()
 

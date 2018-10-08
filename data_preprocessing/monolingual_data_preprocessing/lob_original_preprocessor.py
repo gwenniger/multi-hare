@@ -22,12 +22,16 @@ class LobOriginalPreprocessor:
                                     "LOB_R.TXT"])
     NUM_LOB_LINE_PREAMBLE_CHARACTERS = 8
 
-    def __init__(self, lob_input_files_directory_path: str):
+    def __init__(self, lob_input_files_directory_path: str,
+                 keep_newlines_within_fragments: bool):
         self.lob_input_files_directory_path = lob_input_files_directory_path
+        self.keep_newlines_within_fragments = keep_newlines_within_fragments
 
     @staticmethod
-    def create_lob_original_preprocessor(lob_input_files_directory_path: str):
-        return LobOriginalPreprocessor(lob_input_files_directory_path)
+    def create_lob_original_preprocessor(lob_input_files_directory_path: str,
+                                         keep_newlines_within_fragments: bool):
+        return LobOriginalPreprocessor(lob_input_files_directory_path,
+                                       keep_newlines_within_fragments)
 
     def perform_special_symbol_replacements(self, line: str):
         #result = line.replace("*<*", "")
@@ -79,14 +83,24 @@ class LobOriginalPreprocessor:
             self.process_lob_original_file_lines(lob_origial_file_path, lob_part_id_to_lines_map)
         return lob_part_id_to_lines_map
 
-    @staticmethod
-    def perform_final_punctuation_correction(line: str):
+    def perform_final_punctuation_correction(self, line: str):
+        # print("perform_final_punctuation_correction - line: \n\"" +
+        #      line + "\"\n")
         result = line
         # Use temporary newline markers to add whitespace before colon where appropriate
-        result = result.replace(". " + LobOriginalPreprocessor.TEMPORARY_NEWLINE_MARKER, " . ")
-        result = result.replace(".\" " + LobOriginalPreprocessor.TEMPORARY_NEWLINE_MARKER, " . \"")
+        result = re.sub("\.\s+" +
+                        LobOriginalPreprocessor.TEMPORARY_NEWLINE_MARKER,
+                        " . " + LobOriginalPreprocessor.TEMPORARY_NEWLINE_MARKER,
+                        result)
+        result = result.replace(".\" " + LobOriginalPreprocessor.TEMPORARY_NEWLINE_MARKER,
+                                " . \" " + LobOriginalPreprocessor.TEMPORARY_NEWLINE_MARKER)
         # Remove remaining temporary newline markers
-        result = result.replace(LobOriginalPreprocessor.TEMPORARY_NEWLINE_MARKER, "")
+        if self.keep_newlines_within_fragments:
+            result = re.sub("\s*" + LobOriginalPreprocessor.TEMPORARY_NEWLINE_MARKER,
+                            "\n",
+                            result)
+        else:
+            result = result.replace(LobOriginalPreprocessor.TEMPORARY_NEWLINE_MARKER, "")
         # Add a whitespace before a comma, question mark and quotation sign to make
         # them separate tokens
         result = result.replace(",", " ,")
@@ -126,7 +140,7 @@ class LobOriginalPreprocessor:
                         # Add the current lines list to the map
                         if current_lines_list is not None:
                             current_lines_list.append(
-                                LobOriginalPreprocessor.perform_final_punctuation_correction(
+                                self.perform_final_punctuation_correction(
                                     current_line_accumulator))
                             lob_part_id_to_lines_map[current_part_id] = current_lines_list
                             current_line_accumulator = ""
@@ -146,7 +160,7 @@ class LobOriginalPreprocessor:
                         if LobOriginalPreprocessor.is_title_contents_line(line_contents_part):
                             if len(current_line_accumulator) > 0:
                                 current_lines_list.append(
-                                    LobOriginalPreprocessor.perform_final_punctuation_correction(
+                                    self.perform_final_punctuation_correction(
                                         current_line_accumulator)
                                 )
                             current_lines_list.append(special_symbol_replaced_contents)

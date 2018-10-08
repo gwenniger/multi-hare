@@ -712,7 +712,7 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
                              perform_horizontal_batch_padding,
                              LanguageModelParameters(opt.language_model_file_path,
                                                      opt.language_model_weight,
-                                                     opt.word_insertion_penalty), None, epoch)
+                                                     opt.word_insertion_penalty), None, None)
     network.module.set_training(True)  # When using DataParallel
     print("</test evaluation, model epoch " + str(opt.epochs) + " >")
 
@@ -851,12 +851,15 @@ def iam_line_recognition(model_opt, checkpoint):
         else:
             # Load the data and divide into train/dev/test using hard-coded fractions and a loaded data permutation
             # file
+
             train_loader, validation_loader, test_loader = iam_lines_dataset.\
                 get_random_train_set_validation_set_test_set_data_loaders(
                     batch_size, IamLinesDataset.TRAIN_EXAMPLES_FRACTION, IamLinesDataset.VALIDATION_EXAMPLES_FRACTION,
                     IamLinesDataset.TEST_EXAMPLES_FRACTION, permutation_save_or_load_file_path,
                     minimize_vertical_padding, minimize_horizontal_padding, image_input_is_unsigned_int,
-                    perform_horizontal_batch_padding_in_data_loader)
+                    perform_horizontal_batch_padding_in_data_loader,
+                    opt.save_dev_set_file_path,
+                    opt.save_test_set_file_path,)
 
         print("Loading IAM dataset: DONE")
 

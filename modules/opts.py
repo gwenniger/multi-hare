@@ -101,6 +101,14 @@ def train_opts(parser):
                        help="path to the file used for saving the development scores in a table format",
                        required=True)
 
+    group.add_argument("-save_dev_set_file_path", type=str,
+                       help="path used to save the dev-set to",
+                       default=None)
+
+    group.add_argument("-save_test_set_file_path", type=str,
+                       help="path used to save the dev-set to",
+                       default=None)
+
     # GPU
     group.add_argument('-gpuid', default=[], nargs='+', type=int,
                        help="Use CUDA on the listed devices.")

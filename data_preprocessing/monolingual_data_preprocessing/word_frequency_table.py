@@ -1,6 +1,7 @@
 from abc import abstractmethod
 import sys
 from collections import OrderedDict
+from util.utils import Utils
 
 
 class WordCasingGrouping:
@@ -32,8 +33,10 @@ class WordFrequencyTable:
         self.word_group_frequency_rank_table = None
 
     @staticmethod
-    def create_word_frequency_table(input_file_path: str, collapse_word_case: bool):
+    def create_word_frequency_table(input_file_path: str, collapse_word_case: bool,
+                                    split_symbol: str = None):
         if collapse_word_case:
+            print(">>>collapsing word case")
             word_case_grouping = LowerCaseWordGrouping()
         else:
             word_case_grouping = KeepCaseWordGrouping()
@@ -41,7 +44,13 @@ class WordFrequencyTable:
 
         with open(input_file_path, 'r') as file:
             for line in file:
-                for word in line.split():
+                stripped_line = line.strip()
+                if split_symbol is not None:
+                    words = stripped_line.split(split_symbol)
+                else:
+                    words = stripped_line.split()
+
+                for word in words:
                     word_frequency_table.increase_word_group_count(word)
 
         word_frequency_table.compute_word_groups_sorted_by_count_and_word_frequency_rank_table()
@@ -62,29 +71,25 @@ class WordFrequencyTable:
         self.word_groups_sorted_by_count = sorted(self.word_group_frequency_table.items(), key=lambda kv: kv[1])
         self.word_groups_sorted_by_count.reverse()
 
+        print("Number of word-groups:" + str(len(self.word_groups_sorted_by_count)))
+
         self.word_group_frequency_rank_table = OrderedDict()
         for i, word_frequency_tuple in enumerate(self.word_groups_sorted_by_count):
             self.word_group_frequency_rank_table[word_frequency_tuple[0]] = i
 
-    @staticmethod
-    def test_word_frequency_table(input_file_path: str):
-        word_frequency_table = WordFrequencyTable.\
-            create_word_frequency_table(input_file_path, False)
-        # print("\nword_frequency_table.word_groups_sorted_by_count: "
-        #       + str(word_frequency_table.word_groups_sorted_by_count))
-        print("\nword_frequency_table.word_group_frequency_rank_table: "
-              + str(word_frequency_table.word_group_frequency_rank_table))
+    def get_word_frequency(self, word: str):
+        word_group = self.word_case_grouping.get_word_group(word)
+        return self.word_group_frequency_table[word_group]
+
+    def get_word_frequency_rank(self, word: str):
+        word_group = self.word_case_grouping.get_word_group(word)
+        return self.word_group_frequency_rank_table[word_group]
+
+    def get_total_word_count(self):
+        total_count = 0
+        for count in self.word_group_frequency_table.values():
+            total_count += count
+        return total_count
 
 
-def main():
-
-    if len(sys.argv) != 2:
-        raise RuntimeError("Error: test_word_frequency_table INPUT_FILE_PATH")
-
-    input_file_path = sys.argv[1]
-    WordFrequencyTable.test_word_frequency_table(input_file_path)
-
-
-if __name__ == "__main__":
-    main()
 

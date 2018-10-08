@@ -448,12 +448,23 @@ class IamLinesDataset(Dataset):
 
         return train_loader, validation_loader, test_loader
 
+    @staticmethod
+    def write_iam_dataset_to_file(
+            output_file_path: str, iam_lines_dataset):
+
+        with open(output_file_path, "w") as output_file:
+            for iam_line_information in iam_lines_dataset.examples_line_information:
+                output_file.write(
+                    "".join(iam_line_information.get_characters_with_word_separator()) + "\n")
+
+
     def get_random_train_set_validation_set_test_set_data_loaders(
             self, batch_size: int, train_examples_fraction: float,
             validation_examples_fraction: float, test_examples_fraction: float,
             permutation_save_or_load_file_path: str, minimize_vertical_padding: bool,
             minimize_horizontal_padding: bool, keep_unsigned_int_format: bool,
-            perform_horizontal_batch_padding_in_data_loader: bool):
+            perform_horizontal_batch_padding_in_data_loader: bool,
+            save_dev_set_file_path: str, save_test_set_file_path: str):
 
         IamLinesDataset.check_fractions_add_up_to_one(list([train_examples_fraction,
                                                             validation_examples_fraction,
@@ -463,6 +474,14 @@ class IamLinesDataset(Dataset):
             split_random_train_set_validation_set_and_test_set(train_examples_fraction,
                                                                validation_examples_fraction,
                                                                permutation_save_or_load_file_path)
+
+        if save_dev_set_file_path is not None:
+            IamLinesDataset.write_iam_dataset_to_file(save_dev_set_file_path,
+                                                      validation_set)
+
+        if save_test_set_file_path is not None:
+            IamLinesDataset.write_iam_dataset_to_file(save_test_set_file_path,
+                                                      test_set)
 
         return self.get_train_set_validation_set_test_set_data_loaders(
                 batch_size, train_set, validation_set, test_set,
