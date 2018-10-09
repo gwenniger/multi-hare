@@ -24,6 +24,7 @@ class LanguageModelParameters:
 
 class Evaluator:
     WORD_SEPARATOR_SYMBOL = "|"
+    BEAM_SIZE = 1000
 
     # Note that if seq_len=0 then the result will always be the empty String
     @staticmethod
@@ -33,28 +34,6 @@ class Evaluator:
         # print("convert_to_string - seq_len: " + str(seq_len))
 
         result = ''.join([vocab[x] for x in tokens[0:seq_len]])
-
-        # The decoder that uses the language model produces tokens including white spaces
-        if use_language_model_in_decoder:
-            result = result.replace(" ", "|")
-            # In case the word separator is included in the language model token, the decoder
-            # can produce double separators (one from the above replacement and one from the
-            # word separator appended to the 2nd till nth word).
-            # If the word separator is a separate language model token, the model can even produce
-            # long sequences of word separators with no characters in between.
-            # To counter this, replacing
-            # the repeated word separators by single separators is necessary.
-            print("result before: " + str(result))
-
-            # replace two or more "|" with a single one
-            result = re.sub('\|\|+', '|', result)
-            # result = result.replace("||", "|")
-
-            # If the result starts with a word separator, that should be removed for the final result
-            if result.startswith("|"):
-                result = result[1:]
-            print("result after: " + str(result))
-
 
         # print("convert_to_string - result: " + str(result))
         return result
@@ -79,8 +58,20 @@ class Evaluator:
         return result
 
     @staticmethod
-    def create_decoder(vocab_list: list, beam_size, blank_symbol,
+    def create_decoder(vocab_list: list, cutoff_top_n: int,
+                       beam_size: int,
+                       blank_symbol,
                        language_model_parameters: LanguageModelParameters):
+        """
+
+        :param vocab_list:
+        :param beam_size:
+        :param cutoff_top_n:  A parameter that limits the number of vocabulary
+                              candidates that are kept by the decoder.
+        :param blank_symbol:
+        :param language_model_parameters:
+        :return:
+        """
         if language_model_parameters is not None:
 
             print("Creating decoder with language model loaded from " +
@@ -89,14 +80,18 @@ class Evaluator:
             decoder = ctcdecode.\
                 CTCBeamDecoder(
                     vocab_list, model_path=language_model_parameters.language_model_file_path,
+                    cutoff_top_n=cutoff_top_n,
                     beam_width=beam_size, alpha=language_model_parameters.language_model_weight,
                     beta=language_model_parameters.word_insertion_penalty,
                     blank_id=vocab_list.index(blank_symbol),
+                    space_symbol=Evaluator.WORD_SEPARATOR_SYMBOL,
                     num_processes=16)
         else:
 
-            decoder = ctcdecode.CTCBeamDecoder(vocab_list, beam_width=beam_size,
+            decoder = ctcdecode.CTCBeamDecoder(vocab_list, cutoff_top_n=cutoff_top_n,
+                                               beam_width=beam_size,
                                                blank_id=vocab_list.index(blank_symbol),
+                                               space_symbol=Evaluator.WORD_SEPARATOR_SYMBOL,
                                                num_processes=16)
         return decoder
 
@@ -192,17 +187,25 @@ class Evaluator:
                 # be applied to the outputs
                 probabilities = torch.nn.functional. \
                     softmax(outputs, probabilities_sum_to_one_dimension)
-                probabilities = Evaluator.append_preceding_word_separator_to_probabilities(
-                    probabilities, vocab_list, Evaluator.WORD_SEPARATOR_SYMBOL)
+
+                # No longer necessary with fixed word separator specification in decoder
+                # and normal language model
+                # probabilities = Evaluator.append_preceding_word_separator_to_probabilities(
+                #    probabilities, vocab_list, Evaluator.WORD_SEPARATOR_SYMBOL)
 
                 print(">>> evaluate_mdrnn  - outputs.size: " + str(outputs.size()))
                 print(">>> evaluate_mdrnn  - probabilities.size: " + str(probabilities.size()))
 
                 # beam_size = 20   # This is the problem perhaps...
                 # beam_size = 100  # The normal default is 100
-                beam_size = 1000  # Larger value to see if it further improves results
+                beam_size = Evaluator.BEAM_SIZE  # Larger value to see if it further improves results
+                # This value specifies the number of (character) probabilities kept in the
+                # decoder. If it is set equal or larger to the number of characters in the
+                # vocabulary, no pruning is done for it
+                cutoff_top_n = len(vocab_list)  # No pruning for this parameter
                 print(">>> evaluate_mdrnn  - len(vocab_list): " + str(len(vocab_list)))
-                decoder = Evaluator.create_decoder(vocab_list, beam_size, blank_symbol,
+                decoder = Evaluator.create_decoder(vocab_list,  cutoff_top_n, beam_size,
+                                                   blank_symbol,
                                                    language_model_parameters)
                 label_sizes = WarpCTCLossInterface. \
                     create_sequence_lengths_specification_tensor_different_lengths(labels)
