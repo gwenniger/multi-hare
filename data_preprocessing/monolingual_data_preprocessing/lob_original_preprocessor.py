@@ -149,6 +149,12 @@ class LobOriginalPreprocessor:
         # exclamation sign and quotation sign to make them separate tokens
         result = result.replace(",", " ,")
         result = result.replace("?", " ?")
+        # Make colons and semicolons separate tokens
+        result = result.replace(":", " :")
+        result = result.replace(";", " ;")
+        # Make brackets separate tokens
+        result = result.replace("(", "( ")
+        result = result.replace(")", " )")
         result = result.replace("!", " !")
         result = result.replace("!\"", " ! \"")
         # https://stackoverflow.com/questions/3926451/how-to-match-but-not-capture-part-of-a-regex?rq=1
