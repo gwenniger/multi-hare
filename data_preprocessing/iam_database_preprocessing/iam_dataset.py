@@ -16,7 +16,14 @@ from data_preprocessing.last_minute_padding import LastMinutePadding
 
 class IamLinesDataset(Dataset):
     EXAMPLE_TYPES_OK = "ok"
-    EXAMPLE_TYPES_ERROR = "error"
+    # "error stands for error in segmentation. But notice what it says in the
+    # iam file lines.txt: "
+    # #  "notice: if the line could not be properly segmented
+    # #                                the transcription and extraction of the whole
+    # #                                line should not be affected negatively "
+    # in other words, there is no argument against using these lines, and they
+    # are actually normally used in the literature.
+    EXAMPLE_TYPES_ERROR_IN_WORD_SEGMENTATION = "error"
     EXAMPLE_TYPES_ALL = "all"
     UINT8_WHITE_VALUE = 255
 
@@ -42,7 +49,7 @@ class IamLinesDataset(Dataset):
     def get_examples_line_information(iam_lines_dictionary: IamExamplesDictionary, example_types: str):
         if example_types == IamLinesDataset.EXAMPLE_TYPES_OK:
             examples_key_value_enumeration = iam_lines_dictionary.get_ok_examples()
-        elif example_types == IamLinesDataset.EXAMPLE_TYPES_ERROR:
+        elif example_types == IamLinesDataset.EXAMPLE_TYPES_ERROR_IN_WORD_SEGMENTATION:
             examples_key_value_enumeration = iam_lines_dictionary.get_error_examples()
         elif example_types == IamLinesDataset.EXAMPLE_TYPES_ALL:
             examples_key_value_enumeration = iam_lines_dictionary.get_all_examples()
@@ -76,7 +83,7 @@ class IamLinesDataset(Dataset):
     @staticmethod
     def create_iam_dataset(iam_lines_dictionary: IamExamplesDictionary,
                            save_word_to_string_mapping_table_path: str,
-                           example_types: str = EXAMPLE_TYPES_OK,
+                           example_types: str = EXAMPLE_TYPES_ALL,
                            transformation=None
                            ):
         examples_line_information = IamLinesDataset.get_examples_line_information(iam_lines_dictionary, example_types)
@@ -97,8 +104,8 @@ class IamLinesDataset(Dataset):
     @staticmethod
     def create_iam_lines_dataset_from_input_files(
             iam_database_lines_file_path: str, iam_database_line_images_root_folder_path: str,
-            vocabulary_file_path: str, example_types: str = EXAMPLE_TYPES_OK,
-                           transformation=None):
+            vocabulary_file_path: str, example_types: str = EXAMPLE_TYPES_ALL,
+            transformation=None):
         print("Loading IAM dataset...")
         iam_lines_dicionary = IamExamplesDictionary. \
             create_iam_lines_dictionary(iam_database_lines_file_path,
@@ -537,9 +544,9 @@ class IamLinesDataset(Dataset):
         examples_line_information_train = list([])
         examples_line_information_validation = list([])
         examples_line_information_test = list([])
+        examples_line_information_omitted = list([])
 
-        sets_list = list([train_example_ids_set, dev_example_ids_set, test_example_ids_set])
-        number_of_omitted_examples = 0
+        sets_list = list([train_example_ids_set, dev_example_ids_set, test_example_ids_set])        
         for iam_line_information in self.examples_line_information:
             relevant_part_line_id = \
                 IamLinesDataset.get_relevant_part_line_id(iam_line_information)
@@ -547,22 +554,21 @@ class IamLinesDataset(Dataset):
                 sets_list, relevant_part_line_id)
             if set_containing_id is train_example_ids_set:
                 print("Assigning example with id" + str(iam_line_information.line_id) + " to training set")
-                examples_list = examples_line_information_train
+                examples_line_information_train.append(iam_line_information)
             elif set_containing_id is dev_example_ids_set:
                 print("Assigning example with id" + str(iam_line_information.line_id) + " to validation set")
-                examples_list = examples_line_information_validation
+                examples_line_information_validation.append(iam_line_information)
             elif set_containing_id is test_example_ids_set:
                 print("Assigning example with id" + str(iam_line_information.line_id) + " to test set")
-                examples_list = examples_line_information_test
+                examples_line_information_test.append(iam_line_information)
             else:
                 print("Warning: did not find a valid ids set for the example " + iam_line_information.line_id +
                       " - omitting this example ")
-                number_of_omitted_examples += 1
-            examples_list.append(iam_line_information)
+                examples_line_information_omitted.append(iam_line_information)
         print(">>> number of training examples: " + str(len(examples_line_information_train)))
         print(">>> number of development examples: " + str(len(examples_line_information_validation)))
         print(">>> number of test examples: " + str(len(examples_line_information_test)))
-        print(">>> number of omitted examples: " + str(number_of_omitted_examples))
+        print(">>> number of omitted examples: " + str(len(examples_line_information_omitted)))
 
         train_set = IamLinesDataset(self.iam_lines_dictionary, examples_line_information_train,
                                     self.string_to_index_mapping_table, 64, 8, self.transform)

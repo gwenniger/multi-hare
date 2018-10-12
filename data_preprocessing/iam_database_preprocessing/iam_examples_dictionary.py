@@ -319,9 +319,9 @@ class IamExamplesDictionary():
         return self.error_lines_dictionary.items()
 
     def get_all_examples(self):
-        result = OrderedDict([])
-        result.update(self.ok_lines_dictionary)
-        result.update(self.error_lines_dictionary)
+        result = list([])
+        result.extend(self.ok_lines_dictionary.items())
+        result.extend(self.error_lines_dictionary.items())
         return result
 
     @staticmethod
