@@ -840,6 +840,13 @@ def iam_line_recognition(model_opt, checkpoint):
         minimize_vertical_padding = True
         minimize_horizontal_padding = True
         perform_horizontal_batch_padding_in_data_loader = False
+        use_four_pixel_input_blocks = opt.use_four_pixel_input_blocks
+
+        if use_four_pixel_input_blocks:
+            input_channels = 4
+        else:
+            input_channels = 1
+
 
         if opt.use_split_files_specified_data_split:
             # Load the data and divide into train/dev/test using data-split specification files
@@ -847,7 +854,7 @@ def iam_line_recognition(model_opt, checkpoint):
                 iam_lines_dataset.get_train_set_validation_set_test_set_data_loaders_using_split_specification_files(
                     batch_size, opt.train_split_file_path, opt.dev_split_file_path, opt.test_split_file_path,
                     minimize_vertical_padding, minimize_horizontal_padding, image_input_is_unsigned_int,
-                    perform_horizontal_batch_padding_in_data_loader)
+                    perform_horizontal_batch_padding_in_data_loader, use_four_pixel_input_blocks)
         else:
             # Load the data and divide into train/dev/test using hard-coded fractions and a loaded data permutation
             # file
@@ -867,7 +874,7 @@ def iam_line_recognition(model_opt, checkpoint):
         #test_mdrnn()
         input_height = 16
         input_width = 16
-        input_channels = 1
+
         # hidden_states_size = 32
         # hidden_states_size = 8  # Start with a lower initial hidden states size since there are more layers
         hidden_states_size = model_opt.first_layer_hidden_states_size

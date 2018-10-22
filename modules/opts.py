@@ -109,6 +109,7 @@ def train_opts(parser):
                        help="path used to save the dev-set to",
                        default=None)
 
+
     # GPU
     group.add_argument('-gpuid', default=[], nargs='+', type=int,
                        help="Use CUDA on the listed devices.")
@@ -116,6 +117,13 @@ def train_opts(parser):
     group.add_argument('-seed', type=int, default=-1,
                        help="""Random seed used for the experiments
                        reproducibility.""")
+
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('-use_four_pixel_input_blocks', dest='use_four_pixel_input_blocks',
+                       action='store_true')
+    group.add_argument('-use_resolution_halving', dest='use_four_pixel_input_blocks',
+                       action='store_false')
+
 
     # Init options
     group = parser.add_argument_group('Initialization')

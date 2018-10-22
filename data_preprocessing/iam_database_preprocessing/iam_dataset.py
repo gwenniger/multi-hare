@@ -12,6 +12,8 @@ from data_preprocessing.iam_database_preprocessing.data_permutation import DataP
 import os.path
 from data_preprocessing.padding_strategy import PaddingStrategy
 from data_preprocessing.last_minute_padding import LastMinutePadding
+from util.tensor_block_stacking import TensorBlockStacking
+from modules.size_two_dimensional import SizeTwoDimensional
 
 
 class IamLinesDataset(Dataset):
@@ -232,7 +234,8 @@ class IamLinesDataset(Dataset):
                                                  max_image_width, max_labels_length,
                                                  batch_size: int, padding_strategy: PaddingStrategy,
                                                  keep_unsigned_int_format: bool,
-                                                 shuffle: bool):
+                                                 shuffle: bool,
+                                                 use_four_pixel_input_blocks: bool):
         to_tensor = ToTensor()
 
         train_set_pairs = list([])
@@ -283,6 +286,11 @@ class IamLinesDataset(Dataset):
         last_percentage_complete = 0
 
         for sample in data_set:
+            print("sample index: " + str(sample_index))
+
+            #if sample_index >= 32:   # Hack for fast testing
+            #    break
+
             image_original = sample["image"]
             image_original_dtype = image_original.dtype
 
@@ -296,12 +304,13 @@ class IamLinesDataset(Dataset):
             if image_height_original > scale_reduction_factor and image_width_original > scale_reduction_factor:
                 image_height = int(image_height_original / scale_reduction_factor)
                 image_width = int(image_width_original / scale_reduction_factor)
-                rescale = Rescale(tuple([image_height, image_width]))
 
-                # Rescale works on ndarrays, not on pytorch tensors
-                # print("before: sample[\"image\"].dtype: " + str(sample["image"].dtype))
+                if not use_four_pixel_input_blocks:
+                    rescale = Rescale(tuple([image_height, image_width]))
+                    # Rescale works on ndarrays, not on pytorch tensors
+                    # print("before: sample[\"image\"].dtype: " + str(sample["image"].dtype))
 
-                sample = rescale(sample)
+                    sample = rescale(sample)
             else:
                 image_height = image_height_original
                 image_width = image_width_original
@@ -313,6 +322,19 @@ class IamLinesDataset(Dataset):
                 raise RuntimeError("Error: the image dtype changed")
 
             sample_pytorch = to_tensor(sample)
+
+            if use_four_pixel_input_blocks:
+
+                # Create a version of original image formed by stacking the input pixels within blocks of
+                # 2 by 2 along the third (=channel) dimension
+                four_pixel_block_image  = TensorBlockStacking.rescale_tensor_by_stacking_tensor_blocks(
+                    sample_pytorch['image'], SizeTwoDimensional.create_size_two_dimensional(2, 2),
+                    IamLinesDataset.UINT8_WHITE_VALUE)
+                sample_pytorch['image'] = four_pixel_block_image
+                image_height = four_pixel_block_image.size(1)
+                image_width = four_pixel_block_image.size(2)
+
+
 
            # print("sample_pytorch: " + str(sample_pytorch))
 
@@ -335,19 +357,30 @@ class IamLinesDataset(Dataset):
             # Make sure no row gets lost through integer division
             rows_padding_required_bottom = rows_padding_required - rows_padding_required_top
 
-            # print("columns_padding_required: " + str(columns_padding_required))
-            # print("rows_padding_required: " + str(rows_padding_required))
+            print("columns_padding_required: " + str(columns_padding_required))
+            print("rows_padding_required: " + str(rows_padding_required))
 
             # See: https://pytorch.org/docs/stable/_modules/torch/nn/functional.html
             # pad last dimension (width) by 0, columns_padding_required
             # and one-but-last dimension (height) by 0, rows_padding_required
             # p2d = (0, columns_padding_required, rows_padding_required, 0)
-            p2d = (0, columns_padding_required,
-                   rows_padding_required_top,
-                   rows_padding_required_bottom)
-            # We want to pad with the value for white, which is 255 for uint8
-            image_padded = torch.nn.functional. \
-                pad(image, p2d, "constant", IamLinesDataset.UINT8_WHITE_VALUE)
+
+            if use_four_pixel_input_blocks:
+                p3d = (0, columns_padding_required,
+                       rows_padding_required_top,
+                       rows_padding_required_bottom, 0, 0)
+                # We want to pad with the value for white, which is 255 for uint8
+                image_padded = torch.nn.functional. \
+                    pad(image, p3d, "constant", IamLinesDataset.UINT8_WHITE_VALUE)
+
+            else:
+
+                p2d = (0, columns_padding_required,
+                       rows_padding_required_top,
+                       rows_padding_required_bottom)
+                # We want to pad with the value for white, which is 255 for uint8
+                image_padded = torch.nn.functional. \
+                    pad(image, p2d, "constant", IamLinesDataset.UINT8_WHITE_VALUE)
 
             # Show padded image: for debugging
             # print("image: " + str(image))
@@ -368,9 +401,10 @@ class IamLinesDataset(Dataset):
 
             # Add additional bogus channel dimension, since a channel dimension is expected by downstream
             # users of this method
-            # print("before: image_padded.size(): " + str(image_padded.size()))
-            image_padded = image_padded.unsqueeze(0)
-            # print("after padding: image_padded.size(): " + str(image_padded.size()))
+            print("before: image.size(): " + str(image.size()))
+            if not use_four_pixel_input_blocks:
+                image_padded = image_padded.unsqueeze(0)
+            print("after padding: image_padded.size(): " + str(image_padded.size()))
             # print("after padding: image_padded: " + str(image_padded))
 
             if not keep_unsigned_int_format:
@@ -418,7 +452,8 @@ class IamLinesDataset(Dataset):
             self, batch_size: int, train_set, validation_set, test_set,
             minimize_vertical_padding: bool,
             minimize_horizontal_padding: bool, keep_unsigned_int_format: bool,
-            perform_horizontal_batch_padding_in_data_loader_: bool):
+            perform_horizontal_batch_padding_in_data_loader_: bool,
+            use_four_pixel_input_blocks: bool):
 
         print("Entered get_random_train_set_validation_set_test_set_data_loaders...")
 
@@ -435,23 +470,20 @@ class IamLinesDataset(Dataset):
                                                                    perform_horizontal_batch_padding_in_data_loader_)
 
         print("Prepare IAM data train loader...")
-        train_loader = self.get_data_loader_with_appropriate_padding(train_set, max_image_height, max_image_width,
-                                                                     max_labels_length, batch_size, padding_strategy,
-                                                                     keep_unsigned_int_format,
-                                                                     shuffle=True)
+        train_loader = self.get_data_loader_with_appropriate_padding(
+            train_set, max_image_height, max_image_width, max_labels_length, batch_size, padding_strategy,
+            keep_unsigned_int_format, shuffle=True, use_four_pixel_input_blocks=use_four_pixel_input_blocks)
 
         print("Prepare IAM data validation loader...")
-        validation_loader = self.get_data_loader_with_appropriate_padding(validation_set, max_image_height,
-                                                                          max_image_width,
-                                                                          max_labels_length, batch_size,
-                                                                          padding_strategy, keep_unsigned_int_format,
-                                                                          shuffle=False)
+        validation_loader = self.get_data_loader_with_appropriate_padding(
+            validation_set, max_image_height, max_image_width, max_labels_length, batch_size,
+            padding_strategy, keep_unsigned_int_format, shuffle=False,
+            use_four_pixel_input_blocks=use_four_pixel_input_blocks)
 
         print("Prepare IAM data test loader...")
-        test_loader = self.get_data_loader_with_appropriate_padding(test_set, max_image_height, max_image_width,
-                                                                    max_labels_length, batch_size,
-                                                                    padding_strategy, keep_unsigned_int_format,
-                                                                    shuffle=False)
+        test_loader = self.get_data_loader_with_appropriate_padding(
+            test_set, max_image_height, max_image_width, max_labels_length, batch_size, padding_strategy,
+            keep_unsigned_int_format, shuffle=False, use_four_pixel_input_blocks=use_four_pixel_input_blocks)
 
         return train_loader, validation_loader, test_loader
 
@@ -463,7 +495,6 @@ class IamLinesDataset(Dataset):
             for iam_line_information in iam_lines_dataset.examples_line_information:
                 output_file.write(
                     "".join(iam_line_information.get_characters_with_word_separator()) + "\n")
-
 
     def get_random_train_set_validation_set_test_set_data_loaders(
             self, batch_size: int, train_examples_fraction: float,
@@ -546,7 +577,7 @@ class IamLinesDataset(Dataset):
         examples_line_information_test = list([])
         examples_line_information_omitted = list([])
 
-        sets_list = list([train_example_ids_set, dev_example_ids_set, test_example_ids_set])        
+        sets_list = list([train_example_ids_set, dev_example_ids_set, test_example_ids_set])
         for iam_line_information in self.examples_line_information:
             relevant_part_line_id = \
                 IamLinesDataset.get_relevant_part_line_id(iam_line_information)
@@ -584,7 +615,8 @@ class IamLinesDataset(Dataset):
             dev_examples_split_file_path: str, test_examples_split_file_path: str,
             minimize_vertical_padding: bool,
             minimize_horizontal_padding: bool, keep_unsigned_int_format: bool,
-            perform_horizontal_batch_padding_in_data_loader: bool):
+            perform_horizontal_batch_padding_in_data_loader: bool,
+            use_four_pixel_input_blocks: bool):
 
         train_example_ids_set = IamLinesDataset.get_iam_example_ids_set_from_split_file(train_examples_split_file_path)
         dev_example_ids_set = IamLinesDataset.get_iam_example_ids_set_from_split_file(dev_examples_split_file_path)
@@ -597,11 +629,13 @@ class IamLinesDataset(Dataset):
             batch_size, train_set, validation_set, test_set,
             minimize_vertical_padding,
             minimize_horizontal_padding, keep_unsigned_int_format,
-            perform_horizontal_batch_padding_in_data_loader)
+            perform_horizontal_batch_padding_in_data_loader,
+            use_four_pixel_input_blocks=use_four_pixel_input_blocks)
 
     def __len__(self):
         return len(self.examples_line_information)
-        # return int(len(self.examples_line_information) / 30)  # Hack for faster training during development
+        # return int(len(self.examples_line_information) / 300)  # Hack for faster training during development
+        # return 32  # Hack for faster training during development
 
     def __getitem__(self, idx):
         line_information = self.examples_line_information[idx]
@@ -621,7 +655,7 @@ class IamLinesDataset(Dataset):
 
     def get_image(self, index):
         line_information = self.examples_line_information[index]
-        # print("__getitem__ line_information: " + str(line_information))
+        print("__getitem__ line_information: " + str(line_information))
         image_file_path = self.iam_lines_dictionary.get_image_file_path(line_information)
         # print("image_file_path: " + str(image_file_path))
 
