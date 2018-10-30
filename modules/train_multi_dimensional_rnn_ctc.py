@@ -396,7 +396,7 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
             create_mdlstm_three_layer_pair_network_with_two_channels_per_direction_first_mdlstm_layer(
                 input_channels, block_strided_convolution_block_size,
                 compute_multi_directional, clamp_gradients, use_dropout, opt.use_bias_in_block_strided_convolution,
-                use_example_packing)
+                use_example_packing, use_leaky_lp_cells)
 
 
     else:
@@ -782,7 +782,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     input_height = 16
     input_width = 16
     input_channels = 1
-    hidden_states_size = 8
+    hidden_states_size = 4
     # https://stackoverflow.com/questions/45027234/strange-loss-curve-while-training-lstm-with-keras
     # Possibly a batch size of 128 leads to more instability in training?
     #batch_size = 128
@@ -1012,14 +1012,14 @@ def main():
         model_opt = opt
 
     # mnist_recognition_fixed_length()
-    mnist_recognition_variable_length(model_opt, checkpoint,)
+    # mnist_recognition_variable_length(model_opt, checkpoint,)
 
-    # if opt.iam_database_data_type == "lines":
-    #     iam_line_recognition(model_opt, checkpoint)
-    # elif opt.iam_database_data_type == "words":
-    #     iam_word_recognition(model_opt, checkpoint)
-    # else:
-    #     raise RuntimeError("Unrecognized data type")
+    if opt.iam_database_data_type == "lines":
+        iam_line_recognition(model_opt, checkpoint)
+    elif opt.iam_database_data_type == "words":
+        iam_word_recognition(model_opt, checkpoint)
+    else:
+        raise RuntimeError("Unrecognized data type")
     # #cifar_ten_basic_recognition()
 
 
