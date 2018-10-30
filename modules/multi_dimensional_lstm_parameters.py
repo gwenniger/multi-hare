@@ -1233,7 +1233,8 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
     def __init__(self, hidden_states_size, input_channels,
                  use_dropout: bool, number_of_directions: int,
                  parallel_hidden_and_memory_state_column_computation,
-                 parallel_input_column_computation
+                 parallel_input_column_computation,
+                 output_gate_memory_state_convolution
                  ):
         super(MultiDirectionalMultiDimensionalLSTMParametersFullyParallel, self).__init__(hidden_states_size,
                                                                                                                  input_channels,
@@ -1247,9 +1248,7 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
             parallel_input_column_computation
 
         # Memory state convolutions
-        self.output_gate_memory_state_convolution = nn.Conv1d(self.hidden_states_size * number_of_directions,
-                                                              self.hidden_states_size * number_of_directions, 1,
-                                                              groups=number_of_directions)
+        self.output_gate_memory_state_convolution = output_gate_memory_state_convolution
         nn.init.xavier_uniform_(self.output_gate_memory_state_convolution.weight)
 
         self.input_columns = None
@@ -1260,14 +1259,14 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
         self.skewed_images_variable = None
 
     @staticmethod
-    def create_multi_directional_multi_dimensional_lstm_parameters_fully_parallel(
-            hidden_states_size, input_channels, clamp_gradients: bool, use_dropout: bool, number_of_directions: int):
-        print(">>>create_multi_directional_multi_dimensional_lstm_parameters_fully_parallel...")
+    def create_multi_directional_mdlstm_or_leaky_lp_cell_parameters_fully_parallel(
+            hidden_states_size, input_channels, clamp_gradients: bool, use_dropout: bool, number_of_directions: int,
+            output_gate_memory_state_convolution):
 
         parallel_hidden_and_memory_state_column_computation = \
             MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.\
-            create_parallel_hidden_and_memory_state_column_computation(hidden_states_size, clamp_gradients,
-                                                                                 use_dropout, number_of_directions)
+            create_parallel_hidden_and_memory_state_column_computation(
+                hidden_states_size, clamp_gradients, use_dropout, number_of_directions)
 
         parallel_input_column_computation = \
             MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.\
@@ -1278,7 +1277,33 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
         return MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
             hidden_states_size, input_channels, use_dropout, number_of_directions,
             parallel_hidden_and_memory_state_column_computation,
-            parallel_input_column_computation)
+            parallel_input_column_computation, output_gate_memory_state_convolution)
+
+    @staticmethod
+    def create_multi_directional_multi_dimensional_lstm_parameters_fully_parallel(
+            hidden_states_size, input_channels, clamp_gradients: bool, use_dropout: bool, number_of_directions: int):
+        print(">>>create_multi_directional_multi_dimensional_lstm_parameters_fully_parallel...")
+        output_gate_memory_state_convolution = nn.Conv1d(
+            hidden_states_size * number_of_directions,
+            hidden_states_size * number_of_directions, 1,
+            groups=number_of_directions)
+        return MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.\
+            create_multi_directional_mdlstm_or_leaky_lp_cell_parameters_fully_parallel(
+                hidden_states_size, input_channels, clamp_gradients, use_dropout, number_of_directions,
+                output_gate_memory_state_convolution)
+
+    @staticmethod
+    def create_multi_directional_multi_dimensional_leaky_lp_cell_parameters_fully_parallel(
+            hidden_states_size, input_channels, clamp_gradients: bool, use_dropout: bool, number_of_directions: int):
+        print(">>>create_multi_directional_multi_dimensional_leaky_lp_cell_parameters_fully_parallel...")
+        output_gate_memory_state_convolution = nn.Conv1d(
+            hidden_states_size * number_of_directions,
+            hidden_states_size * number_of_directions * 2, 1,
+            groups=number_of_directions * 2)
+        return MultiDirectionalMultiDimensionalLSTMParametersFullyParallel. \
+            create_multi_directional_mdlstm_or_leaky_lp_cell_parameters_fully_parallel(
+                hidden_states_size, input_channels, clamp_gradients, use_dropout, number_of_directions,
+                output_gate_memory_state_convolution)
 
     @staticmethod
     def create_parallel_input_column_computation(
@@ -1735,6 +1760,29 @@ class MultiDirectionalMultiDimensionalLSTMParametersCreatorFullyParallel(MultiDi
         return MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.\
             create_multi_directional_multi_dimensional_lstm_parameters_fully_parallel(
                 hidden_states_size, input_channels, clamp_gradients, use_dropout, number_of_directions)
+
+
+class MultiDirectionalMultiDimensionalLeakyLPCellParametersCreatorFullyParallel(MultiDimensionalLSTMParametersCreator):
+
+    def create_multi_dimensional_lstm_parameters_one_direction(self,
+                                                               hidden_states_size, input_channels,
+                                                               clamp_gradients: bool,
+                                                               use_dropout: bool,
+                                                               ):
+        raise RuntimeError("not implemented")
+
+    @abstractmethod
+    def create_multi_directional_multi_dimensional_lstm_parameters(self,
+                                                                   hidden_states_size,
+                                                                   input_channels,
+                                                                   use_dropout: bool,
+                                                                   clamp_gradients: bool,
+                                                                   number_of_directions: bool):
+        return MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.\
+            create_multi_directional_multi_dimensional_leaky_lp_cell_parameters_fully_parallel(
+                hidden_states_size, input_channels, clamp_gradients, use_dropout, number_of_directions)
+
+
 
 
 class MultiDirectionalMultiDimensionalLSTMParametersCreatorParallelWithSeparateInputConvolution(MultiDimensionalLSTMParametersCreator):

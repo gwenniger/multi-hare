@@ -12,11 +12,14 @@ from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParame
 from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParametersCreatorSlow
 from modules.multi_dimensional_lstm_parameters import MultiDimensionalLSTMParametersCreatorFast
 from modules.multi_dimensional_lstm_parameters import MultiDirectionalMultiDimensionalLSTMParametersCreatorFullyParallel
-from modules.multi_dimensional_lstm_parameters import MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution
+from modules.multi_dimensional_lstm_parameters import \
+    MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution
 from modules.multi_dimensional_lstm_parameters import \
     MultiDirectionalMultiDimensionalLSTMParametersCreatorParallelWithSeparateInputConvolution
 from modules.multi_dimensional_lstm_parameters import \
     MultiDirectionalMultiDimensionalLSTMParametersFullyParallel
+from modules.multi_dimensional_lstm_parameters import \
+    MultiDirectionalMultiDimensionalLeakyLPCellParametersCreatorFullyParallel
 from util.image_input_transformer import ImageInputTransformer
 from modules.inside_model_gradient_clipping import InsideModelGradientClamping
 from util.tensor_utils import TensorUtils
@@ -179,11 +182,16 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             clamp_gradients: bool,
             use_dropout: bool,
             use_example_packing: bool,
+            use_leaky_lp_cells: bool,
             nonlinearity="tanh"):
 
         if compute_multi_directional:
-            mult_dimensional_lstm_parameters_creater = \
-                MultiDirectionalMultiDimensionalLSTMParametersCreatorFullyParallel()
+            if use_leaky_lp_cells:
+                mult_dimensional_lstm_parameters_creater = \
+                    MultiDirectionalMultiDimensionalLeakyLPCellParametersCreatorFullyParallel()
+            else:
+                mult_dimensional_lstm_parameters_creater = \
+                    MultiDirectionalMultiDimensionalLSTMParametersCreatorFullyParallel()
         else:
             raise RuntimeError("Not implemented")
 
@@ -231,8 +239,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
         self.training = training
 
-    def compute_multi_dimensional_lstm_one_direction(self, mdlstm_parameters, examples):
-
+    def prepare_skewed_images_and_mask(self, examples):
         if self.use_example_packing:
             mdlstm_examples_packing = \
                 MDLSTMExamplesPacking.created_mdlstm_examples_packing(examples, 1)
@@ -254,32 +261,14 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                     create_vertically_and_horizontally_packed_examples_and_mask_one_direction(examples)
                 number_of_images = 1
         else:
-            x = examples
             # Create a binary mask that tells which of the cell positions are valid and which are not
-            mask = ImageInputTransformer.create_skewed_images_mask_two_dim(x)
-            skewed_images_variable = ImageInputTransformer.create_skewed_images_variable_four_dim(x)
-            number_of_images = x.size(0)
+            skewed_images_variable = ImageInputTransformer.create_skewed_images_variable_four_dim(examples)
+            mask = ImageInputTransformer.create_skewed_images_mask_two_dim(examples)
+            number_of_images = examples.size(0)
+            mdlstm_examples_packing = None
+        return skewed_images_variable, mask, number_of_images, mdlstm_examples_packing
 
-        # print("skewed_images_variable: " + str(skewed_images_variable))
-
-        # Add a column of padding zeros to mask, so that mask[:, column_index]
-        # will return the padding for the previous column
-        p2d = (1, 0, 0, 0)
-        mask = torch.nn.functional.pad(mask, p2d, "constant", 0)
-
-        if MultiDimensionalRNNBase.use_cuda():
-            # https://discuss.pytorch.org/t/which-device-is-model-tensor-stored-on/4908/7
-            device = skewed_images_variable.get_device()
-
-        # print("compute_multi_dimensional_lstm_one_direction - x.size(): " + str(x.size()))
-        # print("compute_multi_dimensional_lstm_one_direction - self.hidden_states_size: " + str(self.hidden_states_size))
-
-        # Step 1: Create a skewed version of the input image
-        # skewed_image = ImageInputTransformer.create_row_diagonal_offset_tensor(x)
-
-        # print("list(x.size()): " + str(list(x.size())))
-        image_height = skewed_images_variable.size(2)
-
+    def prepare_initial_states(self, image_height: int, number_of_images: int, device):
         if self.compute_multi_directional():
             # print("image height: " + str(image_height))
             previous_hidden_state_column = torch.zeros(1,
@@ -310,6 +299,31 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         if MultiDimensionalRNNBase.use_cuda():
             previous_hidden_state_column = previous_hidden_state_column.to(device)
             previous_memory_state_column = previous_memory_state_column.to(device)
+        return previous_hidden_state_column, previous_memory_state_column
+
+    def compute_multi_dimensional_lstm(self, mdlstm_parameters, examples):
+
+        skewed_images_variable, mask, number_of_images, mdlstm_examples_packing = self.prepare_skewed_images_and_mask(examples)
+
+        # print("skewed_images_variable: " + str(skewed_images_variable))
+
+        # Add a column of padding zeros to mask, so that mask[:, column_index]
+        # will return the padding for the previous column
+        p2d = (1, 0, 0, 0)
+        mask = torch.nn.functional.pad(mask, p2d, "constant", 0)
+
+        if MultiDimensionalRNNBase.use_cuda():
+            # https://discuss.pytorch.org/t/which-device-is-model-tensor-stored-on/4908/7
+            device = skewed_images_variable.get_device()
+
+        # print("compute_multi_dimensional_lstm_one_direction - x.size(): " + str(x.size()))
+        # print("compute_multi_dimensional_lstm_one_direction - self.hidden_states_size: " + str(self.hidden_states_size))
+
+        # print("list(x.size()): " + str(list(x.size())))
+        image_height = skewed_images_variable.size(2)
+
+        previous_hidden_state_column, previous_memory_state_column = self.prepare_initial_states(
+            image_height, number_of_images, device)
 
         skewed_image_columns = skewed_images_variable.size(3)
 
@@ -631,8 +645,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # print("multi_dimensional_lstm - Time used for examples unpacking: "
             #       + str(util.timing.milliseconds_since(time_start_unpacking)))
         else:
-            # print(">>> x.size(): " + str(x.size()))
-            original_image_columns = x.size(3)
+            # print(">>> examples.size(): " + str(examples.size()))
+            original_image_columns = examples.size(3)
             skewed_image_rows = skewed_images_variable.size(2)
 
             activations_unskewed = ImageInputTransformer.\
@@ -645,6 +659,194 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         # executed sequentially. It isn't entirely clear how to optimize this.
         # See the discussion at:
         # https://discuss.pytorch.org/t/is-there-a-way-to-parallelize-independent-sequential-steps/3360
+
+    def compute_leaky_lp_cell(self, mdlstm_parameters, examples):
+
+        skewed_images_variable, mask, number_of_images, mdlstm_examples_packing = self.prepare_skewed_images_and_mask(
+            examples)
+
+        # Add a column of padding zeros to mask, so that mask[:, column_index]
+        # will return the padding for the previous column
+        p2d = (1, 0, 0, 0)
+        mask = torch.nn.functional.pad(mask, p2d, "constant", 0)
+
+        if MultiDimensionalRNNBase.use_cuda():
+            # https://discuss.pytorch.org/t/which-device-is-model-tensor-stored-on/4908/7
+            device = skewed_images_variable.get_device()
+
+        image_height = skewed_images_variable.size(2)
+
+        previous_hidden_state_column, previous_memory_state_column = self.prepare_initial_states(
+            image_height, number_of_images, device)
+
+        skewed_image_columns = skewed_images_variable.size(3)
+
+        # Prepare input convolutions if applicable
+        mdlstm_parameters.prepare_input_convolutions(skewed_images_variable)
+
+        activations = list([])
+
+        # print("skewed image columns: " + str(skewed_image_columns))
+        # print("starting Leaky LP cell column computation...")
+
+        for column_index in range(0, skewed_image_columns):
+            # Apply a binary mask to zero out entries in the activation_column
+            # and new_memory_state that are not corresponding to valid states,
+            # but that are an artifact of the computation by convolution using
+            # the image skewing trick
+
+            valid_entries_selection_mask_previous_column = mask[:, column_index]
+            valid_entries_selection_mask = mask[:, column_index + 1]
+            # print("valid_entries_selection_mask: " +
+            # str(valid_entries_selection_mask))
+
+            mdlstm_parameters.prepare_computation_next_column_functions(previous_hidden_state_column,
+                                                                        previous_memory_state_column,
+                                                                        valid_entries_selection_mask_previous_column)
+
+            # Compute convolution on previous state column vector padded with zeros
+            input_hidden_state_column = mdlstm_parameters.get_input_hidden_state_column()
+
+            input_state_plus_input = MultiDimensionalRNNBase. \
+                compute_states_plus_input(mdlstm_parameters.get_input_input_column(column_index),
+                                          input_hidden_state_column)
+
+            # Compute the sum of weighted inputs of the input gate
+            input_gate_input_column = mdlstm_parameters.get_input_gate_input_column(column_index)
+            input_and_states_lambda_gate_weighted_states_plus_input = MultiDimensionalLSTM. \
+                compute_weighted_input_input_gate(input_gate_input_column,
+                                                  mdlstm_parameters)
+
+            # Compute the input activation
+            input_activation_column = F.tanh(input_state_plus_input)
+            # input_activation_column = F.relu(input_state_plus_input) # Relu can be used as an alternative to tanh
+            # Compute the input gate activation
+            input_and_states_lambda_gate_activation_column_input = F.sigmoid(
+                input_and_states_lambda_gate_weighted_states_plus_input)
+
+            input_and_states_lambda_gate_activation_column_states = \
+                torch.ones_like(input_and_states_lambda_gate_activation_column_input) - \
+                input_and_states_lambda_gate_activation_column_input
+
+            memory_states_column_forget_gate_one = previous_memory_state_column
+
+            states_lambda_gate_input_column = mdlstm_parameters.get_forget_gate_one_input_column(column_index)
+            states_lambda_gate_weighted_states_plus_input = MultiDimensionalLSTM.compute_weighted_input_lambda_gate(
+                mdlstm_parameters.get_forget_gate_one_hidden_state_column(),
+                mdlstm_parameters.get_forget_gate_one_memory_state_column(),
+                mdlstm_parameters.get_forget_gate_two_memory_state_column(),
+                states_lambda_gate_input_column)
+
+            states_lambda_gate_activation_column_state_one = F.sigmoid(states_lambda_gate_weighted_states_plus_input)
+            # print("states lambda gate activation column_S1: " +
+            #       str(states_lambda_gate_activation_column_state_one))
+
+            states_lambda_gate_activation_column_state_two = \
+                torch.ones_like(states_lambda_gate_activation_column_state_one) - \
+                states_lambda_gate_activation_column_state_one
+            # print("states lambda gate activation column_S2: " +
+            #       str(states_lambda_gate_activation_column_state_two))
+
+            memory_states_column_forget_gate_two = StateUpdateBlock. \
+                get_shifted_column_fast(previous_memory_state_column,
+                                        self.clamp_gradients)
+
+            # Compute the re-weighted (i.e.) mixed state produced
+            # by the states lambda gate
+            states_lambda_gate_reweighted_memory_states = \
+                torch.mul(states_lambda_gate_activation_column_state_one,
+                          memory_states_column_forget_gate_one) +\
+                torch.mul(states_lambda_gate_activation_column_state_two,
+                          memory_states_column_forget_gate_two)
+
+            new_memory_state = \
+                torch.mul(input_activation_column, input_and_states_lambda_gate_activation_column_input) +\
+                torch.mul(states_lambda_gate_reweighted_memory_states,
+                          input_and_states_lambda_gate_activation_column_states)
+
+            output_gates_memory_state_column = \
+                mdlstm_parameters.compute_output_gate_memory_state_weighted_input(previous_memory_state_column)
+            # print(">>>> output_gates_memory_state_column: " + str(output_gates_memory_state_column))
+            # print(">>>> output_gates_memory_state_column.size(): " + str(output_gates_memory_state_column.size()))
+            output_gates_memory_state_columns = torch.chunk(output_gates_memory_state_column, 2, 1)
+            output_gate_one_memory_state_column = output_gates_memory_state_columns[0]
+            output_gate_two_memory_state_column = output_gates_memory_state_columns[1]
+
+            output_gate_one_input_column = mdlstm_parameters.\
+                get_forget_gate_two_input_column(column_index)
+            output_gate_one_weighted_states_plus_input = \
+                MultiDimensionalLSTM.compute_weighted_input_forget_gate(
+                    mdlstm_parameters.get_forget_gate_two_hidden_state_column(),
+                    output_gate_one_memory_state_column,
+                    output_gate_one_input_column)
+
+            output_gate_two_input_column = mdlstm_parameters.get_output_gate_input_column(column_index)
+            output_gate_two_weighted_states_plus_input = \
+                MultiDimensionalLSTM.compute_weighted_input_forget_gate(
+                    mdlstm_parameters.get_output_gate_hidden_state_column(),
+                    output_gate_two_memory_state_column,
+                    output_gate_two_input_column)
+
+            # Compute the output gate one activation
+            output_gate_one_activation_column = F.sigmoid(output_gate_one_weighted_states_plus_input)
+            # Compute the output gate two activation
+            output_gate_two_activation_column = F.sigmoid(output_gate_two_weighted_states_plus_input)
+
+            output_gate_one_output = torch.mul(states_lambda_gate_reweighted_memory_states,
+                                               output_gate_one_activation_column)
+
+            output_gate_two_output = torch.mul(new_memory_state,
+                                               output_gate_two_activation_column)
+
+            output_gates_combined_output = output_gate_one_output + output_gate_two_output
+
+            # With final tanh as in the NVIDIA LSTM diagram
+            activation_column = F.tanh(output_gates_combined_output)
+
+            # # This is following the deep learning book
+            # activation_column = output_gates_combined_output
+
+            # Apply the selection mask to the activation column and new_memory_state
+            # This will set to zero the activation and memory states of masked
+            # (non-valid) cells, effectively resetting them for the computation
+            # in the next column cells that will use them as memory and hidden state
+            # inputs
+            activation_column = TensorUtils.apply_binary_mask(activation_column, valid_entries_selection_mask)
+            new_memory_state = TensorUtils.apply_binary_mask(new_memory_state, valid_entries_selection_mask)
+
+            previous_hidden_state_column = activation_column
+            previous_memory_state_column = new_memory_state
+
+            # Does not seem to help either: https://github.com/pytorch/pytorch/issues/4649
+            # previous_hidden_state_column.retain_grad()
+            # previous_memory_state_column.retain_grad()
+
+            activations.append(activation_column)
+
+            # In the loop the value of grad_fn becomes set, as a backwards path for
+            # back-propagation is collected
+            # print("in loop: previous_memory_state_column.grad_fn: " + str(previous_memory_state_column.grad_fn))
+            # print("in loop: previous_hidden_state_column.grad_fn: " + str(previous_hidden_state_column.grad_fn))
+
+        if self.use_example_packing:
+            # time_start_unpacking = util.timing.date_time_start()
+            activations_unskewed = mdlstm_examples_packing. \
+                extract_unskewed_examples_activations_from_activation_columns(activations)
+            # print("len(activations_unskewed: " + str(len(activations_unskewed)))
+            # for tensor in activations_unskewed:
+            #     print("MDLSTM with packing output activations tensor size: " + str(tensor.size()))
+            # print("multi_dimensional_lstm - Time used for examples unpacking: "
+            #       + str(util.timing.milliseconds_since(time_start_unpacking)))
+        else:
+            # print(">>> x.size(): " + str(x.size()))
+            original_image_columns = examples.size(3)
+            skewed_image_rows = skewed_images_variable.size(2)
+
+            activations_unskewed = ImageInputTransformer. \
+                extract_unskewed_activations_from_activation_columns(activations, original_image_columns)
+
+        # print("activations_unskewed: " + str(activations_unskewed))
+        return activations_unskewed
 
     def forward_multi_directional_multi_dimensional_lstm(self, x):
 
@@ -686,8 +888,11 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         # result = activations_combined
         # return result
 
-        activations_unskewed = self.compute_multi_dimensional_lstm_one_direction(self.mdlstm_parameters,
-                                                                                 x)
+        # activations_unskewed = self.compute_multi_dimensional_lstm(self.mdlstm_parameters,
+        #                                                           x)
+        activations_unskewed = self.compute_leaky_lp_cell(self.mdlstm_parameters,
+                                                                   x)
+
         # print("len(activations_unskewed: " + str(len(activations_unskewed)))
         # print("activations_unskewed.size(): " + str(activations_unskewed.size()))
 
@@ -746,9 +951,21 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
         return forget_gate_weighted_states_plus_weighted_input
 
+    @staticmethod
+    def compute_weighted_input_lambda_gate(lambda_gate_hidden_state_column,
+                                           lambda_gate_memory_state_column_one,
+                                           lambda_gate_memory_state_column_two,
+                                           forget_gate_input_column):
+
+        lambda_gate_weighted_states_plus_weighted_input = forget_gate_input_column + lambda_gate_hidden_state_column + \
+                                                          lambda_gate_memory_state_column_one + \
+                                                          lambda_gate_memory_state_column_two
+
+        return lambda_gate_weighted_states_plus_weighted_input
+
     def forward_one_directional_multi_dimensional_lstm(self, x):
-        activations_unskewed = self.compute_multi_dimensional_lstm_one_direction(self.mdlstm_parameters,
-                                                                                 x)
+        activations_unskewed = self.compute_multi_dimensional_lstm(self.mdlstm_parameters,
+                                                                   x)
         # print("activations_unskewed.size(): " + str(activations_unskewed.size()))
 
         return activations_unskewed
@@ -777,7 +994,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
     # Needs to be implemented in the subclasses
     def _compute_multi_dimensional_function_one_direction(self, function_input):
-        return self.compute_multi_dimensional_lstm_one_direction(self.mdlstm_parameters, function_input)
+        return self.compute_multi_dimensional_lstm(self.mdlstm_parameters, function_input)
 
     # Input tensor x is a batch of image tensors
     def forward(self, x):

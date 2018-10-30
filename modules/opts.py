@@ -124,6 +124,12 @@ def train_opts(parser):
     group.add_argument('-use_resolution_halving', dest='use_four_pixel_input_blocks',
                        action='store_false')
 
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('-use_leaky_lp_cells', dest='use_leaky_lp_cells',
+                       action='store_true')
+    group.add_argument('-use_normal_mdlstm_cells', dest='use_leaky_lp_cells',
+                       action='store_false')
+
 
     # Init options
     group = parser.add_argument_group('Initialization')

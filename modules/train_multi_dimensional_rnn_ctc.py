@@ -316,7 +316,8 @@ def printgradnorm(self, grad_input, grad_output):
 def create_model(checkpoint, data_height: int, input_channels: int, hidden_states_size: int,
                  compute_multi_directional: bool, use_dropout: bool, vocab_list,
                  clamp_gradients: bool, data_set_name: str, inputs_and_outputs_are_lists: bool,
-                 use_example_packing: bool, device_ids: list, use_block_mdlstm: bool):
+                 use_example_packing: bool, device_ids: list, use_block_mdlstm: bool,
+                 use_leaky_lp_cells: bool):
 
     # multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(input_channels,
     #                                                                                 hidden_states_size,
@@ -372,7 +373,8 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
                                           compute_multi_directional,
                                           clamp_gradients,
                                           opt.use_bias_in_block_strided_convolution,
-                                          use_example_packing
+                                          use_example_packing,
+                                          use_leaky_lp_cells
                                           )
     # multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
     #    create_three_layer_pair_network(hidden_states_size, mdlstm_block_size,
@@ -597,6 +599,7 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
                     data_set_name, perform_horizontal_batch_padding: bool,
                     use_example_packing: bool,
                     use_block_mdlstm: bool,
+                    use_leaky_lp_cells: bool,
                     perform_horizontal_batch_padding_in_data_loader):
 
     # http://pytorch.org/docs/master/notes/cuda.html
@@ -620,7 +623,8 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
                            clamp_gradients, data_set_name, inputs_and_outputs_are_lists,
                            use_example_packing,
                            device_ids,
-                           use_block_mdlstm)
+                           use_block_mdlstm,
+                           use_leaky_lp_cells)
 
     # network.register_backward_hook(printgradnorm)
 
@@ -799,6 +803,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     use_block_mdlstm = False
     perform_horizontal_batch_padding_in_data_loader = False
     use_example_packing = True
+    use_leaky_lp_cells = opt.use_leaky_lp_cells
     train_mdrnn_ctc(model_opt, checkpoint, train_loader, test_loader,
                     test_loader, input_channels,
                     hidden_states_size, batch_size,
@@ -806,6 +811,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
                     image_input_is_unsigned_int, "MNIST", minimize_horizontal_padding,
                     use_example_packing,
                     use_block_mdlstm,
+                    use_leaky_lp_cells,
                     perform_horizontal_batch_padding_in_data_loader)
 
     #print(prof)
@@ -893,6 +899,7 @@ def iam_line_recognition(model_opt, checkpoint):
         # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191
 
         use_example_packing = True
+        use_leaky_lp_cells = opt.use_leaky_lp_cells
         use_block_mdlstm = opt.use_block_mdlstm
         #with torch.autograd.profiler.profile(use_cuda=False) as prof:
         train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels,
@@ -902,6 +909,7 @@ def iam_line_recognition(model_opt, checkpoint):
                         minimize_horizontal_padding,
                         use_example_packing,
                         use_block_mdlstm,
+                        use_leaky_lp_cells,
                         perform_horizontal_batch_padding_in_data_loader
                         )
 
@@ -977,12 +985,14 @@ def iam_word_recognition(model_opt, checkpoint):
     # with torch.autograd.profiler.profile(use_cuda=False) as prof:
 
     use_block_mdlstm = opt.use_block_mdlstm
+    use_leaky_lp_cells = opt.use_leaky_lp_cells
     train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels,
                     hidden_states_size,
                     batch_size, compute_multi_directional, use_dropout, vocab_list, blank_symbol,
                     image_input_is_unsigned_int, "IAM", minimize_horizontal_padding,
                     use_example_packing,
                     use_block_mdlstm,
+                    use_leaky_lp_cells,
                     perform_horizontal_batch_padding_in_data_loader)
 
 
@@ -1002,14 +1012,14 @@ def main():
         model_opt = opt
 
     # mnist_recognition_fixed_length()
-    # mnist_recognition_variable_length(model_opt, checkpoint,)
+    mnist_recognition_variable_length(model_opt, checkpoint,)
 
-    if opt.iam_database_data_type == "lines":
-        iam_line_recognition(model_opt, checkpoint)
-    elif opt.iam_database_data_type == "words":
-        iam_word_recognition(model_opt, checkpoint)
-    else:
-        raise RuntimeError("Unrecognized data type")
+    # if opt.iam_database_data_type == "lines":
+    #     iam_line_recognition(model_opt, checkpoint)
+    # elif opt.iam_database_data_type == "words":
+    #     iam_word_recognition(model_opt, checkpoint)
+    # else:
+    #     raise RuntimeError("Unrecognized data type")
     # #cifar_ten_basic_recognition()
 
 

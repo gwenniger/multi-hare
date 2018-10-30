@@ -85,6 +85,7 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
                                                     use_dropout: bool,
                                                     use_bias_with_block_strided_convolution: bool,
                                                     use_example_packing: bool,
+                                                    use_leaky_lp_cells: bool,
                                                     nonlinearity="tanh"
                                                     ):
         multi_dimensional_lstm_layer_pairs = list([])
@@ -98,6 +99,7 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
                                                          use_dropout,
                                                          use_bias_with_block_strided_convolution,
                                                          use_example_packing,
+                                                         use_leaky_lp_cells,
                                                          nonlinearity)
             multi_dimensional_lstm_layer_pairs.append(layer_pair)
             layer_pair_index += 1
@@ -130,6 +132,7 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
             use_dropout: bool,
             use_bias_with_block_strided_convolution: bool,
             use_example_packing: bool,
+            use_leaky_lp_cells: bool,
             nonlinearity="tanh"):
 
         return MDLSTMLayerBlockStridedConvolutionLayerPair.create_mdlstm_block_strided_convolution_layer_pair(
@@ -141,6 +144,7 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
             use_dropout,
             use_bias_with_block_strided_convolution,
             use_example_packing,
+            use_leaky_lp_cells,
             nonlinearity)
 
     # This is an example of a network that stacks two
@@ -153,7 +157,8 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
                                       compute_multi_directional,
                                       clamp_gradients: bool,
                                       use_bias_with_block_strided_convolution: bool,
-                                      use_example_packing: bool):
+                                      use_example_packing: bool,
+                                      use_leaky_lp_cells: bool):
         use_dropout = False
         nonlinearity = "tanh"
 
@@ -186,6 +191,7 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
                                                         compute_multi_directional, clamp_gradients, use_dropout,
                                                         use_bias_with_block_strided_convolution,
                                                         use_example_packing,
+                                                        use_leaky_lp_cells,
                                                         nonlinearity)
 
         # This is an example of a network that stacks two
@@ -419,7 +425,8 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
             compute_multi_directional: bool,
             clamp_gradients: bool, use_dropout: bool,
             use_bias_with_block_strided_convolution: bool,
-            use_example_packing: bool):
+            use_example_packing: bool,
+            use_leaky_lp_cells: bool):
 
         nonlinearity = "tanh"
         layer_pairs_specific_parameters_list = MultiDimensionalLSTMLayerPairStacking. \
@@ -436,6 +443,7 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
                                                         use_dropout,
                                                         use_bias_with_block_strided_convolution,
                                                         use_example_packing,
+                                                        use_leaky_lp_cells,
                                                         nonlinearity)
 
         # Creates a network of three layer pairs, each pair consisting of a MDLSTM layer
@@ -451,7 +459,8 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
             compute_multi_directional: bool,
             clamp_gradients: bool, use_dropout: bool,
             use_bias_with_block_strided_convolution: bool,
-            use_example_packing: bool):
+            use_example_packing: bool,
+            use_leaky_lp_cells: bool):
 
         nonlinearity = "tanh"
         layer_pairs_specific_parameters_list = MultiDimensionalLSTMLayerPairStacking. \
@@ -468,6 +477,7 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
                                                         use_dropout,
                                                         use_bias_with_block_strided_convolution,
                                                         use_example_packing,
+                                                        use_leaky_lp_cells,
                                                         nonlinearity)
 
     @staticmethod

@@ -51,6 +51,7 @@ class MDLSTMLayerBlockStridedConvolutionLayerPair(Module):
             use_dropout: bool,
             use_bias_with_block_strided_convolution: bool,
             use_example_packing: bool,
+            use_leaky_lp_cells: bool,
             nonlinearity="tanh"):
 
         print("Create {mdlstm,_block-strided_convolution} layer_pair...")
@@ -60,6 +61,7 @@ class MDLSTMLayerBlockStridedConvolutionLayerPair(Module):
                                                          clamp_gradients,
                                                          use_dropout,
                                                          use_example_packing,
+                                                         use_leaky_lp_cells,
                                                          nonlinearity)
         # multi_dimensional_lstm = MultiDimensionalLSTM. \
         #     create_multi_dimensional_lstm_parallel_with_separate_input_convolution(
