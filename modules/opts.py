@@ -109,6 +109,10 @@ def train_opts(parser):
                        help="path used to save the dev-set to",
                        default=None)
 
+    group.add_argument("-dataset_save_or_load_file_path", type=str,
+                       help="path used to save the dataset to",
+                       default=None, required=True)
+
 
     # GPU
     group.add_argument('-gpuid', default=[], nargs='+', type=int,

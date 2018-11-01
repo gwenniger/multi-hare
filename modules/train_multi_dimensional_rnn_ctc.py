@@ -853,6 +853,7 @@ def iam_line_recognition(model_opt, checkpoint):
         else:
             input_channels = 1
 
+        dataset_save_or_load_file_path = opt.dataset_save_or_load_file_path
 
         if opt.use_split_files_specified_data_split:
             # Load the data and divide into train/dev/test using data-split specification files
@@ -860,7 +861,8 @@ def iam_line_recognition(model_opt, checkpoint):
                 iam_lines_dataset.get_train_set_validation_set_test_set_data_loaders_using_split_specification_files(
                     batch_size, opt.train_split_file_path, opt.dev_split_file_path, opt.test_split_file_path,
                     minimize_vertical_padding, minimize_horizontal_padding, image_input_is_unsigned_int,
-                    perform_horizontal_batch_padding_in_data_loader, use_four_pixel_input_blocks)
+                    perform_horizontal_batch_padding_in_data_loader, use_four_pixel_input_blocks,
+                    dataset_save_or_load_file_path)
         else:
             # Load the data and divide into train/dev/test using hard-coded fractions and a loaded data permutation
             # file
@@ -869,10 +871,11 @@ def iam_line_recognition(model_opt, checkpoint):
                 get_random_train_set_validation_set_test_set_data_loaders(
                     batch_size, IamLinesDataset.TRAIN_EXAMPLES_FRACTION, IamLinesDataset.VALIDATION_EXAMPLES_FRACTION,
                     IamLinesDataset.TEST_EXAMPLES_FRACTION, permutation_save_or_load_file_path,
+                    dataset_save_or_load_file_path,
                     minimize_vertical_padding, minimize_horizontal_padding, image_input_is_unsigned_int,
                     perform_horizontal_batch_padding_in_data_loader,
                     opt.save_dev_set_file_path,
-                    opt.save_test_set_file_path,)
+                    opt.save_test_set_file_path)
 
         print("Loading IAM dataset: DONE")
 

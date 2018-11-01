@@ -499,10 +499,16 @@ class IamLinesDataset(Dataset):
     def get_random_train_set_validation_set_test_set_data_loaders(
             self, batch_size: int, train_examples_fraction: float,
             validation_examples_fraction: float, test_examples_fraction: float,
-            permutation_save_or_load_file_path: str, minimize_vertical_padding: bool,
+            permutation_save_or_load_file_path: str,
+            dataset_save_or_load_file_path: str,
+            minimize_vertical_padding: bool,
             minimize_horizontal_padding: bool, keep_unsigned_int_format: bool,
             perform_horizontal_batch_padding_in_data_loader: bool,
-            save_dev_set_file_path: str, save_test_set_file_path: str):
+            save_dev_set_file_path: str, save_test_set_file_path: str
+    ):
+
+        if os.path.isfile(dataset_save_or_load_file_path):
+            return self.load_dataset_from_file(dataset_save_or_load_file_path)
 
         IamLinesDataset.check_fractions_add_up_to_one(list([train_examples_fraction,
                                                             validation_examples_fraction,
@@ -521,11 +527,15 @@ class IamLinesDataset(Dataset):
             IamLinesDataset.write_iam_dataset_to_file(save_test_set_file_path,
                                                       test_set)
 
-        return self.get_train_set_validation_set_test_set_data_loaders(
-                batch_size, train_set, validation_set, test_set,
-                minimize_vertical_padding,
-                minimize_horizontal_padding, keep_unsigned_int_format,
-                perform_horizontal_batch_padding_in_data_loader)
+        train_loader, validation_loader, test_loader = self.get_train_set_validation_set_test_set_data_loaders(
+            batch_size, train_set, validation_set, test_set,
+            minimize_vertical_padding,
+            minimize_horizontal_padding, keep_unsigned_int_format,
+            perform_horizontal_batch_padding_in_data_loader)
+
+        self.save_dataset_to_file(dataset_save_or_load_file_path, train_loader, validation_loader, test_loader)
+
+        return train_loader, validation_loader, test_loader
 
     @staticmethod
     def get_iam_example_ids_set_from_split_file(split_file_path: str):
@@ -610,13 +620,29 @@ class IamLinesDataset(Dataset):
 
         return train_set, validation_set, test_set
 
+    def load_dataset_from_file(self, dataset_load_file_path: str):
+            print(">>>Loading data from saved file \"" + dataset_load_file_path + "\"...")
+            train_loader, validation_loader, test_loader = torch.load(dataset_load_file_path)
+            print("done.")
+            return train_loader, validation_loader, test_loader
+
+    def save_dataset_to_file(self, dataset_save_file_path, train_loader, validation_loader, test_loader):
+        print(">>>Saving data to \"" + dataset_save_file_path + "\"...")
+        torch.save((train_loader, validation_loader, test_loader), dataset_save_file_path)
+        print("done.")
+
     def get_train_set_validation_set_test_set_data_loaders_using_split_specification_files(
             self, batch_size: int, train_examples_split_file_path: str,
             dev_examples_split_file_path: str, test_examples_split_file_path: str,
             minimize_vertical_padding: bool,
             minimize_horizontal_padding: bool, keep_unsigned_int_format: bool,
             perform_horizontal_batch_padding_in_data_loader: bool,
-            use_four_pixel_input_blocks: bool):
+            use_four_pixel_input_blocks: bool,
+            dataset_save_or_load_file_path: str
+    ):
+
+        if os.path.isfile(dataset_save_or_load_file_path):
+            return self.load_dataset_from_file(dataset_save_or_load_file_path)
 
         train_example_ids_set = IamLinesDataset.get_iam_example_ids_set_from_split_file(train_examples_split_file_path)
         dev_example_ids_set = IamLinesDataset.get_iam_example_ids_set_from_split_file(dev_examples_split_file_path)
@@ -625,12 +651,16 @@ class IamLinesDataset(Dataset):
         train_set, validation_set, test_set = self.split_specified_train_set_validation_set_and_test_set(
             train_example_ids_set, dev_example_ids_set, test_example_ids_set)
 
-        return self.get_train_set_validation_set_test_set_data_loaders(
+        train_loader, validation_loader, test_loader =  self.get_train_set_validation_set_test_set_data_loaders(
             batch_size, train_set, validation_set, test_set,
             minimize_vertical_padding,
             minimize_horizontal_padding, keep_unsigned_int_format,
             perform_horizontal_batch_padding_in_data_loader,
             use_four_pixel_input_blocks=use_four_pixel_input_blocks)
+
+        self.save_dataset_to_file(dataset_save_or_load_file_path, train_loader, validation_loader, test_loader)
+
+        return train_loader, validation_loader, test_loader
 
     def __len__(self):
         return len(self.examples_line_information)
