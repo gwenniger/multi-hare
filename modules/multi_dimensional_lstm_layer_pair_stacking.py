@@ -4,6 +4,7 @@ from modules.mdlstm_layer_block_strided_convolution_layer_pair import BlockMulti
 from modules.block_strided_convolution import BlockStridedConvolution
 import torch.nn as nn
 from modules.size_two_dimensional import SizeTwoDimensional
+from modules.multi_dimensional_lstm import MultiDimensionalLSTM
 
 
 class MDLSTMLayerPairSpecificParameters:
@@ -79,15 +80,13 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
         return MultiDimensionalLSTMLayerPairStacking(block_multi_dimensional_lstm_layer_pairs)
 
     @staticmethod
-    def create_multi_dimensional_lstm_pair_stacking(layer_pair_specific_parameters_list: list,
-                                                    compute_multi_directional: bool,
-                                                    clamp_gradients: bool,
-                                                    use_dropout: bool,
-                                                    use_bias_with_block_strided_convolution: bool,
-                                                    use_example_packing: bool,
-                                                    use_leaky_lp_cells: bool,
-                                                    nonlinearity="tanh"
-                                                    ):
+    def create_multi_dimensional_lstm_layer_pairs_list(
+            layer_pair_specific_parameters_list: list, compute_multi_directional: bool,
+            clamp_gradients: bool, use_dropout: bool,
+            use_bias_with_block_strided_convolution: bool,
+            use_example_packing: bool,
+            use_leaky_lp_cells: bool,
+            nonlinearity="tanh"):
         multi_dimensional_lstm_layer_pairs = list([])
         layer_pair_index = 0
         for layer_pair_specific_parameters in layer_pair_specific_parameters_list:
@@ -103,6 +102,23 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
                                                          nonlinearity)
             multi_dimensional_lstm_layer_pairs.append(layer_pair)
             layer_pair_index += 1
+        return multi_dimensional_lstm_layer_pairs
+
+    @staticmethod
+    def create_multi_dimensional_lstm_pair_stacking(layer_pair_specific_parameters_list: list,
+                                                    compute_multi_directional: bool,
+                                                    clamp_gradients: bool,
+                                                    use_dropout: bool,
+                                                    use_bias_with_block_strided_convolution: bool,
+                                                    use_example_packing: bool,
+                                                    use_leaky_lp_cells: bool,
+                                                    nonlinearity="tanh"
+                                                    ):
+        multi_dimensional_lstm_layer_pairs = MultiDimensionalLSTMLayerPairStacking.\
+            create_multi_dimensional_lstm_layer_pairs_list(
+                layer_pair_specific_parameters_list, compute_multi_directional,
+                clamp_gradients, use_dropout, use_bias_with_block_strided_convolution,
+                use_example_packing, use_leaky_lp_cells, nonlinearity)
         return MultiDimensionalLSTMLayerPairStacking(multi_dimensional_lstm_layer_pairs)
 
     @staticmethod
@@ -320,24 +336,8 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
                                                      pair_three_specific_parameters])
         return layer_pairs_specific_parameters_list
 
-
-    """
-    The structure and number of hidden units per layer are inspired on 
-    "Dropout improves Recurrent Neural Networks for Handwriting Recognition"
-    (Pham et.al, 2015). The crucial architectural choice of this network 
-    is to start the first MDLSTM layers for the four directions with only 
-    2 hidden units per direction.
-    Since the resolution for the following layers decreases rapidly with 
-    4 times 2 BlockStridedConvolution blocks, it is cheaper to have a higher 
-    number of channels for the following layers, but expensive to have it 
-    for the first layer. Note that this network is still not exactly identical 
-    in structure to the one described in (Pham et.al, 2015), since in that 
-    network the third BlockStridedConvolution layer is missing and replaced 
-    by a fully connected layer . Ideally, both structures should be tested 
-    to see if there's any difference in performance. 
-    """
     @staticmethod
-    def create_three_layer_pair_network_parameters_with_two_channels_per_direction_first_mdlstm_layer(
+    def create_first_two_layer_pair_parameters_with_two_channels_per_direction_first_mdlstm_layer(
             input_channels,
             mdlstm_block_size: SizeTwoDimensional,
             block_strided_convolution_block_size: SizeTwoDimensional,
@@ -366,8 +366,38 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
             output_channels, mdlstm_block_size,
             block_strided_convolution_block_size)
 
+        result = list([pair_one_specific_parameters, pair_two_specific_parameters])
+        return result
+
+    """
+    The structure and number of hidden units per layer are inspired on 
+    "Dropout improves Recurrent Neural Networks for Handwriting Recognition"
+    (Pham et.al, 2015). The crucial architectural choice of this network 
+    is to start the first MDLSTM layers for the four directions with only 
+    2 hidden units per direction.
+    Since the resolution for the following layers decreases rapidly with 
+    4 times 2 BlockStridedConvolution blocks, it is cheaper to have a higher 
+    number of channels for the following layers, but expensive to have it 
+    for the first layer. Note that this network is still not exactly identical 
+    in structure to the one described in (Pham et.al, 2015), since in that 
+    network the third BlockStridedConvolution layer is missing and replaced 
+    by a fully connected layer . Ideally, both structures should be tested 
+    to see if there's any difference in performance. 
+    """
+    @staticmethod
+    def create_three_layer_pair_network_parameters_with_two_channels_per_direction_first_mdlstm_layer(
+            input_channels,
+            mdlstm_block_size: SizeTwoDimensional,
+            block_strided_convolution_block_size: SizeTwoDimensional,
+            parameter_creation_function):
+
+        layer_pairs_specific_parameters_list = \
+            MultiDimensionalLSTMLayerPairStacking.\
+            create_first_two_layer_pair_parameters_with_two_channels_per_direction_first_mdlstm_layer(
+                input_channels, mdlstm_block_size, block_strided_convolution_block_size, parameter_creation_function)
+
         # Layer pair three
-        input_channels = output_channels
+        input_channels = 20
         # Here the number of mdstlm_hidden_states and output channels are increased with a factor that is
         # equal to the layer number
         third_mdlstm_hidden_states_size_per_direction = 50
@@ -377,8 +407,7 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
             input_channels, third_mdlstm_hidden_states_size_per_direction, output_channels, mdlstm_block_size,
             block_strided_convolution_block_size)
 
-        layer_pairs_specific_parameters_list = list([pair_one_specific_parameters, pair_two_specific_parameters,
-                                                     pair_three_specific_parameters])
+        layer_pairs_specific_parameters_list.append(pair_three_specific_parameters)
         return layer_pairs_specific_parameters_list
 
 
@@ -479,6 +508,66 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
                                                         use_example_packing,
                                                         use_leaky_lp_cells,
                                                         nonlinearity)
+
+    @staticmethod
+    def create_mdlstm_two_and_half_layer_pair_network_with_two_channels_per_direction_first_mdlstm_layer(
+            input_channels,
+            block_strided_convolution_block_size: SizeTwoDimensional,
+            compute_multi_directional: bool,
+            clamp_gradients: bool, use_dropout: bool,
+            use_bias_with_block_strided_convolution: bool,
+            use_example_packing: bool,
+            use_leaky_lp_cells: bool):
+
+        """
+        This function creates the first five layers of the
+        network described in "Dropout improves Recurrent Neural
+        Networks for Handwriting Recognition", which consists of
+        two layer pairs of MDLSTM + BlockStridedConvolution and
+        one third MDLSTM layer.
+
+        The full network finishes with four fully connected layers that consume
+        the output of the network created by this function, followed by summation
+        and softmax. These final layers are not created here.
+
+        :param input_channels:
+        :param block_strided_convolution_block_size:
+        :param compute_multi_directional:
+        :param clamp_gradients:
+        :param use_dropout:
+        :param use_bias_with_block_strided_convolution:
+        :param use_example_packing:
+        :param use_leaky_lp_cells:
+        :return:
+        """
+
+        nonlinearity = "tanh"
+        layer_pairs_specific_parameters_list = MultiDimensionalLSTMLayerPairStacking. \
+            create_first_two_layer_pair_parameters_with_two_channels_per_direction_first_mdlstm_layer(
+                input_channels, None,
+                block_strided_convolution_block_size,
+                MultiDimensionalLSTMLayerPairStacking.mdlstm_parameter_creation_function)
+        print("layers_pairs_specific_parameters_list: " + str(layer_pairs_specific_parameters_list))
+
+        multi_dimensional_lstm_layer_pairs =  MultiDimensionalLSTMLayerPairStacking.create_multi_dimensional_lstm_layer_pairs_list(
+            layer_pairs_specific_parameters_list, compute_multi_directional,
+            clamp_gradients, use_dropout, use_bias_with_block_strided_convolution,
+            use_example_packing, use_leaky_lp_cells, nonlinearity)
+
+        layer_index = 2
+        mdlstm_hidden_states_size = 50
+        third_mdlstm_layer = MultiDimensionalLSTM. \
+            create_multi_dimensional_lstm_fully_parallel(layer_index, input_channels, mdlstm_hidden_states_size,
+                                                         compute_multi_directional,
+                                                         clamp_gradients,
+                                                         use_dropout,
+                                                         use_example_packing,
+                                                         use_leaky_lp_cells,
+                                                         nonlinearity)
+        multi_dimensional_lstm_layer_pairs.append(third_mdlstm_layer)
+
+        return MultiDimensionalLSTMLayerPairStacking(multi_dimensional_lstm_layer_pairs)
+
 
     @staticmethod
     def create_one_layer_pair_plus_second_block_convolution_layer_network(
@@ -584,15 +673,21 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
 
     def get_width_reduction_factor(self):
         result = 1
-        for layer_pair in self.multi_dimensional_lstm_layer_pairs:
-            result *= layer_pair.block_strided_convolution.get_width_reduction_factor()
+        for layer_pair_or_layer in self.multi_dimensional_lstm_layer_pairs:
+            if isinstance(layer_pair_or_layer, MDLSTMLayerBlockStridedConvolutionLayerPair):
+                result *= layer_pair_or_layer.block_strided_convolution.get_width_reduction_factor()
+            elif isinstance(layer_pair_or_layer, BlockStridedConvolution):
+                result *= layer_pair_or_layer.get_width_reduction_factor()
 
         return result
 
     def get_height_reduction_factor(self):
         result = 1
-        for layer_pair in self.multi_dimensional_lstm_layer_pairs:
-            result *= layer_pair.block_strided_convolution.get_height_reduction_factor()
+        for layer_pair_or_layer in self.multi_dimensional_lstm_layer_pairs:
+            if isinstance(layer_pair_or_layer, MDLSTMLayerBlockStridedConvolutionLayerPair):
+                result *= layer_pair_or_layer.block_strided_convolution.get_height_reduction_factor()
+            elif isinstance(layer_pair_or_layer, BlockStridedConvolution):
+                result *= layer_pair_or_layer.get_height_reduction_factor()
 
         return result
 

@@ -826,7 +826,7 @@ def iam_line_recognition(model_opt, checkpoint):
         # but it is only slightly faster (GPU usage appears to be already maxed out)
         # 14 gives out of memory error with initial hidden states size 8 (12 seems to work)
         # 40 gives out of memory error with initial hidden states size 2
-        batch_size = 32
+        batch_size = 30 # 32 gave out of memory error with Leaky LP cells, which have one more gate
 
         #lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
         lines_file_path = model_opt.iam_database_lines_file_path
