@@ -144,7 +144,8 @@ def train_mdrnn_no_ctc(train_loader, test_loader, input_channels: int, input_siz
 
     # FIXME : Required arguments to create_network_to_soft_max_network are missing
     network = NetworkToSoftMaxNetwork.create_network_to_soft_max_network(multi_dimensional_rnn,
-                                                                         input_size, number_of_classes_excluding_blank)
+                                                                         input_size, number_of_classes_excluding_blank,
+                                                                         False)
     if Utils.use_cuda():
 
         network = custom_data_parallel.data_parallel.DataParallel(network, device_ids=device_ids)
@@ -317,7 +318,7 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
                  compute_multi_directional: bool, use_dropout: bool, vocab_list,
                  clamp_gradients: bool, data_set_name: str, inputs_and_outputs_are_lists: bool,
                  use_example_packing: bool, device_ids: list, use_block_mdlstm: bool,
-                 use_leaky_lp_cells: bool):
+                 use_leaky_lp_cells: bool, use_network_structure_bluche: bool):
 
     # multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(input_channels,
     #                                                                                 hidden_states_size,
@@ -366,41 +367,53 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
     # mdlstm_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 4)
     block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
 
-    if data_set_name == "MNIST":
-        multi_dimensional_rnn = MultiDimensionalLSTMLayerPairStacking.\
-            create_two_layer_pair_network(hidden_states_size, mdlstm_block_size,
-                                          block_strided_convolution_block_size,
-                                          compute_multi_directional,
-                                          clamp_gradients,
-                                          opt.use_bias_in_block_strided_convolution,
-                                          use_example_packing,
-                                          use_leaky_lp_cells
-                                          )
-    # multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
-    #    create_three_layer_pair_network(hidden_states_size, mdlstm_block_size,
-    #                                 block_strided_convolution_block_size)
-
-    elif data_set_name == "IAM":
-        # multi_dimensional_rnn = MultiDimensionalLSTMLayerPairStacking. \
-        #     create_block_mdlstm_three_layer_pair_network_linear_parameter_size_increase(
-        #         input_channels, hidden_states_size, mdlstm_block_size, block_strided_convolution_block_size,
-        #         compute_multi_directional,clamp_gradients, use_dropout, opt.use_bias_in_block_strided_convolution)
-
-        # Create network with MDLSTM layers instead of block-MDLSTM layers
-        # multi_dimensional_rnn = MultiDimensionalLSTMLayerPairStacking. \
-        #     create_mdlstm_three_layer_pair_network_linear_parameter_size_increase(
-        #         input_channels, hidden_states_size, block_strided_convolution_block_size,
-        #         compute_multi_directional, clamp_gradients, use_dropout, opt.use_bias_in_block_strided_convolution,
-        #         use_example_packing)
+    if use_network_structure_bluche:
         multi_dimensional_rnn = MultiDimensionalLSTMLayerPairStacking. \
-            create_mdlstm_three_layer_pair_network_with_two_channels_per_direction_first_mdlstm_layer(
+            create_mdlstm_two_and_half_layer_pair_network_with_two_channels_per_direction_first_mdlstm_layer(
                 input_channels, block_strided_convolution_block_size,
                 compute_multi_directional, clamp_gradients, use_dropout, opt.use_bias_in_block_strided_convolution,
-                use_example_packing, use_leaky_lp_cells)
-
+                use_example_packing, use_leaky_lp_cells
+              )
+        input_network_produces_multiple_output_directions = True
 
     else:
-        raise RuntimeError("Error: \"" + str(data_set_name) + "\" is an unrecognized dataset name")
+        input_network_produces_multiple_output_directions = False
+
+        if data_set_name == "MNIST":
+            multi_dimensional_rnn = MultiDimensionalLSTMLayerPairStacking.\
+                create_two_layer_pair_network(hidden_states_size, mdlstm_block_size,
+                                              block_strided_convolution_block_size,
+                                              compute_multi_directional,
+                                              clamp_gradients,
+                                              opt.use_bias_in_block_strided_convolution,
+                                              use_example_packing,
+                                              use_leaky_lp_cells
+                                              )
+
+        # multi_dimensional_rnn = BlockMultiDimensionalLSTMLayerPairStacking. \
+        #    create_three_layer_pair_network(hidden_states_size, mdlstm_block_size,
+        #                                 block_strided_convolution_block_size)
+
+        elif data_set_name == "IAM":
+            # multi_dimensional_rnn = MultiDimensionalLSTMLayerPairStacking. \
+            #     create_block_mdlstm_three_layer_pair_network_linear_parameter_size_increase(
+            #         input_channels, hidden_states_size, mdlstm_block_size, block_strided_convolution_block_size,
+            #         compute_multi_directional,clamp_gradients, use_dropout, opt.use_bias_in_block_strided_convolution)
+
+            # Create network with MDLSTM layers instead of block-MDLSTM layers
+            # multi_dimensional_rnn = MultiDimensionalLSTMLayerPairStacking. \
+            #     create_mdlstm_three_layer_pair_network_linear_parameter_size_increase(
+            #         input_channels, hidden_states_size, block_strided_convolution_block_size,
+            #         compute_multi_directional, clamp_gradients, use_dropout, opt.use_bias_in_block_strided_convolution,
+            #         use_example_packing)
+            multi_dimensional_rnn = MultiDimensionalLSTMLayerPairStacking. \
+                create_mdlstm_three_layer_pair_network_with_two_channels_per_direction_first_mdlstm_layer(
+                    input_channels, block_strided_convolution_block_size,
+                    compute_multi_directional, clamp_gradients, use_dropout, opt.use_bias_in_block_strided_convolution,
+                    use_example_packing, use_leaky_lp_cells)
+
+        else:
+            raise RuntimeError("Error: \"" + str(data_set_name) + "\" is an unrecognized dataset name")
 
     # See: https://pytorch.org/tutorials/beginner/former_torchies/nn_tutorial.html
     # multi_dimensional_rnn.register_backward_hook(printgradnorm)
@@ -425,6 +438,7 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
         data_height, clamp_gradients,
         inputs_and_outputs_are_lists,
         use_example_packing,
+        input_network_produces_multiple_output_directions,
         use_block_mdlstm)
 
     network.to(torch.device("cuda:0"))
@@ -600,6 +614,7 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
                     use_example_packing: bool,
                     use_block_mdlstm: bool,
                     use_leaky_lp_cells: bool,
+                    use_network_structure_bluche: bool,
                     perform_horizontal_batch_padding_in_data_loader):
 
     # http://pytorch.org/docs/master/notes/cuda.html
@@ -624,7 +639,8 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
                            use_example_packing,
                            device_ids,
                            use_block_mdlstm,
-                           use_leaky_lp_cells)
+                           use_leaky_lp_cells,
+                           use_network_structure_bluche)
 
     # network.register_backward_hook(printgradnorm)
 
@@ -804,6 +820,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     perform_horizontal_batch_padding_in_data_loader = False
     use_example_packing = True
     use_leaky_lp_cells = opt.use_leaky_lp_cells
+    use_network_structure_bluche = opt.use_network_structure_bluche
     train_mdrnn_ctc(model_opt, checkpoint, train_loader, test_loader,
                     test_loader, input_channels,
                     hidden_states_size, batch_size,
@@ -812,6 +829,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
                     use_example_packing,
                     use_block_mdlstm,
                     use_leaky_lp_cells,
+                    use_network_structure_bluche,
                     perform_horizontal_batch_padding_in_data_loader)
 
     #print(prof)
@@ -903,6 +921,7 @@ def iam_line_recognition(model_opt, checkpoint):
 
         use_example_packing = True
         use_leaky_lp_cells = opt.use_leaky_lp_cells
+        use_network_structure_bluche = opt.use_network_structure_bluche
         use_block_mdlstm = opt.use_block_mdlstm
         #with torch.autograd.profiler.profile(use_cuda=False) as prof:
         train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels,
@@ -913,6 +932,7 @@ def iam_line_recognition(model_opt, checkpoint):
                         use_example_packing,
                         use_block_mdlstm,
                         use_leaky_lp_cells,
+                        use_network_structure_bluche,
                         perform_horizontal_batch_padding_in_data_loader
                         )
 
@@ -989,6 +1009,7 @@ def iam_word_recognition(model_opt, checkpoint):
 
     use_block_mdlstm = opt.use_block_mdlstm
     use_leaky_lp_cells = opt.use_leaky_lp_cells
+    use_network_structure_bluche = opt.use_network_structure_bluche
     train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels,
                     hidden_states_size,
                     batch_size, compute_multi_directional, use_dropout, vocab_list, blank_symbol,
@@ -996,6 +1017,7 @@ def iam_word_recognition(model_opt, checkpoint):
                     use_example_packing,
                     use_block_mdlstm,
                     use_leaky_lp_cells,
+                    use_network_structure_bluche,
                     perform_horizontal_batch_padding_in_data_loader)
 
 
@@ -1023,7 +1045,7 @@ def main():
         iam_word_recognition(model_opt, checkpoint)
     else:
         raise RuntimeError("Unrecognized data type")
-    # #cifar_ten_basic_recognition()
+    # cifar_ten_basic_recognition()
 
 
 if __name__ == "__main__":

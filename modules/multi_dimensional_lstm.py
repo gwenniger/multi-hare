@@ -229,6 +229,14 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                           mdlstm_parameters, self.use_example_packing, self.nonlinearity))
         return result
 
+    def get_number_of_output_channels(self):
+        """
+            Get the number of output channels. Does not specify the number of output directions.
+        :return:
+        """
+        result = self.hidden_states_size
+        return result
+
     def set_training(self, training):
         self.mdlstm_parameters.set_training(training)
 
@@ -250,7 +258,11 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                     create_vertically_and_horizontally_packed_examples_four_directions_plus_mask(examples)
                 if skewed_images_variable.size(1) != 4 * self.input_channels:
                     raise RuntimeError("Error: expected the 4 images for four directions to be stacked on "
-                                       "the second (channel) dimension")
+                                       "the second (channel) dimension: \n" +
+                                       "skewed_images_variable.size(1): " + str(skewed_images_variable.size(1))
+                                       + " != 4 * self.input_channels = 4 * " + str(self.input_channels) +
+                                       "\nskewed_images_variable.size(): " + str(skewed_images_variable.size()) +
+                                       "\n layer index: " + str(self.layer_index))
                 number_of_images = 4
 
                 # print("multi_dimensional_lstm - Time used for examples packing: "

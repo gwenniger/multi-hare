@@ -44,6 +44,12 @@ class ModuleIOStructuring:
                                   class_activations_resized_temp):
         examples_activation_height_times_width = ModuleIOStructuring. \
             compute_paired_lists_multiples(examples_activation_heights, examples_activation_widths)
+
+        # print("module_io_strcuturing.class_activations_resized_temp.size(): " +
+        #       str(class_activations_resized_temp.size()))
+        # print("module_io_strcuturing.examples_activation_height_times_width: " +
+        #       str(examples_activation_height_times_width))
+
         chunks_multiple_rows = torch.split(class_activations_resized_temp,
                                            examples_activation_height_times_width, 1)
         chunks = list([])

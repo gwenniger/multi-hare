@@ -10,6 +10,7 @@ from data_preprocessing.last_minute_padding import LastMinutePadding
 from modules.module_io_structuring import ModuleIOStructuring
 from modules.mdlstm_examples_packing import MDLSTMExamplesPacking
 import custom_data_parallel.data_parallel
+from modules.fully_connected_layers import FullyConnectedLayers
 
 
 class ActivationsResizer:
@@ -114,7 +115,8 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
                  clamp_gradients: bool,
                  input_is_list: bool,
                  use_examples_packing: bool,
-                 use_block_mdlstm: bool
+                 input_network_produces_multiple_output_directions: bool,
+                 use_block_mdlstm: bool,
                  ):
         super(NetworkToSoftMaxNetwork, self).__init__()
         self.clamp_gradients = clamp_gradients
@@ -123,14 +125,27 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         self.use_block_mdlstm = use_block_mdlstm
         self.network = network
         self.activations_resizer = activations_resizer
-        self.number_of_output_channels =self.get_real_network().get_number_of_output_channels()
+        self.number_of_output_channels = self.get_real_network().get_number_of_output_channels()
             #activations_resizer.get_number_of_output_channels()
         self.number_of_classes_excluding_blank = number_of_classes_excluding_blank
+        self.input_network_produces_multiple_output_directions = input_network_produces_multiple_output_directions
 
         print(">>> number_of_output_channels: " + str(self.number_of_output_channels))
 
         print("NetworkToSoftMaxNetwork - number of classes: " + str(self.get_number_of_classes_including_blank()))
-        self.fc3 = nn.Linear(self.number_of_output_channels, self.get_number_of_classes_including_blank())
+        # TODO: This should be replaced by a list "fully_connected_layers"
+        # Or in fact, it is smarter to use a 1d convolution with
+        # stride 1 to mimic the linear channel, but enable grouping to
+        # parallelize the computation of the multiple fully connected
+        # layers, using grouping
+
+        # A class "FullyConnectedLayer" should be created that takes care
+        # of the efficient
+        if self.input_network_produces_multiple_output_directions:
+            self.fully_connected_layers = FullyConnectedLayers.create_fully_connected_layers(
+                self.number_of_output_channels, self.get_number_of_classes_including_blank(), 4)
+        else:
+            self.fully_connected_layers = nn.Linear(self.number_of_output_channels, self.get_number_of_classes_including_blank())
 
         # MDLSTMExamplesPacking for the to-be-processed batch of examples
         # When example-packing is used, this must be computed at the beginning of the
@@ -150,7 +165,11 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
 
         # Initialize the linear output layer with Xavier uniform  weights
         # torch.nn.init.xavier_normal_(self.fc3.weight)
-        torch.nn.init.xavier_uniform_(self.fc3.weight)
+
+        if self.input_network_produces_multiple_output_directions:
+            torch.nn.init.xavier_uniform_(self.fully_connected_layers.one_dimensional_grouped_convolution.weight)
+        else:
+            torch.nn.init.xavier_uniform_(self.fully_connected_layers.weight)
         # print("self.fc3 : " + str(self.fc3))
         # print("self.fc3.weight: " + str(self.fc3.weight))
         # print("self.fc3.bias: " + str(self.fc3.bias))
@@ -163,13 +182,16 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
                                            data_height: int, clamp_gradients: bool,
                                            input_is_list: bool,
                                            use_examples_packing: bool,
-                                           use_block_mdlstm: bool=False):
+                                           input_network_produces_multiple_output_directions: bool,
+                                           use_block_mdlstm: bool=False,
+                                           ):
         activations_resizer = KeepAllActivationsResizer(network, data_height)
         # activations_resizer = SumActivationsResizer(network)
         return NetworkToSoftMaxNetwork(network, number_of_classes_excluding_blank,
                                        activations_resizer,
                                        clamp_gradients, input_is_list,
                                        use_examples_packing,
+                                       input_network_produces_multiple_output_directions,
                                        use_block_mdlstm
                                        )
 
@@ -180,19 +202,25 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         self.get_real_network().set_training(training)
 
     @staticmethod
-    def collect_examples_activation_heights(activations):
+    def collect_examples_activation_heights(activations, input_network_produces_multiple_output_directions: bool):
         examples_activation_heights = list([])
         for example_activations in activations:
-            example_activations_height = example_activations.size(1)
+            if input_network_produces_multiple_output_directions:
+                example_activations_height = example_activations.size(2)
+            else:
+                example_activations_height = example_activations.size(1)
             examples_activation_heights.append(example_activations_height)
         return examples_activation_heights
 
     @staticmethod
-    def collect_examples_activation_widths(activations):
+    def collect_examples_activation_widths(activations, input_network_produces_multiple_output_directions: bool):
         examples_activation_widths = list([])
         for example_activations in activations:
             # print(">>> example_activations.size(): " + str(example_activations.size()))
-            example_activations_width = example_activations.size(2)
+            if input_network_produces_multiple_output_directions:
+                example_activations_width = example_activations.size(3)
+            else:
+                example_activations_width = example_activations.size(2)
             examples_activation_widths.append(example_activations_width)
         return examples_activation_widths
 
@@ -213,16 +241,32 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         activations for each example.
     """
     @staticmethod
-    def extract_concatenated_height_one_activations_from_block_activations(activations_per_example_list):
+    def extract_concatenated_height_one_activations_from_block_activations(
+            activations_per_example_list,
+            input_network_produces_multiple_output_directions: bool):
 
         # print("network_to_softmax_network - activations sizes after dechunking: ")
         # for element in activations_per_example_list:
         #     print(">>> activations list element size - " + str(element.size()))
 
+        if not input_network_produces_multiple_output_directions:
+            raise RuntimeError("input_network_produces_multiple_output_directions = "
+                               + str(input_network_produces_multiple_output_directions))
+
         activations_height_one = list([])
         for example_activations in activations_per_example_list:
+
+            if input_network_produces_multiple_output_directions:
+                # In this case the example_activations tensor is four dimensional, with
+                # the second and third dimension being the height and width respectively
+                if not example_activations.size(0) == 1:
+                    raise RuntimeError("Expected dimension zero to be of size 1")
+                # Remove the first (bogus) dimension
+                example_activations = example_activations.squeeze(0)
+
             if example_activations.size(1) > 1:
                 # print("example_activations.size(): " + str(example_activations.size()))
+
                 activation_rows = torch.split(example_activations, 1, dim=1)
                 # Debugging check
                 ModuleIOStructuring.check_activation_rows_are_not_equal(activation_rows)
@@ -235,6 +279,7 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
 
         # Create tensor with all activations concatenated on width dimension
         activations_single_tensor = torch.cat(activations_height_one, 2)
+        # print("activations_single_tensor.size(): " + str(activations_single_tensor.size()))
         return activations_single_tensor
 
     # de-chunk the chunked activations, yielding a list with for every element
@@ -246,16 +291,20 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
                                                                                        SizeTwoDimensional(1, 1))
 
     @staticmethod
-    def get_activations_single_tensor_and_activation_heights_and_widths(activations):
+    def get_activations_single_tensor_and_activation_heights_and_widths(
+            activations, input_network_produces_multiple_output_directions: bool):
         # From the de-chunked activations, collect the examples activation heights and widths
         # for later use when recovering the class activations belonging to each example
         # after computing all the class activations in one go from one long concatenated tensor
-        examples_activation_heights = NetworkToSoftMaxNetwork.collect_examples_activation_heights(activations)
-        examples_activation_widths = NetworkToSoftMaxNetwork.collect_examples_activation_widths(activations)
+        examples_activation_heights = NetworkToSoftMaxNetwork.collect_examples_activation_heights(
+            activations, input_network_produces_multiple_output_directions)
+        examples_activation_widths = NetworkToSoftMaxNetwork.collect_examples_activation_widths(
+            activations, input_network_produces_multiple_output_directions)
 
         # Concatenate the activations of the examples
         activations_single_tensor = NetworkToSoftMaxNetwork. \
-            extract_concatenated_height_one_activations_from_block_activations(activations)
+            extract_concatenated_height_one_activations_from_block_activations(
+                activations, input_network_produces_multiple_output_directions)
 
         return activations_single_tensor, examples_activation_heights, examples_activation_widths
 
@@ -295,7 +344,8 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         # de-chunk the chunked activations
         activations = NetworkToSoftMaxNetwork.dechunk_activations(activations_chunked, tensor_list_chunking)
 
-        return NetworkToSoftMaxNetwork.get_activations_single_tensor_and_activation_heights_and_widths(activations)
+        return NetworkToSoftMaxNetwork.get_activations_single_tensor_and_activation_heights_and_widths(
+            activations, self.input_network_produces_multiple_output_directions)
 
     @staticmethod
     def resize_activations_block_mdlstm_minimal_padding(activations):
@@ -332,6 +382,28 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
             max_input_width = max(max_input_width, example.size(2))
         return max_input_width
 
+    def create_padded_chunks(self, chunks, expected_output_width):
+        chunks_padded = list([])
+        for chunk in chunks:
+            columns_padding_required = expected_output_width - chunk.size(1)
+            # print("chunk.size: " + str(chunk.size()))
+            # print("columns_padding_required: " + str(columns_padding_required))
+            p1d = (0, columns_padding_required)
+            # Padding is done to the last dimension but we need to padd the one-but last dimension
+            # so transpose, padd, then transpose back
+            chunk_transposed = chunk.transpose(1, 2)
+            chunk_transposed_padded = torch.nn.functional.pad(chunk_transposed, p1d, "constant", 0)
+
+            # torch.nn.functional.pad has a gradient and therefore needs to be
+            # clamped to avoid that it can cause exploding gradients
+            if self.clamp_gradients:
+                InsideModelGradientClamping.clamp_grad(chunk_transposed_padded,
+                                                       NetworkToSoftMaxNetwork.LINEAR_LAYER_GRADIENT_CLAMPING_BOUND)
+
+            chunk_padded = chunk_transposed_padded.transpose(1, 2)
+            chunks_padded.append(chunk_padded)
+        return chunks_padded
+
     def forward(self, x, max_input_width=None):
 
         if self.input_is_list:
@@ -360,7 +432,8 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
                 activations = TensorListChunking.retrieve_original_order(activations_reordered, original_indices)
                 # activations = self.network(reordered_elements_list)
                 activations, examples_activation_heights, examples_activation_widths = \
-                    NetworkToSoftMaxNetwork.get_activations_single_tensor_and_activation_heights_and_widths(activations)
+                    NetworkToSoftMaxNetwork.get_activations_single_tensor_and_activation_heights_and_widths(
+                        activations, self.input_network_produces_multiple_output_directions)
 
             else:
                 last_minute_padding = LastMinutePadding(self.get_height_reduction_factor(),
@@ -409,7 +482,7 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
 
         # Restructure the activations to be 2-dimensional, with the first dimension
         # the number of activations and the second dimension the number of channels
-        if (self.use_block_mdlstm or  self.use_example_packing) and self.input_is_list:
+        if (self.use_block_mdlstm or self.use_example_packing) and self.input_is_list:
             activations_resized_two_dimensional = \
                 NetworkToSoftMaxNetwork.resize_activations_block_mdlstm_minimal_padding(activations)
         else:
@@ -417,7 +490,7 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
 
 
         # print("activations_resized_no_height: " + str(activations_resized_no_height))
-        class_activations = self.fc3(activations_resized_two_dimensional)
+        class_activations = self.fully_connected_layers(activations_resized_two_dimensional)
 
         if self.clamp_gradients:
             # print("NetworkToSoftMaxNetwork - register gradient clamping...")
@@ -437,26 +510,10 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
             chunks = ModuleIOStructuring.extract_activation_chunks(examples_activation_heights,
                                                                    examples_activation_widths,
                                                                    class_activations_resized_temp)
+            # for chunk in chunks:
+            #     print("chunk.size(): " + str(chunk.size()))
 
-            chunks_padded = list([])
-            for chunk in chunks:
-                columns_padding_required = expected_output_width - chunk.size(1)
-                # print("chunk.size: " + str(chunk.size()))
-                # print("columns_padding_required: " + str(columns_padding_required))
-                p1d = (0, columns_padding_required)
-                # Padding is done to the last dimension but we need to padd the one-but last dimension
-                # so transpose, padd, then transpose back
-                chunk_transposed = chunk.transpose(1, 2)
-                chunk_transposed_padded = torch.nn.functional.pad(chunk_transposed, p1d, "constant", 0)
-
-                # torch.nn.functional.pad has a gradient and therefore needs to be
-                # clamped to avoid that it can cause exploding gradients
-                if self.clamp_gradients:
-                    InsideModelGradientClamping.clamp_grad(chunk_transposed_padded,
-                                                           NetworkToSoftMaxNetwork.LINEAR_LAYER_GRADIENT_CLAMPING_BOUND)
-
-                chunk_padded = chunk_transposed_padded.transpose(1, 2)
-                chunks_padded.append(chunk_padded)
+            chunks_padded = self.create_padded_chunks(chunks, expected_output_width)
             class_activations_resized = torch.cat(chunks_padded, 0)
         else:
             # print("class_activations.size(): " + str(class_activations.size()))

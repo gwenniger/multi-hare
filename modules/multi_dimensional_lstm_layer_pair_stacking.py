@@ -549,12 +549,16 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
                 MultiDimensionalLSTMLayerPairStacking.mdlstm_parameter_creation_function)
         print("layers_pairs_specific_parameters_list: " + str(layer_pairs_specific_parameters_list))
 
-        multi_dimensional_lstm_layer_pairs =  MultiDimensionalLSTMLayerPairStacking.create_multi_dimensional_lstm_layer_pairs_list(
-            layer_pairs_specific_parameters_list, compute_multi_directional,
-            clamp_gradients, use_dropout, use_bias_with_block_strided_convolution,
-            use_example_packing, use_leaky_lp_cells, nonlinearity)
+        multi_dimensional_lstm_layer_pairs =  MultiDimensionalLSTMLayerPairStacking.\
+            create_multi_dimensional_lstm_layer_pairs_list(
+                layer_pairs_specific_parameters_list, compute_multi_directional,
+                clamp_gradients, use_dropout, use_bias_with_block_strided_convolution,
+                use_example_packing, use_leaky_lp_cells, nonlinearity)
 
+        # Single Layer three (first two layers are layer pairs)
         layer_index = 2
+        last_layer_pair = multi_dimensional_lstm_layer_pairs[-1]
+        input_channels = last_layer_pair.get_number_of_output_channels()
         mdlstm_hidden_states_size = 50
         third_mdlstm_layer = MultiDimensionalLSTM. \
             create_multi_dimensional_lstm_fully_parallel(layer_index, input_channels, mdlstm_hidden_states_size,

@@ -134,6 +134,20 @@ def train_opts(parser):
     group.add_argument('-use_normal_mdlstm_cells', dest='use_leaky_lp_cells',
                        action='store_false')
 
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('-use_network_structure_bluche', dest='use_network_structure_bluche',
+                       action='store_true', help="The Bluche (Pham. et.al, 2014) network structure " +
+                       "consists of two MDLSTM + block-strided convolution layer pairs and one " +
+                       "third MDLSTM layer, followed by four fully directed layers, one for each " +
+                       "direction, of which the output is summed")
+    group.add_argument('-use_only_complete_mdlstm_plus_block_strided_convolution_layer_pairs',
+                       dest='use_network_structure_bluche',
+                       action='store_false', help="With this option set, multiple full MDLSTM plus" +
+                       "block-strided convolution layer pairs are used, with the last " +
+                       "block-strided convolution combining the directions, and providing its output" +
+                       "to a single fully connected layer")
+
+
 
     # Init options
     group = parser.add_argument_group('Initialization')
