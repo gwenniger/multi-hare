@@ -83,6 +83,8 @@ class Trainer:
             train_loader: the train loader,
             start: time in seconds training started
 
+        return: Average loss per minibatch
+
         """
         # if isinstance(self.model, torch.nn.DataParallel):
         #     device = self.model.module.get_device()
@@ -92,6 +94,8 @@ class Trainer:
         num_gradient_corrections = 0
         gradient_norms_sum = 0
         running_loss = 0.0
+        total_summed_loss_epoch = 0.0
+        number_of_minibatches = 0
         time_start = time.time()
         for i, data in enumerate(train_loader, 0):
 
@@ -226,6 +230,7 @@ class Trainer:
             # print("loss.data: " + str(loss.data))
             # print("loss.data[0]: " + str(loss.data[0]))
             running_loss += loss_value
+            total_summed_loss_epoch += loss_value
             # if i % 2000 == 1999:  # print every 2000 mini-batches
             # See: https://stackoverflow.com/questions/5598181/python-multiple-prints-on-the-same-line
             # print(str(i)+",", end="", flush=True)
@@ -249,6 +254,10 @@ class Trainer:
                 print(">>> Time used in current epoch: " +
                       str(util.timing.time_since_and_expected_remaining_time(time_start, percent)))
                 sys.stdout.flush()
+            number_of_minibatches +=1
+
+        average_loss_per_minibatch = total_summed_loss_epoch / number_of_minibatches
+        return average_loss_per_minibatch
 
     def get_real_model(self):
         real_model = custom_data_parallel.data_parallel.get_real_model(self.model)

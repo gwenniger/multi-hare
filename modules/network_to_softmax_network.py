@@ -11,6 +11,7 @@ from modules.module_io_structuring import ModuleIOStructuring
 from modules.mdlstm_examples_packing import MDLSTMExamplesPacking
 import custom_data_parallel.data_parallel
 from modules.fully_connected_layers import FullyConnectedLayers
+from modules.fully_connected_layers_sharing_weights import FullyConnectedLayersSharingWeights
 
 
 class ActivationsResizer:
@@ -142,10 +143,28 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         # A class "FullyConnectedLayer" should be created that takes care
         # of the efficient
         if self.input_network_produces_multiple_output_directions:
-            self.fully_connected_layers = FullyConnectedLayers.create_fully_connected_layers(
-                self.number_of_output_channels, self.get_number_of_classes_including_blank(), 4)
+            # Old elaborate implementation, which turns out to be not necessary
+            # self.fully_connected_layers = FullyConnectedLayers.create_fully_connected_layers(
+            #    self.number_of_output_channels, self.get_number_of_classes_including_blank(), 4)
+
+            # Instead of having four separate fully connected layers whose output is then summed,
+            # the same effect can be achieved more effectively by simply having a linear layer
+            # with four times as many inputs, each input connected to each of the outputs by
+            # a weighted connection. Not only is this computationally more efficient, it also
+            # fixes the problem that having four fully connected layers, each with their own bias
+            # weights, and then summing them is redundant. Only one set of bias weight is needed
+            # for the four layers combined, and having redundant bias weight could make learning
+            # harder.
+            print(">>> Using the Bluche network structure with a final fully connected layer combining" +
+                  "the outputs of the third MDLSTM layer for four directions...")
+            self.fully_connected_layer = nn.Linear(self.number_of_output_channels * 4,
+                                                   self.get_number_of_classes_including_blank())
+            # self.fully_connected_layer = FullyConnectedLayersSharingWeights.\
+            #     create_fully_connected_layers_sharing_weights(
+            #         self.number_of_output_channels, self.get_number_of_classes_including_blank(), 4)
         else:
-            self.fully_connected_layers = nn.Linear(self.number_of_output_channels, self.get_number_of_classes_including_blank())
+            self.fully_connected_layer = nn.Linear(self.number_of_output_channels,
+                                                   self.get_number_of_classes_including_blank())
 
         # MDLSTMExamplesPacking for the to-be-processed batch of examples
         # When example-packing is used, this must be computed at the beginning of the
@@ -166,10 +185,13 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         # Initialize the linear output layer with Xavier uniform  weights
         # torch.nn.init.xavier_normal_(self.fc3.weight)
 
-        if self.input_network_produces_multiple_output_directions:
-            torch.nn.init.xavier_uniform_(self.fully_connected_layers.one_dimensional_grouped_convolution.weight)
-        else:
-            torch.nn.init.xavier_uniform_(self.fully_connected_layers.weight)
+        # if self.input_network_produces_multiple_output_directions:
+        #     # torch.nn.init.xavier_uniform_(self.fully_connected_layer.one_dimensional_grouped_convolution.weight)
+        #     torch.nn.init.xavier_uniform_(self.fully_connected_layer.linear_layer.weight)
+        # else:
+
+        torch.nn.init.xavier_uniform_(self.fully_connected_layer.weight)
+
         # print("self.fc3 : " + str(self.fc3))
         # print("self.fc3.weight: " + str(self.fc3.weight))
         # print("self.fc3.bias: " + str(self.fc3.bias))
@@ -490,7 +512,7 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
 
 
         # print("activations_resized_no_height: " + str(activations_resized_no_height))
-        class_activations = self.fully_connected_layers(activations_resized_two_dimensional)
+        class_activations = self.fully_connected_layer(activations_resized_two_dimensional)
 
         if self.clamp_gradients:
             # print("NetworkToSoftMaxNetwork - register gradient clamping...")

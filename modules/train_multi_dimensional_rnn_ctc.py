@@ -699,8 +699,8 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
         # print("Time used for this batch: " + str(util.timing.time_since(time_start_batch)))
 
         input_is_list = perform_horizontal_batch_padding and not perform_horizontal_batch_padding_in_data_loader
-        trainer.train_one_epoch(train_loader, epoch, start, batch_size, device,
-                                input_is_list)
+        average_loss_per_minibatch = trainer.train_one_epoch(
+            train_loader, epoch, start, batch_size, device, input_is_list)
 
         # Update the iteration / minibatch number
         iteration += 1
@@ -712,7 +712,8 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
         validation_stats = Evaluator.evaluate_mdrnn(validation_loader, network, device, vocab_list, blank_symbol,
                                                     width_reduction_factor, image_input_is_unsigned_int,
                                                     perform_horizontal_batch_padding, None,
-                                                    opt.save_score_table_file_path, epoch)
+                                                    opt.save_score_table_file_path, epoch,
+                                                    average_loss_per_minibatch)
         real_model.set_training(True)  # When using DataParallel
         print("</validation evaluation epoch " + str(epoch) + " >")
 
@@ -732,7 +733,7 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
                              perform_horizontal_batch_padding,
                              LanguageModelParameters(opt.language_model_file_path,
                                                      opt.language_model_weight,
-                                                     opt.word_insertion_penalty), None, None)
+                                                     opt.word_insertion_penalty), None, None, None)
     network.module.set_training(True)  # When using DataParallel
     print("</test evaluation, model epoch " + str(opt.epochs) + " >")
 

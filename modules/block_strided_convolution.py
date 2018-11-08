@@ -217,6 +217,19 @@ class BlockStridedConvolution(Module):
 
     def forward(self, x):
 
+        """
+        :param x: (If Using examples-packing) A list of example tensors, each tensor
+        of dimension [1, InputChannels, Height, Width]
+
+        :return:
+        (If Using examples-packing) Returns output in the form of a list, one
+        list entry for each example, with entries of the form
+        [OutputChannels, Height, Width]
+        So for example an
+        input image of size 4 * 24, using 10 output channels will yield output list
+        elements of size [10, 4, 24]
+        """
+
         # time_start_network_forward = util.timing.date_time_start()
 
         if self.use_example_packing:
@@ -238,6 +251,9 @@ class BlockStridedConvolution(Module):
                 # print("Block-strided convolution - Time used for network forward: "
                 #       + str(util.timing.milliseconds_since(time_start_network_forward)))
 
+                # for i, element in enumerate(activations_summed):
+                #     print("Block-strided convolution - result[" + str(i) + "].size(): " + str(element.size()))
+                #
                 return activations_summed
             else:
                 x_chunked, tensor_list_chunking = \

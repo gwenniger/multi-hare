@@ -861,6 +861,16 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         return activations_unskewed
 
     def forward_multi_directional_multi_dimensional_lstm(self, x):
+        """
+
+        :param x:
+        :return: (Using examples-packing) Returns output in the form of a list, one
+        list entry for each example, with entries of the form
+        [1, OutputChannels, Height, Width]
+        in OutputChannels the directions are stacked, so for example an
+        input image of size 4 * 24, with 10 channels per direction will yield output list
+        elements of size [1, 40, 4, 24]
+        """
 
         # time_start_network_forward = util.timing.date_time_start()
 
@@ -912,6 +922,9 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
         # print("multi_dimensional_lstm - Time used for network forward: "
         #       + str(util.timing.milliseconds_since(time_start_network_forward)))
+
+        # for i, element in enumerate(result):
+        #     print("MDLSTM - result[" + str(i) + "].size(): " + str(element.size()))
 
         return result
 

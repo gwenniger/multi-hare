@@ -130,15 +130,16 @@ class Evaluator:
     def score_table_header(dev_set_size: int):
         result = "Scores on the development set of size: " + str(dev_set_size) +"\n"
         result += "\nepoch_number,total_correct,accuracy,CER_including_word_separators[%]," \
-                  "CER_excluding_word_separators[%],WER[%]\n"
+                  "CER_excluding_word_separators[%],WER[%],Average_training_CTC_loss_per_minibatch\n"
         return result
 
     @staticmethod
     def score_table_line(epoch_number: int, total_correct: int, accuracy: float,
                          cer_including_word_separators: float, cer_excluding_word_separator: float,
-                         wer: float):
+                         wer: float, average_loss_per_minibatch: float):
         result = str(epoch_number) + "," + str(total_correct) + "," + str(accuracy) + "," +\
-                 str(cer_including_word_separators) + "," + str(cer_excluding_word_separator) + "," + str(wer)
+                 str(cer_including_word_separators) + "," + str(cer_excluding_word_separator) + "," + str(wer) +\
+                 "," + str(average_loss_per_minibatch)
         return result
 
     @staticmethod
@@ -146,7 +147,7 @@ class Evaluator:
                        vocab_list: list, blank_symbol: str, horizontal_reduction_factor: int,
                        image_input_is_unsigned_int: bool, minimize_horizontal_padding: bool,
                        language_model_parameters: LanguageModelParameters,
-                       save_score_table_file_path: str, epoch_number: int):
+                       save_score_table_file_path: str, epoch_number: int, average_loss_per_minibatch: float):
 
         correct = 0
         total = 0
@@ -291,7 +292,7 @@ class Evaluator:
                                                                    validation_stats.get_accuracy(),
                                                                    cer_including_word_separators,
                                                                    cer_excluding_word_separators,
-                                                                   wer) + "\n")
-
+                                                                   wer,
+                                                                   average_loss_per_minibatch) + "\n")
 
         return validation_stats
