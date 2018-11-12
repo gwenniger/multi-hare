@@ -74,3 +74,6 @@ class FullyConnectedLayersSharingWeights(torch.nn.Module):
             result = self.linear_layer(input_activations_resized_two_dimensional)
 
         return result
+
+    def get_weight(self):
+        return self.linear_layer.weight

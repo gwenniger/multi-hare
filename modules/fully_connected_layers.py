@@ -70,3 +70,7 @@ class FullyConnectedLayers(torch.nn.Module):
         result = result.transpose(1, 2)
 
         return result
+
+    def get_weight(self):
+        return self.one_dimensional_grouped_convolution.weight
+

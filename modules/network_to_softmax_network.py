@@ -157,11 +157,11 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
             # harder.
             print(">>> Using the Bluche network structure with a final fully connected layer combining" +
                   "the outputs of the third MDLSTM layer for four directions...")
-            self.fully_connected_layer = nn.Linear(self.number_of_output_channels * 4,
-                                                   self.get_number_of_classes_including_blank())
-            # self.fully_connected_layer = FullyConnectedLayersSharingWeights.\
-            #     create_fully_connected_layers_sharing_weights(
-            #         self.number_of_output_channels, self.get_number_of_classes_including_blank(), 4)
+            # self.fully_connected_layer = nn.Linear(self.number_of_output_channels * 4,
+            #                                        self.get_number_of_classes_including_blank())
+            self.fully_connected_layer = FullyConnectedLayersSharingWeights.\
+                create_fully_connected_layers_sharing_weights(
+                    self.number_of_output_channels, self.get_number_of_classes_including_blank(), 4)
         else:
             self.fully_connected_layer = nn.Linear(self.number_of_output_channels,
                                                    self.get_number_of_classes_including_blank())
@@ -185,12 +185,11 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         # Initialize the linear output layer with Xavier uniform  weights
         # torch.nn.init.xavier_normal_(self.fc3.weight)
 
-        # if self.input_network_produces_multiple_output_directions:
-        #     # torch.nn.init.xavier_uniform_(self.fully_connected_layer.one_dimensional_grouped_convolution.weight)
-        #     torch.nn.init.xavier_uniform_(self.fully_connected_layer.linear_layer.weight)
-        # else:
-
-        torch.nn.init.xavier_uniform_(self.fully_connected_layer.weight)
+        if self.input_network_produces_multiple_output_directions:
+            # torch.nn.init.xavier_uniform_(self.fully_connected_layer.one_dimensional_grouped_convolution.weight)
+            torch.nn.init.xavier_uniform_(self.fully_connected_layer.linear_layer.weight)
+        else:
+            torch.nn.init.xavier_uniform_(self.fully_connected_layer.weight)
 
         # print("self.fc3 : " + str(self.fc3))
         # print("self.fc3.weight: " + str(self.fc3.weight))
@@ -216,6 +215,12 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
                                        input_network_produces_multiple_output_directions,
                                        use_block_mdlstm
                                        )
+
+    def get_weight_fully_connected_layer(self):
+        if self.input_network_produces_multiple_output_directions:
+            return self.fully_connected_layer.get_weight()
+        else:
+            return self.fully_connected_layer.weight
 
     def get_number_of_classes_including_blank(self):
         return self.number_of_classes_excluding_blank + 1

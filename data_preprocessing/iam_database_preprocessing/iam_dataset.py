@@ -104,6 +104,19 @@ class IamLinesDataset(Dataset):
                                transformation)
 
     @staticmethod
+    def create_iam_words_dataset_from_input_files(
+            iam_database_lines_file_path: str, iam_database_line_images_root_folder_path: str,
+                vocabulary_file_path: str, example_types: str = EXAMPLE_TYPES_ALL, transformation=None):
+        iam_words_dicionary = IamExamplesDictionary. \
+            create_iam_words_dictionary(iam_database_lines_file_path,
+                                        iam_database_line_images_root_folder_path,
+                                        False)
+        iam_words_dataset = IamLinesDataset.create_iam_dataset(iam_words_dicionary,
+                                                               vocabulary_file_path,
+                                                               example_types, transformation)
+        return iam_words_dataset
+
+    @staticmethod
     def create_iam_lines_dataset_from_input_files(
             iam_database_lines_file_path: str, iam_database_line_images_root_folder_path: str,
             vocabulary_file_path: str, example_types: str = EXAMPLE_TYPES_ALL,

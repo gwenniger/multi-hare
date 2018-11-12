@@ -444,9 +444,11 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
     network.to(torch.device("cuda:0"))
 
     if checkpoint is not None:
-        print("before loading checkpoint: network.module.fc3" + str(network.fc3.weight))
+        print("before loading checkpoint: network.get_weight_fully_connected_layer()" +
+              str(network.get_weight_fully_connected_layer()))
         network.load_state_dict(checkpoint["model"])
-        print("after loading checkpoint: network.module.fc3" + str(network.fc3.weight))
+        print("after loading checkpoint: network.get_weight_fully_connected_layer()" +
+              str(network.get_weight_fully_connected_layer()))
 
     network = custom_data_parallel.data_parallel.DataParallel(network, device_ids=device_ids)
 
@@ -471,6 +473,11 @@ def build_optim(model, checkpoint):
     if opt.train_from:
         print('Loading optimizer from checkpoint.')
         optim = checkpoint['optim']
+        # Set the max gradient norm using the value in opt
+        if optim.max_grad_norm != opt.max_grad_norm:
+            print(">>>Warning : setting the optimizer max_grad_norm to a new value: "
+                  + str(opt.max_grad_norm))
+            optim.max_grad_norm = opt.max_grad_norm
 
         # We need to save a copy of optim.optimizer.state_dict() for setting
         # the, optimizer state later on in Stage 2 in this method, since
@@ -836,6 +843,38 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     #print(prof)
 
 
+def create_iam_data_loaders(opt, iam_lines_dataset,
+                            batch_size: int, minimize_vertical_padding: bool,
+                            minimize_horizontal_padding: bool, image_input_is_unsigned_int: bool,
+                            perform_horizontal_batch_padding_in_data_loader: bool,
+                            use_four_pixel_input_blocks: bool,
+                            permutation_save_or_load_file_path: str,
+                            dataset_save_or_load_file_path: str
+                            ):
+    if opt.use_split_files_specified_data_split:
+        # Load the data and divide into train/dev/test using data-split specification files
+        train_loader, validation_loader, test_loader = \
+            iam_lines_dataset.get_train_set_validation_set_test_set_data_loaders_using_split_specification_files(
+                batch_size, opt.train_split_file_path, opt.dev_split_file_path, opt.test_split_file_path,
+                minimize_vertical_padding, minimize_horizontal_padding, image_input_is_unsigned_int,
+                perform_horizontal_batch_padding_in_data_loader, use_four_pixel_input_blocks,
+                dataset_save_or_load_file_path)
+    else:
+        # Load the data and divide into train/dev/test using hard-coded fractions and a loaded data permutation
+        # file
+
+        train_loader, validation_loader, test_loader = iam_lines_dataset. \
+            get_random_train_set_validation_set_test_set_data_loaders(
+                batch_size, IamLinesDataset.TRAIN_EXAMPLES_FRACTION, IamLinesDataset.VALIDATION_EXAMPLES_FRACTION,
+                IamLinesDataset.TEST_EXAMPLES_FRACTION, permutation_save_or_load_file_path,
+                dataset_save_or_load_file_path,
+                minimize_vertical_padding, minimize_horizontal_padding, image_input_is_unsigned_int,
+                perform_horizontal_batch_padding_in_data_loader,
+                opt.save_dev_set_file_path,
+                opt.save_test_set_file_path)
+    return train_loader, validation_loader, test_loader
+
+
 def iam_line_recognition(model_opt, checkpoint):
         print("opt.language_model_file_path: " + str(opt.language_model_file_path))
 
@@ -874,41 +913,20 @@ def iam_line_recognition(model_opt, checkpoint):
 
         dataset_save_or_load_file_path = opt.dataset_save_or_load_file_path
 
-        if opt.use_split_files_specified_data_split:
-            # Load the data and divide into train/dev/test using data-split specification files
-            train_loader, validation_loader, test_loader = \
-                iam_lines_dataset.get_train_set_validation_set_test_set_data_loaders_using_split_specification_files(
-                    batch_size, opt.train_split_file_path, opt.dev_split_file_path, opt.test_split_file_path,
-                    minimize_vertical_padding, minimize_horizontal_padding, image_input_is_unsigned_int,
-                    perform_horizontal_batch_padding_in_data_loader, use_four_pixel_input_blocks,
-                    dataset_save_or_load_file_path)
-        else:
-            # Load the data and divide into train/dev/test using hard-coded fractions and a loaded data permutation
-            # file
-
-            train_loader, validation_loader, test_loader = iam_lines_dataset.\
-                get_random_train_set_validation_set_test_set_data_loaders(
-                    batch_size, IamLinesDataset.TRAIN_EXAMPLES_FRACTION, IamLinesDataset.VALIDATION_EXAMPLES_FRACTION,
-                    IamLinesDataset.TEST_EXAMPLES_FRACTION, permutation_save_or_load_file_path,
-                    dataset_save_or_load_file_path,
-                    minimize_vertical_padding, minimize_horizontal_padding, image_input_is_unsigned_int,
-                    perform_horizontal_batch_padding_in_data_loader,
-                    opt.save_dev_set_file_path,
-                    opt.save_test_set_file_path)
+        train_loader, validation_loader, test_loader = create_iam_data_loaders(
+            opt, iam_lines_dataset, batch_size, minimize_vertical_padding, minimize_horizontal_padding,
+            image_input_is_unsigned_int, perform_horizontal_batch_padding_in_data_loader,
+            use_four_pixel_input_blocks, permutation_save_or_load_file_path, dataset_save_or_load_file_path)
 
         print("Loading IAM dataset: DONE")
 
         # test_mdrnn_cell()
         #test_mdrnn()
-        input_height = 16
-        input_width = 16
-
         # hidden_states_size = 32
         # hidden_states_size = 8  # Start with a lower initial hidden states size since there are more layers
         hidden_states_size = model_opt.first_layer_hidden_states_size
         # https://stackoverflow.com/questions/45027234/strange-loss-curve-while-training-lstm-with-keras
         # Possibly a batch size of 128 leads to more instability in training?
-        #batch_size = 128
 
         compute_multi_directional = True
         # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
@@ -949,24 +967,16 @@ def iam_word_recognition(model_opt, checkpoint):
 
     # lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
     lines_file_path = model_opt.iam_database_lines_file_path
-    # iam_database_line_images_root_folder_path = "/datastore/data/iam-database/lines"
-    iam_database_line_images_root_folder_path = model_opt.iam_database_line_images_root_folder_path
+    # iam_database_word_images_root_folder_path = "/datastore/data/iam-database/lines"
+    iam_database_word_images_root_folder_path = model_opt.iam_database_line_images_root_folder_path
 
     print("Loading IAM dataset...")
-    iam_words_dicionary = IamExamplesDictionary.\
-        create_iam_words_dictionary(lines_file_path, iam_database_line_images_root_folder_path,
-                                    False)
-    iam_words_dataset = IamLinesDataset.create_iam_dataset(iam_words_dicionary,
-                                                           opt.vocabulary_file_path,
-                                                           "ok", None)
+    iam_words_dataset = IamLinesDataset.create_iam_words_dataset_from_input_files(
+        lines_file_path, iam_database_word_images_root_folder_path, opt.vocabulary_file_path)
 
     # This vocab_list will be used by the decoder
     vocab_list = iam_words_dataset.get_vocabulary_list()
     blank_symbol = iam_words_dataset.get_blank_symbol()
-
-    train_examples_fraction = 0.80
-    validation_examples_fraction = 0.10
-    test_examples_fraction = 0.10
 
     permutation_save_or_load_file_path = opt.data_permutation_file_path
 
@@ -975,15 +985,15 @@ def iam_word_recognition(model_opt, checkpoint):
     image_input_is_unsigned_int = False
     perform_horizontal_batch_padding_in_data_loader = False
     use_example_packing = True
-    train_loader, validation_loader, test_loader = iam_words_dataset. \
-        get_random_train_set_validation_set_test_set_data_loaders(batch_size, train_examples_fraction,
-                                                                  validation_examples_fraction,
-                                                                  test_examples_fraction,
-                                                                  permutation_save_or_load_file_path,
-                                                                  minimize_vertical_padding,
-                                                                  minimize_horizontal_padding,
-                                                                  image_input_is_unsigned_int,
-                                                                  perform_horizontal_batch_padding_in_data_loader)
+
+    dataset_save_or_load_file_path = opt.dataset_save_or_load_file_path
+    use_four_pixel_input_blocks = opt.use_four_pixel_input_blocks
+
+    train_loader, validation_loader, test_loader = create_iam_data_loaders(
+        opt, iam_words_dataset, batch_size, minimize_vertical_padding, minimize_horizontal_padding,
+        image_input_is_unsigned_int, perform_horizontal_batch_padding_in_data_loader,
+        use_four_pixel_input_blocks, permutation_save_or_load_file_path, dataset_save_or_load_file_path)
+
     print("Loading IAM dataset: DONE")
 
     # test_mdrnn_cell()
