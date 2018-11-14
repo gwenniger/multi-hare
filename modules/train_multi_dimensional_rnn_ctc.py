@@ -318,7 +318,8 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
                  compute_multi_directional: bool, use_dropout: bool, vocab_list,
                  clamp_gradients: bool, data_set_name: str, inputs_and_outputs_are_lists: bool,
                  use_example_packing: bool, device_ids: list, use_block_mdlstm: bool,
-                 use_leaky_lp_cells: bool, use_network_structure_bluche: bool):
+                 use_leaky_lp_cells: bool, use_network_structure_bluche: bool,
+                 share_weights_across_directions_in_fully_connected_layer: bool):
 
     # multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(input_channels,
     #                                                                                 hidden_states_size,
@@ -439,6 +440,7 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
         inputs_and_outputs_are_lists,
         use_example_packing,
         input_network_produces_multiple_output_directions,
+        share_weights_across_directions_in_fully_connected_layer,
         use_block_mdlstm)
 
     network.to(torch.device("cuda:0"))
@@ -470,7 +472,7 @@ def show_optimizer_state(optim):
 def build_optim(model, checkpoint):
     saved_optimizer_state_dict = None
 
-    if opt.train_from:
+    if opt.train_from and not opt.reset_adam_state:
         print('Loading optimizer from checkpoint.')
         optim = checkpoint['optim']
         # Set the max gradient norm using the value in opt
@@ -486,6 +488,10 @@ def build_optim(model, checkpoint):
         # optim.optimizer.state_dict()
         saved_optimizer_state_dict = optim.optimizer.state_dict()
     else:
+        if opt.reset_adam_state:
+            print(">>> Warning: manually resetting optimizer state and learning rate")
+            print("New learning rate is: " + str(opt.learning_rate))
+
         print('Making optimizer for training.')
         optim = Optim(
             opt.optim, opt.learning_rate, opt.max_grad_norm,
@@ -510,7 +516,7 @@ def build_optim(model, checkpoint):
         "(model.parameters())")
     show_optimizer_state(optim)
 
-    if opt.train_from:
+    if opt.train_from and not opt.reset_adam_state:
         # Stage 2: In this stage, which is only performed when loading an
         # optimizer from a checkpoint, we load the saved_optimizer_state_dict
         # into the re-created optimizer, to set the optim.optimizer.state
@@ -540,9 +546,9 @@ def build_optim(model, checkpoint):
                 "Error: loaded Adam optimizer from existing model" +
                 " but optimizer state is empty")
 
-        # We don't want to get the_decay_at from the model
-        # but rather from the configuration parameters. Otherwise
-        # we can never change this parameter for an existing model!
+    # We don't want to get the_decay_at from the model
+    # but rather from the configuration parameters. Otherwise
+    # we can never change this parameter for an existing model!
     print("Info: before setting -  optim.start_decay_at: "
           + str(optim.start_decay_at))
     optim.start_decay_at = opt.start_decay_at
@@ -622,6 +628,7 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
                     use_block_mdlstm: bool,
                     use_leaky_lp_cells: bool,
                     use_network_structure_bluche: bool,
+                    share_weights_across_directions_in_fully_connected_layer: bool,
                     perform_horizontal_batch_padding_in_data_loader):
 
     # http://pytorch.org/docs/master/notes/cuda.html
@@ -647,7 +654,8 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
                            device_ids,
                            use_block_mdlstm,
                            use_leaky_lp_cells,
-                           use_network_structure_bluche)
+                           use_network_structure_bluche,
+                           share_weights_across_directions_in_fully_connected_layer)
 
     # network.register_backward_hook(printgradnorm)
 
@@ -829,6 +837,8 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     use_example_packing = True
     use_leaky_lp_cells = opt.use_leaky_lp_cells
     use_network_structure_bluche = opt.use_network_structure_bluche
+    share_weights_across_directions_in_fully_connected_layer = \
+        opt.share_weights_across_directions_in_fully_connected_layer
     train_mdrnn_ctc(model_opt, checkpoint, train_loader, test_loader,
                     test_loader, input_channels,
                     hidden_states_size, batch_size,
@@ -838,6 +848,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
                     use_block_mdlstm,
                     use_leaky_lp_cells,
                     use_network_structure_bluche,
+                    share_weights_across_directions_in_fully_connected_layer,
                     perform_horizontal_batch_padding_in_data_loader)
 
     #print(prof)
@@ -887,9 +898,10 @@ def iam_line_recognition(model_opt, checkpoint):
         batch_size = 30 # 32 gave out of memory error with Leaky LP cells, which have one more gate
 
         #lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
-        lines_file_path = model_opt.iam_database_lines_file_path
+        lines_file_path = opt.iam_database_lines_file_path
+        print("lines_file_path: " + str(lines_file_path))
         # iam_database_line_images_root_folder_path = "/datastore/data/iam-database/lines"
-        iam_database_line_images_root_folder_path = model_opt.iam_database_line_images_root_folder_path
+        iam_database_line_images_root_folder_path = opt.iam_database_line_images_root_folder_path
 
         iam_lines_dataset = IamLinesDataset.create_iam_lines_dataset_from_input_files(
             lines_file_path, iam_database_line_images_root_folder_path, opt.vocabulary_file_path)
@@ -941,6 +953,8 @@ def iam_line_recognition(model_opt, checkpoint):
         use_example_packing = True
         use_leaky_lp_cells = opt.use_leaky_lp_cells
         use_network_structure_bluche = opt.use_network_structure_bluche
+        share_weights_across_directions_in_fully_connected_layer = \
+            opt.share_weights_across_directions_in_fully_connected_layer
         use_block_mdlstm = opt.use_block_mdlstm
         #with torch.autograd.profiler.profile(use_cuda=False) as prof:
         train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels,
@@ -952,6 +966,7 @@ def iam_line_recognition(model_opt, checkpoint):
                         use_block_mdlstm,
                         use_leaky_lp_cells,
                         use_network_structure_bluche,
+                        share_weights_across_directions_in_fully_connected_layer,
                         perform_horizontal_batch_padding_in_data_loader
                         )
 
@@ -1021,6 +1036,8 @@ def iam_word_recognition(model_opt, checkpoint):
     use_block_mdlstm = opt.use_block_mdlstm
     use_leaky_lp_cells = opt.use_leaky_lp_cells
     use_network_structure_bluche = opt.use_network_structure_bluche
+    share_weights_across_directions_in_fully_connected_layer = \
+        opt.share_weights_across_directions_in_fully_connected_layer
     train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels,
                     hidden_states_size,
                     batch_size, compute_multi_directional, use_dropout, vocab_list, blank_symbol,
@@ -1029,6 +1046,7 @@ def iam_word_recognition(model_opt, checkpoint):
                     use_block_mdlstm,
                     use_leaky_lp_cells,
                     use_network_structure_bluche,
+                    share_weights_across_directions_in_fully_connected_layer,
                     perform_horizontal_batch_padding_in_data_loader)
 
 

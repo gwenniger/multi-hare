@@ -122,6 +122,12 @@ def train_opts(parser):
                        help="""Random seed used for the experiments
                        reproducibility.""")
 
+    # Reset the adam optimizer state, and learning rate
+    group.add_argument('-reset_adam_state',
+                       dest='reset_adam_state',
+                       action='store_true',
+                       help="Using this flag, a manual reset of the adam state can be forced")
+
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('-use_four_pixel_input_blocks', dest='use_four_pixel_input_blocks',
                        action='store_true')
@@ -146,6 +152,24 @@ def train_opts(parser):
                        "block-strided convolution layer pairs are used, with the last " +
                        "block-strided convolution combining the directions, and providing its output" +
                        "to a single fully connected layer")
+
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('-share_weights_across_directions_in_fully_connected_layer',
+                       dest='share_weights_across_directions_in_fully_connected_layer',
+                       action='store_true',
+                       help="Share the weights in the last fully connected layer that combines the output of "
+                            "four MDLSTMs. This switch only has effect if the one-but-last layer is an MDLSTM layer "
+                            "and not if it is a block-strided convolution layer.")
+    group.add_argument('-use_unique_weights_for_each_directions_in_fully_connected_layer',
+                       dest='share_weights_across_directions_in_fully_connected_layer',
+                       action='store_false',
+                       help="Do not share the weights in the last fully connected layer that combines the output of "
+                            "four MDLSTMs, but have (conceptually) four different layers, "
+                            "one for each direction, whose "
+                            "output are summed. In the actual implementation there is just one layer, with four times" 
+                            " as many inputs, which is the same thing, except for removing redundant bias weights."
+                            " This switch only has effect if the one-but-last layer is an MDLSTM layer "
+                            "and not if it is a block-strided convolution layer.")
 
 
 

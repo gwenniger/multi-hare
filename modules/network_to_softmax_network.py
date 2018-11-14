@@ -117,6 +117,7 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
                  input_is_list: bool,
                  use_examples_packing: bool,
                  input_network_produces_multiple_output_directions: bool,
+                 share_weights_across_directions: bool,
                  use_block_mdlstm: bool,
                  ):
         super(NetworkToSoftMaxNetwork, self).__init__()
@@ -130,6 +131,7 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
             #activations_resizer.get_number_of_output_channels()
         self.number_of_classes_excluding_blank = number_of_classes_excluding_blank
         self.input_network_produces_multiple_output_directions = input_network_produces_multiple_output_directions
+        self.share_weights_across_directions = share_weights_across_directions
 
         print(">>> number_of_output_channels: " + str(self.number_of_output_channels))
 
@@ -155,13 +157,22 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
             # weights, and then summing them is redundant. Only one set of bias weight is needed
             # for the four layers combined, and having redundant bias weight could make learning
             # harder.
-            print(">>> Using the Bluche network structure with a final fully connected layer combining" +
+            print(">>> Using the Bluche network structure with a final fully connected layer combining " +
                   "the outputs of the third MDLSTM layer for four directions...")
-            # self.fully_connected_layer = nn.Linear(self.number_of_output_channels * 4,
-            #                                        self.get_number_of_classes_including_blank())
-            self.fully_connected_layer = FullyConnectedLayersSharingWeights.\
-                create_fully_connected_layers_sharing_weights(
-                    self.number_of_output_channels, self.get_number_of_classes_including_blank(), 4)
+
+            if self.share_weights_across_directions:
+                print(">>> Creating a network-to-softmax layer combining MDLSTM outputs for multiple "
+                      "directions with shared weights across directions (weight sharing)")
+                self.fully_connected_layer = FullyConnectedLayersSharingWeights.\
+                    create_fully_connected_layers_sharing_weights(
+                        self.number_of_output_channels, self.get_number_of_classes_including_blank(), 4)
+
+            else:
+                print(">>> Creating a network-to-softmax layer combining MDLSTM outputs for multiple "
+                      "directions with unique weights for each direction (no weight sharing)")
+                self.fully_connected_layer = nn.Linear(self.number_of_output_channels * 4,
+                                                       self.get_number_of_classes_including_blank())
+
         else:
             self.fully_connected_layer = nn.Linear(self.number_of_output_channels,
                                                    self.get_number_of_classes_including_blank())
@@ -185,7 +196,7 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         # Initialize the linear output layer with Xavier uniform  weights
         # torch.nn.init.xavier_normal_(self.fc3.weight)
 
-        if self.input_network_produces_multiple_output_directions:
+        if self.use_weight_sharing_across_directions():
             # torch.nn.init.xavier_uniform_(self.fully_connected_layer.one_dimensional_grouped_convolution.weight)
             torch.nn.init.xavier_uniform_(self.fully_connected_layer.linear_layer.weight)
         else:
@@ -204,6 +215,7 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
                                            input_is_list: bool,
                                            use_examples_packing: bool,
                                            input_network_produces_multiple_output_directions: bool,
+                                           share_weights_across_directions: bool,
                                            use_block_mdlstm: bool=False,
                                            ):
         activations_resizer = KeepAllActivationsResizer(network, data_height)
@@ -213,11 +225,16 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
                                        clamp_gradients, input_is_list,
                                        use_examples_packing,
                                        input_network_produces_multiple_output_directions,
+                                       share_weights_across_directions,
                                        use_block_mdlstm
                                        )
 
+    def use_weight_sharing_across_directions(self):
+        return self.input_network_produces_multiple_output_directions and \
+               self.share_weights_across_directions
+
     def get_weight_fully_connected_layer(self):
-        if self.input_network_produces_multiple_output_directions:
+        if self.use_weight_sharing_across_directions():
             return self.fully_connected_layer.get_weight()
         else:
             return self.fully_connected_layer.weight
