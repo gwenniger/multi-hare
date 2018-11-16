@@ -444,7 +444,7 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
         use_block_mdlstm)
 
     # Get the device String for the first GPU, which may not be numbered 0
-    device_string = "cuda:" + device_ids[0]
+    device_string = "cuda:" + str(device_ids[0])
     network.to(torch.device(device_string))
 
     if checkpoint is not None:
