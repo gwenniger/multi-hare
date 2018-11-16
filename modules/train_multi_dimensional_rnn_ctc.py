@@ -629,14 +629,14 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
                     use_leaky_lp_cells: bool,
                     use_network_structure_bluche: bool,
                     share_weights_across_directions_in_fully_connected_layer: bool,
-                    perform_horizontal_batch_padding_in_data_loader):
+                    perform_horizontal_batch_padding_in_data_loader,
+                    device_ids: list = [0, 1]):
 
     # http://pytorch.org/docs/master/notes/cuda.html
     device = torch.device("cuda:0")
     # device_ids should include device!
     # device_ids lists all the gpus that may be used for parallelization
     # device is the initial device the model will be put on
-    device_ids = [0, 1]
     # device_ids = [0]
 
     # assert compute_multi_directional
@@ -956,6 +956,9 @@ def iam_line_recognition(model_opt, checkpoint):
         share_weights_across_directions_in_fully_connected_layer = \
             opt.share_weights_across_directions_in_fully_connected_layer
         use_block_mdlstm = opt.use_block_mdlstm
+
+        device_ids = get_device_ids_from_opt(opt)
+
         #with torch.autograd.profiler.profile(use_cuda=False) as prof:
         train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels,
                         hidden_states_size,
@@ -967,8 +970,17 @@ def iam_line_recognition(model_opt, checkpoint):
                         use_leaky_lp_cells,
                         use_network_structure_bluche,
                         share_weights_across_directions_in_fully_connected_layer,
-                        perform_horizontal_batch_padding_in_data_loader
+                        perform_horizontal_batch_padding_in_data_loader,
+                        device_ids
                         )
+
+
+def get_device_ids_from_opt(opts):
+    if  opts.gpuid is not None:
+        print("Running on the following gpus: " + opts.gpuid)
+        return opts.gpuid
+    else:
+        raise RuntimeError("opt.gpuid is not defined")
 
 
 def iam_word_recognition(model_opt, checkpoint):
@@ -1038,6 +1050,9 @@ def iam_word_recognition(model_opt, checkpoint):
     use_network_structure_bluche = opt.use_network_structure_bluche
     share_weights_across_directions_in_fully_connected_layer = \
         opt.share_weights_across_directions_in_fully_connected_layer
+
+    device_ids = get_device_ids_from_opt(opt)
+
     train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels,
                     hidden_states_size,
                     batch_size, compute_multi_directional, use_dropout, vocab_list, blank_symbol,
@@ -1047,7 +1062,8 @@ def iam_word_recognition(model_opt, checkpoint):
                     use_leaky_lp_cells,
                     use_network_structure_bluche,
                     share_weights_across_directions_in_fully_connected_layer,
-                    perform_horizontal_batch_padding_in_data_loader)
+                    perform_horizontal_batch_padding_in_data_loader,
+                    device_ids)
 
 
     # train_mdrnn_no_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
