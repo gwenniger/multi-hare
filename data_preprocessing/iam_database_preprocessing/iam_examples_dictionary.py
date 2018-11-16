@@ -255,7 +255,9 @@ class IamExamplesDictionary():
         size_rejected_images_lines_dictionary = OrderedDict([])
 
         total_ok_images = 0
+        total_error_images = 0
         number_of_rejected_images_labeled_ok = 0
+        number_of_rejected_images_labeled_error = 0
         with open(lines_file_path, "r") as ifile:
             for line in ifile:
                 # The lines end with a new line character and hence need
@@ -266,13 +268,12 @@ class IamExamplesDictionary():
                 if not IamExamplesDictionary.is_comment(line):
                     line_information = information_creation_function(line)
 
+                    image_is_acceptable = True
+                    if require_min_image_size:
+                        image_is_acceptable = IamExamplesDictionary.image_has_minimal_dimensions(
+                            line_information, iam_database_line_images_root_folder_path, get_file_path_part_function)
+
                     if line_information.ok:
-
-                        image_is_acceptable = True
-
-                        if require_min_image_size:
-                            image_is_acceptable = IamExamplesDictionary.image_has_minimal_dimensions(
-                                line_information, iam_database_line_images_root_folder_path, get_file_path_part_function)
 
                         if not image_is_acceptable:
                             size_rejected_images_lines_dictionary[line_information.line_id] = line_information
@@ -281,10 +282,19 @@ class IamExamplesDictionary():
                             ok_lines_dictionary[line_information.line_id] = line_information
                         total_ok_images += 1
                     else:
-                        error_lines_dictionary[line_information.line_id] = line_information
+                        if not image_is_acceptable:
+                            size_rejected_images_lines_dictionary[line_information.line_id] = line_information
+                            number_of_rejected_images_labeled_error += 1
+                        else:
+                            error_lines_dictionary[line_information.line_id] = line_information
+                        total_error_images += 1
 
             print("Rejected in total " + str(number_of_rejected_images_labeled_ok) + " of the " +
                   str(total_ok_images) + " ok labeled images, since they do not satisfy " +
+                  "the minimum size requirements")
+
+            print("Rejected in total " + str(number_of_rejected_images_labeled_error) + " of the " +
+                  str(total_error_images) + " error labeled images, since they do not satisfy " +
                   "the minimum size requirements")
 
         return IamExamplesDictionary(ok_lines_dictionary, error_lines_dictionary,
