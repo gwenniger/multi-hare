@@ -636,6 +636,10 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
 
     # http://pytorch.org/docs/master/notes/cuda.html
     # device = torch.device("cuda:0")
+    # Create default device using the device_ids list
+    device_string = "cuda:" + str(device_ids[0])
+    device = torch.device(device_string)
+
     # device_ids should include device!
     # device_ids lists all the gpus that may be used for parallelization
     # device is the initial device the model will be put on
