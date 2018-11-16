@@ -199,8 +199,42 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         if self.use_weight_sharing_across_directions():
             # torch.nn.init.xavier_uniform_(self.fully_connected_layer.one_dimensional_grouped_convolution.weight)
             torch.nn.init.xavier_uniform_(self.fully_connected_layer.linear_layer.weight)
+
+            # TODO: It may be better to set the bias according to the marginal
+            # Set bias to zero
+            with torch.no_grad():
+                self.fully_connected_layer.linear_layer.bias.zero_()
         else:
             torch.nn.init.xavier_uniform_(self.fully_connected_layer.weight)
+
+            # Set bias to zero
+            # TODO: It may be better to set the bias according to the marginal
+            # statistics of the outputs, i.e. according to how much prior probability
+            # every output class has
+            with torch.no_grad():
+                self.fully_connected_layer.bias.zero_()
+
+            if self.input_network_produces_multiple_output_directions:
+                print(">>>Compensating Xavier weight initialization fully-connected layers, four"
+                      "directions, by re-multiplying weight by factor sqrt(4)=2")
+                # We multiply the weights again with 2 = sqrt(4) after the initial
+                # Xavier uniform initialization. The motivation is that Xavier uniform
+                # initialization initializes weights to :
+                # Wi,j = U(-sqrt(6/(m+n), sqrt(6/(m+n)) with m the fan-in and n the fan-out.
+                # However, in this case we want to normalize as if we were really having four
+                # separate feed-forward layers that where al separately initialized, then summed.
+                # This means we have to compensate for the fact that m is four times too big
+                # during the Xavier initialization. This is done by multiplying the weights
+                # again with sqrt(4) = 2, since:
+                # sqrt(6/((m/4)+n) = sqrt(6*4/(m+n) = sqrt(4) * sqrt(6/(m+n) =
+                # 2 * sqrt(6/(m+n)
+                # This should facilitate better learning, since we empirically observe that
+                # without this compensation the initial learning is very slow.
+                # See also: https://pytorch.org/docs/stable/_modules/torch/nn/init.html
+                print("Before compensation: " + str(self.fully_connected_layer.weight.norm()))
+                with torch.no_grad():
+                    self.fully_connected_layer.weight.mul_(2)
+                print("After compensation: " + str(self.fully_connected_layer.weight.norm()))
 
         # print("self.fc3 : " + str(self.fc3))
         # print("self.fc3.weight: " + str(self.fc3.weight))
