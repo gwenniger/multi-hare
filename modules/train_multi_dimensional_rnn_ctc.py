@@ -443,7 +443,9 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
         share_weights_across_directions_in_fully_connected_layer,
         use_block_mdlstm)
 
-    network.to(torch.device("cuda:0"))
+    # Get the device String for the first GPU, which may not be numbered 0
+    device_string = "cuda:" + device_ids[0]
+    network.to(torch.device(device_string))
 
     if checkpoint is not None:
         print("before loading checkpoint: network.get_weight_fully_connected_layer()" +
@@ -633,7 +635,7 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
                     device_ids: list = [0, 1]):
 
     # http://pytorch.org/docs/master/notes/cuda.html
-    device = torch.device("cuda:0")
+    # device = torch.device("cuda:0")
     # device_ids should include device!
     # device_ids lists all the gpus that may be used for parallelization
     # device is the initial device the model will be put on
