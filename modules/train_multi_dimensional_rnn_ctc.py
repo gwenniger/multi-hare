@@ -976,7 +976,7 @@ def iam_line_recognition(model_opt, checkpoint):
 
 
 def get_device_ids_from_opt(opts):
-    if opts.gpuid is not None and len(opt.gpuids) > 0:
+    if opts.gpuid is not None and len(opt.gpuid) > 0:
         print("Running on the following gpus: " + str(opts.gpuid))
         return opts.gpuid
     else:
