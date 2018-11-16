@@ -1033,7 +1033,13 @@ def iam_word_recognition(model_opt, checkpoint):
 
     # test_mdrnn_cell()
     # test_mdrnn()
-    input_channels = 1
+
+    use_four_pixel_input_blocks = opt.use_four_pixel_input_blocks
+    if use_four_pixel_input_blocks:
+        input_channels = 4
+    else:
+        input_channels = 1
+
     # hidden_states_size = 32
     # hidden_states_size = 8  # Start with a lower initial hidden states size since there are more layers
     hidden_states_size = model_opt.first_layer_hidden_states_size
