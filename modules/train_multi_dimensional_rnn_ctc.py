@@ -997,7 +997,8 @@ def iam_word_recognition(model_opt, checkpoint):
     # but it is only slightly faster (GPU usage appears to be already maxed out)
     # batch_size = 64 #  #128 #32 #128
     #batch_size = 128
-    batch_size = 96
+    batch_size = 256
+    # batch_size = 96
     # batch_size = 64
 
     # lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
