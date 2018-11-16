@@ -976,11 +976,13 @@ def iam_line_recognition(model_opt, checkpoint):
 
 
 def get_device_ids_from_opt(opts):
-    if opts.gpuid is not None:
+    if opts.gpuid is not None and len(opt.gpuids) > 0:
         print("Running on the following gpus: " + str(opts.gpuid))
         return opts.gpuid
     else:
-        raise RuntimeError("opt.gpuid is not defined")
+        raise RuntimeError("opt.gpuid is not defined or has empty list. Please specify"
+                           "-gpuid GPU1 ... GPUn as a flag. For example \"-gpuid 0 1\" for using"
+                           " the first two GPUs")
 
 
 def iam_word_recognition(model_opt, checkpoint):
