@@ -895,13 +895,15 @@ def create_iam_data_loaders(opt, iam_lines_dataset,
 def iam_line_recognition(model_opt, checkpoint):
         print("opt.language_model_file_path: " + str(opt.language_model_file_path))
 
-
         # With the improved padding, the height of the images is 128,
         # and memory usage is less, so batch_size 30 instead of 20 is possible,
         # but it is only slightly faster (GPU usage appears to be already maxed out)
         # 14 gives out of memory error with initial hidden states size 8 (12 seems to work)
         # 40 gives out of memory error with initial hidden states size 2
-        batch_size = 30 # 32 gave out of memory error with Leaky LP cells, which have one more gate
+        # batch_size = 30 # 32 gave out of memory error with Leaky LP cells, which have one more gate
+
+        batch_size = model_opt.batch_size
+        print("Using batch_size: " + str(batch_size))
 
         #lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
         lines_file_path = opt.iam_database_lines_file_path
@@ -996,8 +998,13 @@ def iam_word_recognition(model_opt, checkpoint):
     # and memory usage is less, so batch_size 30 instead of 20 is possible,
     # but it is only slightly faster (GPU usage appears to be already maxed out)
     # batch_size = 64 #  #128 #32 #128
+
+    # Reading the batch_size from model_opt
+    batch_size = model_opt.batch_size
+    print("Using batch_size: " + str(batch_size))
+
     #batch_size = 128
-    batch_size = 256
+    # batch_size = 256
     # batch_size = 96
     # batch_size = 64
 

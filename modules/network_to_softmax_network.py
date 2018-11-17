@@ -196,23 +196,17 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         # Initialize the linear output layer with Xavier uniform  weights
         # torch.nn.init.xavier_normal_(self.fc3.weight)
 
+        # Tested with initializing bias zero using four-directional input with unique weights for each
+        # direction. But it did not work wel, learning seemed to be taken extremely long, with still
+        # very poor output after 20+ epochs.
+        # self.set_bias_to_zero()
+
         if self.use_weight_sharing_across_directions():
             # torch.nn.init.xavier_uniform_(self.fully_connected_layer.one_dimensional_grouped_convolution.weight)
             torch.nn.init.xavier_uniform_(self.fully_connected_layer.linear_layer.weight)
 
-            # TODO: It may be better to set the bias according to the marginal
-            # Set bias to zero
-            with torch.no_grad():
-                self.fully_connected_layer.linear_layer.bias.zero_()
         else:
             torch.nn.init.xavier_uniform_(self.fully_connected_layer.weight)
-
-            # Set bias to zero
-            # TODO: It may be better to set the bias according to the marginal
-            # statistics of the outputs, i.e. according to how much prior probability
-            # every output class has
-            with torch.no_grad():
-                self.fully_connected_layer.bias.zero_()
 
             if self.input_network_produces_multiple_output_directions:
                 print(">>>Compensating Xavier weight initialization fully-connected layers, four"
@@ -241,6 +235,26 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         # print("self.fc3.bias: " + str(self.fc3.bias))
 
         print("NetworkToSoftMaxNetwork - clamp_gradients: " + str(clamp_gradients))
+
+    def set_bias_to_zero(self):
+
+        if self.use_weight_sharing_across_directions():
+            # torch.nn.init.xavier_uniform_(self.fully_connected_layer.one_dimensional_grouped_convolution.weight)
+            torch.nn.init.xavier_uniform_(self.fully_connected_layer.linear_layer.weight)
+
+            # TODO: It may be better to set the bias according to the marginal
+            # Set bias to zero
+            with torch.no_grad():
+                self.fully_connected_layer.linear_layer.bias.zero_()
+        else:
+            torch.nn.init.xavier_uniform_(self.fully_connected_layer.weight)
+
+            # Set bias to zero
+            # TODO: It may be better to set the bias according to the marginal
+            # statistics of the outputs, i.e. according to how much prior probability
+            # every output class has
+            with torch.no_grad():
+                self.fully_connected_layer.bias.zero_()
 
     @staticmethod
     def create_network_to_soft_max_network(network,

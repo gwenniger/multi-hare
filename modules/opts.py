@@ -171,8 +171,6 @@ def train_opts(parser):
                             " This switch only has effect if the one-but-last layer is an MDLSTM layer "
                             "and not if it is a block-strided convolution layer.")
 
-
-
     # Init options
     group = parser.add_argument_group('Initialization')
     group.add_argument('-param_init', type=float, default=0.1,
