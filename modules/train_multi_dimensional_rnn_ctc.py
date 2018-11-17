@@ -902,7 +902,7 @@ def iam_line_recognition(model_opt, checkpoint):
         # 40 gives out of memory error with initial hidden states size 2
         # batch_size = 30 # 32 gave out of memory error with Leaky LP cells, which have one more gate
 
-        batch_size = model_opt.batch_size
+        batch_size = opt.batch_size
         print("Using batch_size: " + str(batch_size))
 
         #lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
@@ -1000,7 +1000,7 @@ def iam_word_recognition(model_opt, checkpoint):
     # batch_size = 64 #  #128 #32 #128
 
     # Reading the batch_size from model_opt
-    batch_size = model_opt.batch_size
+    batch_size = opt.batch_size
     print("Using batch_size: " + str(batch_size))
 
     #batch_size = 128
