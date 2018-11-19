@@ -9,36 +9,46 @@ from modules.multi_dimensional_lstm import MultiDimensionalLSTM
 
 class MDLSTMLayerPairSpecificParameters:
     def __init__(self, input_channels: int, mdlstm_hidden_states_size: int,
-                 output_channels: int, block_strided_convolution_block_size: SizeTwoDimensional):
+                 output_channels: int, block_strided_convolution_block_size: SizeTwoDimensional,
+                 block_strided_convolution_shares_weights_across_directions: bool = False):
         self.input_channels = input_channels
         self.mdlstm_hidden_states_size = mdlstm_hidden_states_size
         self.output_channels = output_channels
         self.block_strided_convolution_block_size = block_strided_convolution_block_size
+        self.block_strided_convolution_shares_weights_across_directions = \
+            block_strided_convolution_shares_weights_across_directions
 
 
     @staticmethod
     def create_mdlstm_layer_pair_specific_parameters(input_channels: int, mdlstm_hidden_states_size: int,
-                                                     output_channels: int, block_strided_convolution_block_size: SizeTwoDimensional):
+                                                     output_channels: int,
+                                                     block_strided_convolution_block_size: SizeTwoDimensional,
+                                                     block_strided_convolution_shares_weights_across_directions: bool):
         return MDLSTMLayerPairSpecificParameters(input_channels, mdlstm_hidden_states_size,
-                                                 output_channels, block_strided_convolution_block_size)
+                                                 output_channels, block_strided_convolution_block_size,
+                                                 block_strided_convolution_shares_weights_across_directions)
 
 
 class BlockMDLSTMLayerPairSpecificParameters(MDLSTMLayerPairSpecificParameters):
     def __init__(self, input_channels: int, mdlstm_hidden_states_size: int,
                  output_channels: int, block_strided_convolution_block_size: SizeTwoDimensional,
-                 mdlstm_block_size: SizeTwoDimensional):
+                 mdlstm_block_size: SizeTwoDimensional,
+                 block_strided_convolution_shares_weights_across_directions: bool):
         super(BlockMDLSTMLayerPairSpecificParameters, self).\
             __init__(input_channels, mdlstm_hidden_states_size, output_channels,
-                     block_strided_convolution_block_size)
+                     block_strided_convolution_block_size, block_strided_convolution_shares_weights_across_directions)
         self.mdlstm_block_size = mdlstm_block_size
 
     @staticmethod
     def create_block_mdlstm_layer_pair_specific_parameters(input_channels: int, mdlstm_hidden_states_size: int,
                                                            output_channels: int, mdlstm_block_size: SizeTwoDimensional,
-                                                           block_strided_convolution_block_size: SizeTwoDimensional):
+                                                           block_strided_convolution_block_size: SizeTwoDimensional,
+                                                           block_strided_convolution_shares_weights_across_directions:
+                                                           bool):
         return BlockMDLSTMLayerPairSpecificParameters(input_channels, mdlstm_hidden_states_size,
                                                       output_channels, mdlstm_block_size,
-                                                      block_strided_convolution_block_size)
+                                                      block_strided_convolution_block_size,
+                                                      block_strided_convolution_shares_weights_across_directions)
 
 
 class MultiDimensionalLSTMLayerPairStacking(Module):
@@ -161,6 +171,7 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
             use_bias_with_block_strided_convolution,
             use_example_packing,
             use_leaky_lp_cells,
+            layer_pair_specific_parameters.block_strided_convolution_shares_weights_across_directions,
             nonlinearity)
 
     # This is an example of a network that stacks two
@@ -270,19 +281,23 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
     def block_mdlstm_parameter_creation_function(
             input_channels, mdlstm_hidden_states_size, output_channels,
             mdlstm_block_size: SizeTwoDimensional,
-            block_strided_convolution_block_size: SizeTwoDimensional):
+            block_strided_convolution_block_size: SizeTwoDimensional,
+            block_strided_convolution_shares_weights_across_directions: bool):
 
         return BlockMDLSTMLayerPairSpecificParameters.create_block_mdlstm_layer_pair_specific_parameters(
             input_channels, mdlstm_hidden_states_size, output_channels, mdlstm_block_size,
-            block_strided_convolution_block_size)
+            block_strided_convolution_block_size,
+            block_strided_convolution_shares_weights_across_directions)
 
     @staticmethod
     def mdlstm_parameter_creation_function(
             input_channels,  mdlstm_hidden_states_size, output_channels,
             mdlstm_block_size: SizeTwoDimensional,
-            block_strided_convolution_block_size: SizeTwoDimensional):
+            block_strided_convolution_block_size: SizeTwoDimensional,
+            block_strided_convolution_shares_weights_across_directions: bool):
         return MDLSTMLayerPairSpecificParameters.create_mdlstm_layer_pair_specific_parameters(
-            input_channels, mdlstm_hidden_states_size, output_channels, block_strided_convolution_block_size)
+            input_channels, mdlstm_hidden_states_size, output_channels, block_strided_convolution_block_size,
+            block_strided_convolution_shares_weights_across_directions)
 
     # Following "Handwriting Recognition with Large Multidimensional Long Short-Term
     # Memory Recurrent Neural Networks" (Voigtlander et.al, 2016)
@@ -336,12 +351,29 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
                                                      pair_three_specific_parameters])
         return layer_pairs_specific_parameters_list
 
+
+    @staticmethod
+    def share_weights_for_block_strided_convolution_layer_with_index(
+            block_strided_convolution_layers_using_weight_sharing: list, index):
+        """
+        Determine whether the block-strided convolution weights are to be shared
+        for the block-strided convolution layer with given index
+        :param block_strided_convolution_layers_using_weight_sharing: A list of indices of
+        block-strided convolution layers that should use weight sharing
+        :param index: the index of the layer for which weight-sharing or not is to be determined
+
+        :return: A boolean that specifies using weight sharing or not for the block-strided
+        convolution layer with this index
+        """
+        return index in block_strided_convolution_layers_using_weight_sharing
+
     @staticmethod
     def create_first_two_layer_pair_parameters_with_two_channels_per_direction_first_mdlstm_layer(
             input_channels,
             mdlstm_block_size: SizeTwoDimensional,
             block_strided_convolution_block_size: SizeTwoDimensional,
-            parameter_creation_function):
+            parameter_creation_function,
+            block_strided_convolution_layers_using_weight_sharing: list):
 
         # Layer pair one
         # number_of_elements_reduction_factor = block_strided_convolution_block_size.width * \
@@ -350,9 +382,13 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
         first_mdlstm_hidden_states_size_per_direction = 2
         output_channels = 6
 
+
+
         pair_one_specific_parameters = parameter_creation_function(
             input_channels, first_mdlstm_hidden_states_size_per_direction, output_channels, mdlstm_block_size,
-            block_strided_convolution_block_size)
+            block_strided_convolution_block_size,
+            MultiDimensionalLSTMLayerPairStacking.share_weights_for_block_strided_convolution_layer_with_index(
+                block_strided_convolution_layers_using_weight_sharing, 0))
 
         # Layer pair two
         input_channels = output_channels
@@ -364,7 +400,10 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
         pair_two_specific_parameters = parameter_creation_function(
             input_channels, second_mdlstm_hidden_states_size_per_direction,
             output_channels, mdlstm_block_size,
-            block_strided_convolution_block_size)
+            block_strided_convolution_block_size,
+            MultiDimensionalLSTMLayerPairStacking.share_weights_for_block_strided_convolution_layer_with_index(
+                block_strided_convolution_layers_using_weight_sharing, 1)
+        )
 
         result = list([pair_one_specific_parameters, pair_two_specific_parameters])
         return result
@@ -389,7 +428,9 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
             input_channels,
             mdlstm_block_size: SizeTwoDimensional,
             block_strided_convolution_block_size: SizeTwoDimensional,
-            parameter_creation_function):
+            parameter_creation_function,
+            block_strided_convolution_layers_using_weight_sharing: list
+    ):
 
         layer_pairs_specific_parameters_list = \
             MultiDimensionalLSTMLayerPairStacking.\
@@ -517,7 +558,8 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
             clamp_gradients: bool, use_dropout: bool,
             use_bias_with_block_strided_convolution: bool,
             use_example_packing: bool,
-            use_leaky_lp_cells: bool):
+            use_leaky_lp_cells: bool,
+            block_strided_convolution_layers_using_weight_sharing: list):
 
         """
         This function creates the first five layers of the
@@ -546,7 +588,9 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
             create_first_two_layer_pair_parameters_with_two_channels_per_direction_first_mdlstm_layer(
                 input_channels, None,
                 block_strided_convolution_block_size,
-                MultiDimensionalLSTMLayerPairStacking.mdlstm_parameter_creation_function)
+                MultiDimensionalLSTMLayerPairStacking.mdlstm_parameter_creation_function,
+                block_strided_convolution_layers_using_weight_sharing
+        )
         print("layers_pairs_specific_parameters_list: " + str(layer_pairs_specific_parameters_list))
 
         multi_dimensional_lstm_layer_pairs =  MultiDimensionalLSTMLayerPairStacking.\
@@ -626,9 +670,10 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
                                               block_strided_convolution_block_size.height
         output_channels = 4 * first_mdlstm_hidden_states_size
 
-        pair_one_specific_parameters = BlockMDLSTMLayerPairSpecificParameters.create_block_mdlstm_layer_pair_specific_parameters(
-            input_channels, first_mdlstm_hidden_states_size, output_channels, mdlstm_block_size,
-            block_strided_convolution_block_size)
+        pair_one_specific_parameters = BlockMDLSTMLayerPairSpecificParameters.\
+            create_block_mdlstm_layer_pair_specific_parameters(
+                input_channels, first_mdlstm_hidden_states_size, output_channels, mdlstm_block_size,
+                block_strided_convolution_block_size)
 
         # Layer pair two
         input_channels = output_channels

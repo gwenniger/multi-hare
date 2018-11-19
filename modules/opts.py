@@ -113,6 +113,13 @@ def train_opts(parser):
                        help="path used to save the dataset to",
                        default=None, required=True)
 
+    group.add_argument('-block_strided_convolution_layers_using_weight_sharing', default=[], nargs='+', type=int,
+                       help="Use weight-sharing across directions for one or more block-strided convolution"
+                            "layers. The default is no weight-sharing, use for example : "
+                            "\" -block_strided_convolution_layers_using_weight_sharing 0 1 \" to use weight-sharing "
+                            "in the first and second block-strided convolution layer, or "
+                            "\"-block_strided_convolution_layers_using_weight_sharing 1\" to use it only in the second "
+                            "layer")
 
     # GPU
     group.add_argument('-gpuid', default=[], nargs='+', type=int,

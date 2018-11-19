@@ -319,7 +319,8 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
                  clamp_gradients: bool, data_set_name: str, inputs_and_outputs_are_lists: bool,
                  use_example_packing: bool, device_ids: list, use_block_mdlstm: bool,
                  use_leaky_lp_cells: bool, use_network_structure_bluche: bool,
-                 share_weights_across_directions_in_fully_connected_layer: bool):
+                 share_weights_across_directions_in_fully_connected_layer: bool,
+                 block_strided_convolution_layers_using_weight_sharing: list):
 
     # multi_dimensional_rnn = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(input_channels,
     #                                                                                 hidden_states_size,
@@ -373,7 +374,8 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
             create_mdlstm_two_and_half_layer_pair_network_with_two_channels_per_direction_first_mdlstm_layer(
                 input_channels, block_strided_convolution_block_size,
                 compute_multi_directional, clamp_gradients, use_dropout, opt.use_bias_in_block_strided_convolution,
-                use_example_packing, use_leaky_lp_cells
+                use_example_packing, use_leaky_lp_cells,
+                block_strided_convolution_layers_using_weight_sharing
               )
         input_network_produces_multiple_output_directions = True
 
@@ -631,6 +633,7 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
                     use_leaky_lp_cells: bool,
                     use_network_structure_bluche: bool,
                     share_weights_across_directions_in_fully_connected_layer: bool,
+                    block_strided_convolution_layers_using_weight_sharing: list,
                     perform_horizontal_batch_padding_in_data_loader,
                     device_ids: list = [0, 1]):
 
@@ -661,7 +664,8 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
                            use_block_mdlstm,
                            use_leaky_lp_cells,
                            use_network_structure_bluche,
-                           share_weights_across_directions_in_fully_connected_layer)
+                           share_weights_across_directions_in_fully_connected_layer,
+                           block_strided_convolution_layers_using_weight_sharing)
 
     # network.register_backward_hook(printgradnorm)
 
@@ -963,6 +967,8 @@ def iam_line_recognition(model_opt, checkpoint):
         use_network_structure_bluche = opt.use_network_structure_bluche
         share_weights_across_directions_in_fully_connected_layer = \
             opt.share_weights_across_directions_in_fully_connected_layer
+        block_strided_convolution_layers_using_weight_sharing =\
+            opt.block_strided_convolution_layers_using_weight_sharing
         use_block_mdlstm = opt.use_block_mdlstm
 
         device_ids = get_device_ids_from_opt(opt)
@@ -978,6 +984,7 @@ def iam_line_recognition(model_opt, checkpoint):
                         use_leaky_lp_cells,
                         use_network_structure_bluche,
                         share_weights_across_directions_in_fully_connected_layer,
+                        block_strided_convolution_layers_using_weight_sharing,
                         perform_horizontal_batch_padding_in_data_loader,
                         device_ids
                         )

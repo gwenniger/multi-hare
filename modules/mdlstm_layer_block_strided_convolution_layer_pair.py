@@ -16,6 +16,7 @@ class MDLSTMLayerBlockStridedConvolutionLayerPair(Module):
 
     @staticmethod
     def create_block_mdlstm_block_strided_convolution_layer_pair(
+            layer_index: int,
             input_channels: int, mdlstm_hidden_states_size: int,
             output_channels: int, mdlstm_block_size: SizeTwoDimensional,
             block_strided_convolution_block_size: SizeTwoDimensional,
@@ -33,7 +34,7 @@ class MDLSTMLayerBlockStridedConvolutionLayerPair(Module):
                 nonlinearity)
 
         block_strided_convolution = BlockStridedConvolution.\
-            create_block_strided_convolution(mdlstm_hidden_states_size, output_channels,
+            create_block_strided_convolution(layer_index, mdlstm_hidden_states_size, output_channels,
                                              block_strided_convolution_block_size,
                                              clamp_gradients,
                                              use_bias_with_block_strided_convolution,
@@ -52,6 +53,7 @@ class MDLSTMLayerBlockStridedConvolutionLayerPair(Module):
             use_bias_with_block_strided_convolution: bool,
             use_example_packing: bool,
             use_leaky_lp_cells: bool,
+            share_weights_block_strided_convolution_across_directions: bool,
             nonlinearity="tanh"):
 
         print("Create {mdlstm,_block-strided_convolution} layer_pair...")
@@ -72,12 +74,13 @@ class MDLSTMLayerBlockStridedConvolutionLayerPair(Module):
         #                                                  use_example_packing,
         #                                                  nonlinearity)
         block_strided_convolution = BlockStridedConvolution. \
-            create_block_strided_convolution(mdlstm_hidden_states_size, output_channels,
+            create_block_strided_convolution(layer_index, mdlstm_hidden_states_size, output_channels,
                                              block_strided_convolution_block_size,
                                              clamp_gradients,
                                              use_bias_with_block_strided_convolution,
                                              use_example_packing,
                                              compute_multi_directional,
+                                             share_weights_block_strided_convolution_across_directions,
                                              nonlinearity)
 
         return MDLSTMLayerBlockStridedConvolutionLayerPair(multi_dimensional_lstm, block_strided_convolution)
