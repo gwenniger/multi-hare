@@ -1,9 +1,9 @@
 #!/bin/bash
 
-#cd warp-ctc
-#mkdir build; cd build
-#cmake ..
-#make
+cd warp-ctc
+mkdir build; cd build
+cmake ..
+make
 
 
 echo "Next install the binding...:"
