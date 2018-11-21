@@ -199,7 +199,7 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         # Tested with initializing bias zero using four-directional input with unique weights for each
         # direction. But it did not work wel, learning seemed to be taken extremely long, with still
         # very poor output after 20+ epochs.
-        # self.set_bias_to_zero()
+        self.set_bias_to_zero()
 
         if self.use_weight_sharing_across_directions():
             # torch.nn.init.xavier_uniform_(self.fully_connected_layer.one_dimensional_grouped_convolution.weight)
