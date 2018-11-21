@@ -637,130 +637,135 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
                     perform_horizontal_batch_padding_in_data_loader,
                     device_ids: list = [0, 1]):
 
-    # http://pytorch.org/docs/master/notes/cuda.html
-    # device = torch.device("cuda:0")
-    # Create default device using the device_ids list
-    device_string = "cuda:" + str(device_ids[0])
-    device = torch.device(device_string)
+    # Change the default cuda device to device_ids[0]
+    # So that if for example gpus 2 and 3 are used, gpu 2 will become the default gpu
+    # for everything within this function
+    with torch.cuda.device(device_ids[0]):
 
-    # device_ids should include device!
-    # device_ids lists all the gpus that may be used for parallelization
-    # device is the initial device the model will be put on
-    # device_ids = [0]
+        # http://pytorch.org/docs/master/notes/cuda.html
+        # device = torch.device("cuda:0")
+        # Create default device using the device_ids list
+        device_string = "cuda:" + str(device_ids[0])
+        device = torch.device(device_string)
 
-    # assert compute_multi_directional
+        # device_ids should include device!
+        # device_ids lists all the gpus that may be used for parallelization
+        # device is the initial device the model will be put on
+        # device_ids = [0]
 
-    # See: https://pytorch.org/tutorials/beginner/former_torchies/nn_tutorial.html
-    # multi_dimensional_rnn.register_backward_hook(printgradnorm)
+        # assert compute_multi_directional
 
-    data_height = get_data_height(train_loader)
-    clamp_gradients = False
-    inputs_and_outputs_are_lists = perform_horizontal_batch_padding and not perform_horizontal_batch_padding_in_data_loader
-    network = create_model(checkpoint, data_height, input_channels, hidden_states_size,
-                           compute_multi_directional, use_dropout, vocab_list,
-                           clamp_gradients, data_set_name, inputs_and_outputs_are_lists,
-                           use_example_packing,
-                           device_ids,
-                           use_block_mdlstm,
-                           use_leaky_lp_cells,
-                           use_network_structure_bluche,
-                           share_weights_across_directions_in_fully_connected_layer,
-                           block_strided_convolution_layers_using_weight_sharing)
+        # See: https://pytorch.org/tutorials/beginner/former_torchies/nn_tutorial.html
+        # multi_dimensional_rnn.register_backward_hook(printgradnorm)
 
-    # network.register_backward_hook(printgradnorm)
+        data_height = get_data_height(train_loader)
+        clamp_gradients = False
+        inputs_and_outputs_are_lists = perform_horizontal_batch_padding and not perform_horizontal_batch_padding_in_data_loader
+        network = create_model(checkpoint, data_height, input_channels, hidden_states_size,
+                               compute_multi_directional, use_dropout, vocab_list,
+                               clamp_gradients, data_set_name, inputs_and_outputs_are_lists,
+                               use_example_packing,
+                               device_ids,
+                               use_block_mdlstm,
+                               use_leaky_lp_cells,
+                               use_network_structure_bluche,
+                               share_weights_across_directions_in_fully_connected_layer,
+                               block_strided_convolution_layers_using_weight_sharing)
 
-    check_save_model_path()
+        # network.register_backward_hook(printgradnorm)
 
-    # See: https://pytorch.org/tutorials/beginner/former_torchies/nn_tutorial.html
-    # network.register_backward_hook(printgradnorm)
+        check_save_model_path()
 
-    if Utils.use_cuda():
-        # multi_dimensional_rnn = multi_dimensional_rnn.cuda()
-        network.to(device)
-        #print("multi_dimensional_rnn.module.mdlstm_direction_one_parameters.parallel_memory_state_column_computation :"
-        #      + str(multi_dimensional_rnn.module.mdlstm_direction_one_parameters.parallel_memory_state_column_computation))
+        # See: https://pytorch.org/tutorials/beginner/former_torchies/nn_tutorial.html
+        # network.register_backward_hook(printgradnorm)
 
-        #print("multi_dimensional_rnn.module.mdlstm_direction_one_parameters."
-        #      "parallel_memory_state_column_computation.parallel_convolution.bias :"
-        #      + str(multi_dimensional_rnn.module.mdlstm_direction_one_parameters.
-        #            parallel_memory_state_column_computation.parallel_convolution.bias))
+        if Utils.use_cuda():
+            # multi_dimensional_rnn = multi_dimensional_rnn.cuda()
+            network.to(device)
+            #print("multi_dimensional_rnn.module.mdlstm_direction_one_parameters.parallel_memory_state_column_computation :"
+            #      + str(multi_dimensional_rnn.module.mdlstm_direction_one_parameters.parallel_memory_state_column_computation))
 
-        #print("multi_dimensional_rnn.module.mdlstm_direction_one_parameters."
-        #      "parallel_hidden_state_column_computation.parallel_convolution.bias :"
-        #      + str(multi_dimensional_rnn.module.mdlstm_direction_one_parameters.
-        #            parallel_hidden_state_column_computation.parallel_convolution.bias))
-    else:
-        raise RuntimeError("CUDA not available")
+            #print("multi_dimensional_rnn.module.mdlstm_direction_one_parameters."
+            #      "parallel_memory_state_column_computation.parallel_convolution.bias :"
+            #      + str(multi_dimensional_rnn.module.mdlstm_direction_one_parameters.
+            #            parallel_memory_state_column_computation.parallel_convolution.bias))
 
-    print_number_of_parameters(network)
+            #print("multi_dimensional_rnn.module.mdlstm_direction_one_parameters."
+            #      "parallel_hidden_state_column_computation.parallel_convolution.bias :"
+            #      + str(multi_dimensional_rnn.module.mdlstm_direction_one_parameters.
+            #            parallel_hidden_state_column_computation.parallel_convolution.bias))
+        else:
+            raise RuntimeError("CUDA not available")
 
-    optimizer = create_optimizer(network, checkpoint)
+        print_number_of_parameters(network)
 
-    start = time.time()
+        optimizer = create_optimizer(network, checkpoint)
 
-    #ctc_loss = warpctc_pytorch.CTCLoss()
-    warp_ctc_loss_interface = WarpCTCLossInterface.create_warp_ctc_loss_interface()
-    # Get the width reduction factor which will be needed to compute the real widths
-    # in the output from the real input width information in the warp_ctc_loss function
+        start = time.time()
 
-    real_model = custom_data_parallel.data_parallel.get_real_model(network)
+        #ctc_loss = warpctc_pytorch.CTCLoss()
+        warp_ctc_loss_interface = WarpCTCLossInterface.create_warp_ctc_loss_interface()
+        # Get the width reduction factor which will be needed to compute the real widths
+        # in the output from the real input width information in the warp_ctc_loss function
 
-    width_reduction_factor = real_model.get_width_reduction_factor()
+        real_model = custom_data_parallel.data_parallel.get_real_model(network)
 
-    model_properties = ModelProperties(image_input_is_unsigned_int, width_reduction_factor)
-    trainer = Trainer(network, optimizer, warp_ctc_loss_interface, model_properties)
+        width_reduction_factor = real_model.get_width_reduction_factor()
 
-    iteration = 1
+        model_properties = ModelProperties(image_input_is_unsigned_int, width_reduction_factor)
+        trainer = Trainer(network, optimizer, warp_ctc_loss_interface, model_properties)
 
-    # I don't like reassigning attributes of opt: it's not clear.
-    if checkpoint is not None:
-        start_epoch = checkpoint['epoch'] + 1
-    else:
-        start_epoch = 1
+        iteration = 1
 
-    for epoch in range(start_epoch, opt.epochs + 1):  # loop over the dataset multiple times
-        print(">>> Training, starting epoch " + str(epoch) + "...")
+        # I don't like reassigning attributes of opt: it's not clear.
+        if checkpoint is not None:
+            start_epoch = checkpoint['epoch'] + 1
+        else:
+            start_epoch = 1
 
-        # print("Time used for this batch: " + str(util.timing.time_since(time_start_batch)))
+        for epoch in range(start_epoch, opt.epochs + 1):  # loop over the dataset multiple times
+            print(">>> Training, starting epoch " + str(epoch) + "...")
 
-        input_is_list = perform_horizontal_batch_padding and not perform_horizontal_batch_padding_in_data_loader
-        average_loss_per_minibatch = trainer.train_one_epoch(
-            train_loader, epoch, start, batch_size, device, input_is_list)
+            # print("Time used for this batch: " + str(util.timing.time_since(time_start_batch)))
 
-        # Update the iteration / minibatch number
-        iteration += 1
+            input_is_list = perform_horizontal_batch_padding and not perform_horizontal_batch_padding_in_data_loader
+            average_loss_per_minibatch = trainer.train_one_epoch(
+                train_loader, epoch, start, batch_size, device, input_is_list)
 
-        print("<validation evaluation epoch " + str(epoch) + " >")
+            # Update the iteration / minibatch number
+            iteration += 1
+
+            print("<validation evaluation epoch " + str(epoch) + " >")
+            # Run evaluation
+            # multi_dimensional_rnn.set_training(False) # Normal case
+            real_model.set_training(False)  # When using DataParallel
+            validation_stats = Evaluator.evaluate_mdrnn(validation_loader, network, device, vocab_list, blank_symbol,
+                                                        width_reduction_factor, image_input_is_unsigned_int,
+                                                        perform_horizontal_batch_padding, None,
+                                                        opt.save_score_table_file_path, epoch,
+                                                        average_loss_per_minibatch)
+            real_model.set_training(True)  # When using DataParallel
+            print("</validation evaluation epoch " + str(epoch) + " >")
+
+            trainer.drop_checkpoint(opt, epoch, validation_stats)
+
+        print('Finished Training')
+
+        print('Evaluation on test set...')
+
+        print("<test evaluation, model epoch " + str(opt.epochs) + " >")
         # Run evaluation
         # multi_dimensional_rnn.set_training(False) # Normal case
-        real_model.set_training(False)  # When using DataParallel
-        validation_stats = Evaluator.evaluate_mdrnn(validation_loader, network, device, vocab_list, blank_symbol,
-                                                    width_reduction_factor, image_input_is_unsigned_int,
-                                                    perform_horizontal_batch_padding, None,
-                                                    opt.save_score_table_file_path, epoch,
-                                                    average_loss_per_minibatch)
-        real_model.set_training(True)  # When using DataParallel
-        print("</validation evaluation epoch " + str(epoch) + " >")
 
-        trainer.drop_checkpoint(opt, epoch, validation_stats)
-
-    print('Finished Training')
-
-    print('Evaluation on test set...')
-
-    print("<test evaluation, model epoch " + str(opt.epochs) + " >")
-    # Run evaluation
-    # multi_dimensional_rnn.set_training(False) # Normal case
-
-    network.module.set_training(False)  # When using DataParallel
-    Evaluator.evaluate_mdrnn(test_loader, network, device, vocab_list, blank_symbol,
-                             width_reduction_factor, image_input_is_unsigned_int,
-                             perform_horizontal_batch_padding,
-                             LanguageModelParameters(opt.language_model_file_path,
-                                                     opt.language_model_weight,
-                                                     opt.word_insertion_penalty), None, None, None)
-    network.module.set_training(True)  # When using DataParallel
-    print("</test evaluation, model epoch " + str(opt.epochs) + " >")
+        network.module.set_training(False)  # When using DataParallel
+        Evaluator.evaluate_mdrnn(test_loader, network, device, vocab_list, blank_symbol,
+                                 width_reduction_factor, image_input_is_unsigned_int,
+                                 perform_horizontal_batch_padding,
+                                 LanguageModelParameters(opt.language_model_file_path,
+                                                         opt.language_model_weight,
+                                                         opt.word_insertion_penalty), None, None, None)
+        network.module.set_training(True)  # When using DataParallel
+        print("</test evaluation, model epoch " + str(opt.epochs) + " >")
 
 
 def mnist_recognition_fixed_length():
