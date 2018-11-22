@@ -118,7 +118,7 @@ class Optim(object):
         """
         self._step += 1
 
-        if selfsf.max_grad_norm:
+        if self.max_grad_norm:
             # # First clip by gradient value, in case some gradient values became infinity
             # # this will set them back, which norm-based correction cannot. This
             # # is a somewhat dirty trick to assure that at least the gradient norm can

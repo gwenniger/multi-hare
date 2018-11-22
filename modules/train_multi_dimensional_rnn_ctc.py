@@ -1026,84 +1026,89 @@ def iam_word_recognition(model_opt, checkpoint):
     # batch_size = 96
     # batch_size = 64
 
+    device_ids = get_device_ids_from_opt(opt)
+
     # lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
     lines_file_path = model_opt.iam_database_lines_file_path
     # iam_database_word_images_root_folder_path = "/datastore/data/iam-database/lines"
     iam_database_word_images_root_folder_path = model_opt.iam_database_line_images_root_folder_path
 
-    print("Loading IAM dataset...")
-    iam_words_dataset = IamLinesDataset.create_iam_words_dataset_from_input_files(
-        lines_file_path, iam_database_word_images_root_folder_path, opt.vocabulary_file_path)
+    # Change the default cuda device to device_ids[0]
+    # So that if for example gpus 2 and 3 are used, gpu 2 will become the default gpu
+    # for everything within this function
+    with torch.cuda.device(device_ids[0]):
 
-    # This vocab_list will be used by the decoder
-    vocab_list = iam_words_dataset.get_vocabulary_list()
-    blank_symbol = iam_words_dataset.get_blank_symbol()
+        print("Loading IAM dataset...")
+        iam_words_dataset = IamLinesDataset.create_iam_words_dataset_from_input_files(
+            lines_file_path, iam_database_word_images_root_folder_path, opt.vocabulary_file_path)
 
-    permutation_save_or_load_file_path = opt.data_permutation_file_path
+        # This vocab_list will be used by the decoder
+        vocab_list = iam_words_dataset.get_vocabulary_list()
+        blank_symbol = iam_words_dataset.get_blank_symbol()
 
-    minimize_vertical_padding = True
-    minimize_horizontal_padding = True
-    image_input_is_unsigned_int = False
-    perform_horizontal_batch_padding_in_data_loader = False
-    use_example_packing = True
+        permutation_save_or_load_file_path = opt.data_permutation_file_path
 
-    dataset_save_or_load_file_path = opt.dataset_save_or_load_file_path
-    use_four_pixel_input_blocks = opt.use_four_pixel_input_blocks
+        minimize_vertical_padding = True
+        minimize_horizontal_padding = True
+        image_input_is_unsigned_int = False
+        perform_horizontal_batch_padding_in_data_loader = False
+        use_example_packing = True
 
-    train_loader, validation_loader, test_loader = create_iam_data_loaders(
-        opt, iam_words_dataset, batch_size, minimize_vertical_padding, minimize_horizontal_padding,
-        image_input_is_unsigned_int, perform_horizontal_batch_padding_in_data_loader,
-        use_four_pixel_input_blocks, permutation_save_or_load_file_path, dataset_save_or_load_file_path)
+        dataset_save_or_load_file_path = opt.dataset_save_or_load_file_path
+        use_four_pixel_input_blocks = opt.use_four_pixel_input_blocks
 
-    print("Loading IAM dataset: DONE")
+        train_loader, validation_loader, test_loader = create_iam_data_loaders(
+            opt, iam_words_dataset, batch_size, minimize_vertical_padding, minimize_horizontal_padding,
+            image_input_is_unsigned_int, perform_horizontal_batch_padding_in_data_loader,
+            use_four_pixel_input_blocks, permutation_save_or_load_file_path, dataset_save_or_load_file_path)
 
-    # test_mdrnn_cell()
-    # test_mdrnn()
+        print("Loading IAM dataset: DONE")
 
-    use_four_pixel_input_blocks = opt.use_four_pixel_input_blocks
-    if use_four_pixel_input_blocks:
-        input_channels = 4
-    else:
-        input_channels = 1
+        # test_mdrnn_cell()
+        # test_mdrnn()
 
-    # hidden_states_size = 32
-    # hidden_states_size = 8  # Start with a lower initial hidden states size since there are more layers
-    hidden_states_size = model_opt.first_layer_hidden_states_size
-    # https://stackoverflow.com/questions/45027234/strange-loss-curve-while-training-lstm-with-keras
-    # Possibly a batch size of 128 leads to more instability in training?
-    # batch_size = 128
+        use_four_pixel_input_blocks = opt.use_four_pixel_input_blocks
+        if use_four_pixel_input_blocks:
+            input_channels = 4
+        else:
+            input_channels = 1
 
-    compute_multi_directional = True
-    # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
-    use_dropout = False
+        # hidden_states_size = 32
+        # hidden_states_size = 8  # Start with a lower initial hidden states size since there are more layers
+        hidden_states_size = model_opt.first_layer_hidden_states_size
+        # https://stackoverflow.com/questions/45027234/strange-loss-curve-while-training-lstm-with-keras
+        # Possibly a batch size of 128 leads to more instability in training?
+        # batch_size = 128
 
-    # TODO: Add gradient clipping? This might also make training more stable?
-    # Interesting link with tips on how to fix training:
-    # https://blog.slavv.com/37-reasons-why-your-neural-network-is-not-working-4020854bd607
-    # https://discuss.pytorch.org/t/about-torch-nn-utils-clip-grad-norm/13873
-    # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191
+        compute_multi_directional = True
+        # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
+        use_dropout = False
 
-    # with torch.autograd.profiler.profile(use_cuda=False) as prof:
+        # TODO: Add gradient clipping? This might also make training more stable?
+        # Interesting link with tips on how to fix training:
+        # https://blog.slavv.com/37-reasons-why-your-neural-network-is-not-working-4020854bd607
+        # https://discuss.pytorch.org/t/about-torch-nn-utils-clip-grad-norm/13873
+        # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191
 
-    use_block_mdlstm = opt.use_block_mdlstm
-    use_leaky_lp_cells = opt.use_leaky_lp_cells
-    use_network_structure_bluche = opt.use_network_structure_bluche
-    share_weights_across_directions_in_fully_connected_layer = \
-        opt.share_weights_across_directions_in_fully_connected_layer
+        # with torch.autograd.profiler.profile(use_cuda=False) as prof:
 
-    device_ids = get_device_ids_from_opt(opt)
+        use_block_mdlstm = opt.use_block_mdlstm
+        use_leaky_lp_cells = opt.use_leaky_lp_cells
+        use_network_structure_bluche = opt.use_network_structure_bluche
+        share_weights_across_directions_in_fully_connected_layer = \
+            opt.share_weights_across_directions_in_fully_connected_layer
 
-    train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels,
-                    hidden_states_size,
-                    batch_size, compute_multi_directional, use_dropout, vocab_list, blank_symbol,
-                    image_input_is_unsigned_int, "IAM", minimize_horizontal_padding,
-                    use_example_packing,
-                    use_block_mdlstm,
-                    use_leaky_lp_cells,
-                    use_network_structure_bluche,
-                    share_weights_across_directions_in_fully_connected_layer,
-                    perform_horizontal_batch_padding_in_data_loader,
-                    device_ids)
+        train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels,
+                        hidden_states_size,
+                        batch_size, compute_multi_directional, use_dropout, vocab_list, blank_symbol,
+                        image_input_is_unsigned_int, "IAM", minimize_horizontal_padding,
+                        use_example_packing,
+                        use_block_mdlstm,
+                        use_leaky_lp_cells,
+                        use_network_structure_bluche,
+                        share_weights_across_directions_in_fully_connected_layer,
+                        perform_horizontal_batch_padding_in_data_loader,
+                        device_ids)
 
 
     # train_mdrnn_no_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
