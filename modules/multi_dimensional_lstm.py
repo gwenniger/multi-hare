@@ -91,7 +91,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
     def create_mdlstm_paramters(multi_dimensional_lstm_parameter_creator,
                                 compute_multi_directional: bool,
                                 hidden_states_size: int, input_channels: int,
-                                use_dropout: bool, clamp_gradients: bool):
+                                use_dropout: bool, clamp_gradients: bool,
+                                use_leaky_lp_cells: bool):
         if compute_multi_directional:
             mdlstm_parameters = \
                 multi_dimensional_lstm_parameter_creator.create_multi_directional_multi_dimensional_lstm_parameters(
@@ -103,8 +104,21 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                 multi_dimensional_lstm_parameter_creator.create_multi_dimensional_lstm_parameters_one_direction(
                     hidden_states_size, input_channels, clamp_gradients, use_dropout)
 
-        # Set initial bias for the forget gates to one, since it is known to give better results
-        mdlstm_parameters.set_bias_forget_gates_to_one()
+        if use_leaky_lp_cells:
+            # If Leaky LP cells are used, then there are no forget gates with bias that needs
+            # to be set to one. Rather, there are lambda gates and output gates. For the lambda
+            # gates it is safe to set the bias to zero, meaning no preference/equal weighting of
+            # both the input channels the lambda gate combines. A bias of one for these gates is
+            # a bad idea, since it assigns an arbitrary (and strong) preference for one of the
+            # channels that the lambda gate combines. For the output gates, an initial bias of
+            # zero should also be fine. For this reason, for the sake of simplicity, and
+            # compatibility with Xavier uniform weight initialization: when using Leaky LP
+            # cells, simply initialize the bias for everything in the Leaky LP cells to
+            # zero.
+            mdlstm_parameters.set_bias_everything_to_zero()
+        else:
+            # Set initial bias for the forget gates to one, since it is known to give better results
+            mdlstm_parameters.set_bias_forget_gates_to_one()
 
         return mdlstm_parameters
 
@@ -119,7 +133,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         mdlstm_parameters = MultiDimensionalLSTM.create_mdlstm_paramters(
             MultiDimensionalLSTMParametersCreatorSlow(),
             compute_multi_directional, hidden_states_size, input_channels,
-            use_dropout, clamp_gradients)
+            use_dropout, clamp_gradients, False)
 
         return MultiDimensionalLSTM(layer_index, input_channels, hidden_states_size, compute_multi_directional,
                                     clamp_gradients, use_dropout,
@@ -139,7 +153,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         mdlstm_parameters = MultiDimensionalLSTM.create_mdlstm_paramters(
             MultiDimensionalLSTMParametersCreatorFast(),
             compute_multi_directional, hidden_states_size, input_channels,
-            use_dropout, clamp_gradients)
+            use_dropout, clamp_gradients, False)
 
         return MultiDimensionalLSTM(layer_index, input_channels, hidden_states_size, compute_multi_directional,
                                     clamp_gradients, use_dropout,
@@ -166,7 +180,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         mdlstm_parameters = MultiDimensionalLSTM.create_mdlstm_paramters(
             mult_dimensional_lstm_parameters_creater,
             compute_multi_directional, hidden_states_size, input_channels,
-            use_dropout, clamp_gradients)
+            use_dropout, clamp_gradients, False)
 
         return MultiDimensionalLSTM(layer_index, input_channels, hidden_states_size, compute_multi_directional,
                                     clamp_gradients, use_dropout,
@@ -198,7 +212,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         mdlstm_parameters = MultiDimensionalLSTM.create_mdlstm_paramters(
             mult_dimensional_lstm_parameters_creater,
             compute_multi_directional, hidden_states_size, input_channels,
-            use_dropout, clamp_gradients)
+            use_dropout, clamp_gradients, use_leaky_lp_cells)
 
         return MultiDimensionalLSTM(layer_index, input_channels, hidden_states_size, compute_multi_directional,
                                     clamp_gradients, use_dropout,

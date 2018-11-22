@@ -12,8 +12,7 @@ from util.tensor_utils import TensorUtils
 
 class MultiDimensionalLSTMParametersBase(Module):
     # https://github.com/pytorch/pytorch/issues/750
-    FORGET_GATE_BIAS_INIT = 1  # Good for normal LSTM
-    # FORGET_GATE_BIAS_INIT = 0    # For stable learning in MDLSTM ? Doesn't really seem to help to avoid nans
+    FORGET_GATE_BIAS_INIT = 1  # Good for normal (MD)LSTM, but not for Leaky LP cells!
 
     def __init__(self, hidden_states_size,
                  input_channels: int, use_dropout: bool):
@@ -136,6 +135,11 @@ class MultiDimensionalLSTMParametersBase(Module):
     # Needs to be implemented in the subclasses
     @abstractmethod
     def set_bias_forget_gates_to_one(self):
+        raise RuntimeError("not implemented")
+
+    # Needs to be implemented in the subclasses
+    @abstractmethod
+    def set_bias_everything_to_zero(self):
         raise RuntimeError("not implemented")
 
     # Needs to be implemented in the subclasses
@@ -375,6 +379,11 @@ class MultiDimensionalLSTMParametersOneDirection(OneDirectionalMultiDimensionalL
 
         # self.set_bias_forget_gates_image_input()
 
+        # Needs to be implemented in the subclasses
+
+    def set_bias_everything_to_zero(self):
+        raise RuntimeError("not implemented")
+
     def set_training(self, training):
 
         # TODO: implement this
@@ -519,6 +528,11 @@ class MultiDimensionalLSTMParametersOneDirectionFast(OneDirectionalMultiDimensio
         # self.set_bias_forget_gates_image_input()
         self.set_bias_forget_gates_memory_states_input()
         self.set_bias_forget_gates_hidden_states_input()
+
+        # Needs to be implemented in the subclasses
+
+    def set_bias_everything_to_zero(self):
+        raise RuntimeError("not implemented")
 
     def set_training(self, training):
         self.parallel_hidden_state_column_computation.set_training(training)
@@ -678,6 +692,11 @@ class MultiDimensionalLSTMParametersOneDirectionFullyParallel(OneDirectionalMult
         # self.set_bias_forget_gates_image_input()
         self.set_bias_forget_gates_memory_states_input()
         self.set_bias_forget_gates_hidden_states_input()
+
+        # Needs to be implemented in the subclasses
+
+    def set_bias_everything_to_zero(self):
+        raise RuntimeError("not implemented")
 
     def set_training(self, training):
         self.parallel_hidden_and_memory_state_column_computation.set_training(training)
@@ -1138,6 +1157,9 @@ class MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputCon
         self.set_bias_forget_gates_memory_states_input()
         self.set_bias_forget_gates_hidden_states_input()
 
+    def set_bias_everything_to_zero(self):
+        raise RuntimeError("not implemented")
+
     def set_training(self, training):
         self.parallel_hidden_and_memory_state_column_computation.set_training(training)
 
@@ -1592,7 +1614,28 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
             # print("after: self.parallel_memory_state_column_computation.parallel_convolution.bias.data: " +
             #      str(self.parallel_memory_state_column_computation.parallel_convolution.bias.data))
 
+    def set_bias_everything_to_zero(self):
+        """
+        For Leaky LP Cell networks, rather than doing complicated initialization of some of
+        the gate biases to one, simply set all bias values to zero.
+        Importantly, for Leaky LP cells, initializing bias for lambda gates to one is a
+        bad idea. Since a lambda gate is a switch, and a-priori both switch options should
+        be equally likely, so bias zero is appropriate for such gates. A bias of one,
+        tells that one of the outputs of the switch is preferred strongly, but there is
+        no ground for that. Initialiation to one only makes sense for normal (MD)LSTM
+        forget gates.
+        )
+        :return: Nothing, the bias is set in place
+        """
+
+        print(">>> Multi_dimensional_lstm_parameters: Initializing the bias of everything to zero!")
+        # Set bias to zero
+        with torch.no_grad():
+            self.output_gate_memory_state_convolution.bias.zero_()
+            self.parallel_hidden_and_memory_state_column_computation.parallel_convolution.bias.zero_()
+
     def set_bias_forget_gates_to_one(self):
+        print(">>> Multi_dimensional_lstm_parameters: Set bias forget gates to one")
         # self.set_bias_forget_gates_image_input()
         self.set_bias_forget_gates_memory_states_input()
         self.set_bias_forget_gates_hidden_states_input()
