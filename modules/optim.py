@@ -110,7 +110,7 @@ class Optim(object):
             for op in self.optimizer.optimizers:
                 op.param_groups[0]['lr'] = self.lr
 
-    def step(self):
+    def step_with_specified_max_norm(self, max_grad_norm):
         """Update the model parameters based on current gradients.
 
         Optionally, will employ gradient modification or update learning
@@ -127,13 +127,42 @@ class Optim(object):
             # GradientClipping.clip_gradient_value(self.params)
             # Then perform the norm-based correction
             made_gradient_norm_based_correction, total_norm = GradientClipping.\
-                clip_gradient_norm(self.params, self.max_grad_norm)
+                clip_gradient_norm(self.params, max_grad_norm)
         else:
             print("WARNING: Not Clipping Gradient!")
         self.optimizer.step()
 
         if self.max_grad_norm:
             return made_gradient_norm_based_correction, total_norm
+
+    def step(self):
+        self.step_with_specified_max_norm(self.max_grad_norm)
+
+    def step_with_scaling_for_size_current_batch(self,
+                                                 current_batch_size: int,
+                                                 maximum_batch_size: int):
+        """
+        This method makes a step using norm-based gradient clipping, but correcting for the
+        size of the current batch. This is motivated as follows. Suppose the normal batch size
+        is 30, and all batches have a gradient norm larger than the max_grad_norm, so the
+        gradient is rescaled for each. Now however, for the last batch, which contains the
+        (less than 30) remaining examples, the gradient will still be rescaled to the same
+        maximum. But since in this batch there are less than 30, say only 2 examples,
+        the effective step size per example can become much larger!
+        This leads to an over-correction for the last remaining examples in the batch.
+        This method compensates for this, by rescaling the norm by  the factor
+        current_batch_size / maximum_batch_size. This factor is 1 except for the last batch,
+        which contains the "rest" examples. The scaling factor corrects the effective learning
+        rate for these "rest" examples, so that the optimizer makes no over-correction for them.
+
+        :param maximum_batch_size:
+        :param current_batch_size:
+        :return:
+        """
+
+        scaled_max_grad_norm = self.max_grad_norm * (float(current_batch_size) / maximum_batch_size)
+
+        self.step_with_specified_max_norm(scaled_max_grad_norm)
 
     def update_learning_rate(self, ppl, epoch):
         """

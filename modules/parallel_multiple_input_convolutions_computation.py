@@ -5,7 +5,7 @@ from torch.nn.modules.module import Module
 import torch
 from modules.inside_model_gradient_clipping import InsideModelGradientClamping
 from modules.gradient_clamped_module import GradientClampedModule
-
+from modules.xavier_weight_initialization_correction_for_grouping import XavierWeightInitializationCorrectionForGrouping
 
 # This class optimizes the computation of multiple 2d input convolutions
 # that are computed from the same input, by computing them as a single
@@ -69,6 +69,12 @@ class ParallelMultipleInputConvolutionsComputation(Module):
 
         # Xavier weight initialization
         torch.nn.init.xavier_uniform_(parallel_convolution.weight)
+        # Compensate the weights for the fact that there are multiple groups: effectively there is a number
+        # of virtual independent layers, equal to the number of groups. Therefore the weights should be
+        # re-scaled by a factor sqrt(groups) to get the right initialization for each of the separate virtual
+        # layers
+        XavierWeightInitializationCorrectionForGrouping. \
+            correct_xavier_uniform_initialized_weights_for_grouping(parallel_convolution.weight, number_of_groups)
 
         return ParallelMultipleInputConvolutionsComputation(hidden_states_size, number_of_input_convolutions,
                                                             output_states_size, parallel_convolution, clamp_gradients,

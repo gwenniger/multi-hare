@@ -1,6 +1,7 @@
 import torch
 import util.image_visualization
 
+
 class TensorUtils:
 
     @staticmethod
