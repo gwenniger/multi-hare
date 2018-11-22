@@ -118,7 +118,7 @@ class Optim(object):
         """
         self._step += 1
 
-        if self.max_grad_norm:
+        if selfsf.max_grad_norm:
             # # First clip by gradient value, in case some gradient values became infinity
             # # this will set them back, which norm-based correction cannot. This
             # # is a somewhat dirty trick to assure that at least the gradient norm can
@@ -136,7 +136,7 @@ class Optim(object):
             return made_gradient_norm_based_correction, total_norm
 
     def step(self):
-        self.step_with_specified_max_norm(self.max_grad_norm)
+        return self.step_with_specified_max_norm(self.max_grad_norm)
 
     def step_with_scaling_for_size_current_batch(self,
                                                  current_batch_size: int,
@@ -162,7 +162,7 @@ class Optim(object):
 
         scaled_max_grad_norm = self.max_grad_norm * (float(current_batch_size) / maximum_batch_size)
 
-        self.step_with_specified_max_norm(scaled_max_grad_norm)
+        return self.step_with_specified_max_norm(scaled_max_grad_norm)
 
     def update_learning_rate(self, ppl, epoch):
         """

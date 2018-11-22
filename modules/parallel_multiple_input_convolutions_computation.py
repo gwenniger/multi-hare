@@ -68,6 +68,7 @@ class ParallelMultipleInputConvolutionsComputation(Module):
 
 
         # Xavier weight initialization
+        print("Parallel_multiple_input_convolution_computation - Xavier weight initialization")
         torch.nn.init.xavier_uniform_(parallel_convolution.weight)
         # Compensate the weights for the fact that there are multiple groups: effectively there is a number
         # of virtual independent layers, equal to the number of groups. Therefore the weights should be

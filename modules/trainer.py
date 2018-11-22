@@ -219,13 +219,13 @@ class Trainer:
             # raise RuntimeError("stopping after find bad gradients")
 
             # Perform step including gradient clipping
-            made_gradient_norm_based_correction, total_norm = self.optimizer.step()
+            # made_gradient_norm_based_correction, total_norm = self.optimizer.step()
 
             # Perform an update step, including norm-based gradient clipping. Compensate the maximum gradient
             # norm by the factor: number_of_examples/batch_size.  This is to avoid over-correction (too much learning)
             # for the last batch, which contains less examples.
             made_gradient_norm_based_correction, total_norm = self.optimizer.step_with_scaling_for_size_current_batch(
-                self, number_of_examples, batch_size)
+                number_of_examples, batch_size)
             print("trainer - total norm: " + str(total_norm))
 
             if made_gradient_norm_based_correction:

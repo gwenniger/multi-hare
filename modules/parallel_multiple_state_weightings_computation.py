@@ -166,7 +166,6 @@ class ParallelMultipleStateWeightingsComputation(ParallelMultipleStateWeightings
         if clamp_gradients:
             parallel_convolution = GradientClampedModule(parallel_convolution)
 
-
         # Xavier weight initialization
         torch.nn.init.xavier_uniform_(parallel_convolution.weight)
 
@@ -203,6 +202,14 @@ class ParallelMultipleStateWeightingsComputation(ParallelMultipleStateWeightings
         #       "  output_states_size: " + str(output_states_size))
         parallel_convolution = nn.Conv1d(input_states_size, output_states_size, 1,
                                          groups=number_of_paired_input_weightings)
+
+        if clamp_gradients:
+            parallel_convolution = GradientClampedModule(parallel_convolution)
+
+        print("Parallel_multiple_state_weighting_computation - Xavier weight initialization")
+        # Xavier weight initialization
+        torch.nn.init.xavier_uniform_(parallel_convolution.weight)
+
         # Compensate the weights for the fact that there are effectively multiple groups: effectively there is a number
         # of virtual independent layers, equal to two times the number of paired input weightings. The factor two
         # comes from the fact that each pair stands for two input weightings, one for each of two predecessor
@@ -214,12 +221,6 @@ class ParallelMultipleStateWeightingsComputation(ParallelMultipleStateWeightings
         XavierWeightInitializationCorrectionForGrouping. \
             correct_xavier_uniform_initialized_weights_for_grouping(parallel_convolution.weight,
                                                                     number_of_virtual_layers)
-
-        if clamp_gradients:
-            parallel_convolution = GradientClampedModule(parallel_convolution)
-
-        # Xavier weight initialization
-        torch.nn.init.xavier_uniform_(parallel_convolution.weight)
 
         return ParallelMultipleStateWeightingsComputation(hidden_states_size,
                                                           number_of_paired_input_weightings_per_group,
@@ -386,7 +387,20 @@ class ParallelMultipleInputWeightingsComputation(ParallelMultipleStateWeightings
             parallel_convolution = GradientClampedModule(parallel_convolution)
 
         # Xavier weight initialization
+        print("Parallel_multiple_input_weightings_computation - Xavier weight initialization")
         torch.nn.init.xavier_uniform_(parallel_convolution.weight)
+
+        # Compensate the weights for the fact that there are effectively multiple groups: effectively there is a number
+        # of virtual independent layers, equal to two times the number of paired input weightings. The factor two
+        # comes from the fact that each pair stands for two input weightings, one for each of two predecessor
+        # states
+        # Therefore the weights should be re-scaled by a factor sqrt(groups)
+        # to get the right initialization for each of the separate virtual
+        # layers
+        number_of_virtual_layers = number_of_groups
+        XavierWeightInitializationCorrectionForGrouping. \
+            correct_xavier_uniform_initialized_weights_for_grouping(parallel_convolution.weight,
+                                                                    number_of_virtual_layers)
 
         return ParallelMultipleInputWeightingsComputation(
             hidden_states_size, number_of_single_input_weightings_per_group,
