@@ -1098,6 +1098,9 @@ def iam_word_recognition(model_opt, checkpoint):
         share_weights_across_directions_in_fully_connected_layer = \
             opt.share_weights_across_directions_in_fully_connected_layer
 
+        block_strided_convolution_layers_using_weight_sharing = \
+            opt.block_strided_convolution_layers_using_weight_sharing
+
         train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels,
                         hidden_states_size,
                         batch_size, compute_multi_directional, use_dropout, vocab_list, blank_symbol,
@@ -1107,6 +1110,7 @@ def iam_word_recognition(model_opt, checkpoint):
                         use_leaky_lp_cells,
                         use_network_structure_bluche,
                         share_weights_across_directions_in_fully_connected_layer,
+                        block_strided_convolution_layers_using_weight_sharing,
                         perform_horizontal_batch_padding_in_data_loader,
                         device_ids)
 

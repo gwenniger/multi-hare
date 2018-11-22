@@ -382,8 +382,6 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
         first_mdlstm_hidden_states_size_per_direction = 2
         output_channels = 6
 
-
-
         pair_one_specific_parameters = parameter_creation_function(
             input_channels, first_mdlstm_hidden_states_size_per_direction, output_channels, mdlstm_block_size,
             block_strided_convolution_block_size,
