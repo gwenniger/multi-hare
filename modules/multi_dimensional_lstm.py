@@ -60,6 +60,10 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             print("WARNING: MultiDimensionalLSTM - clamp_gradients=" + str(self.clamp_gradients))
 
         self.use_dropout = use_dropout
+
+        if self.use_dropout:
+            print("Using dropout!")
+
         self.training = training
         self.use_example_packing = use_example_packing
         self.mdlstm_parameters =  mdlstm_parameters
@@ -940,6 +944,11 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         # for i, element in enumerate(result):
         #     print("MDLSTM - result[" + str(i) + "].size(): " + str(element.size()))
 
+        # Dropout is applied to the output of the MDLSTM layer, as in the paper
+        "Dropout improves Recurrent Neural Networks for Handwriting Recognition"
+        if self.use_dropout:
+            result = F.dropout(result, p=0.5, training=self.training)
+
         return result
 
     @staticmethod
@@ -954,14 +963,14 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                            previous_memory_state_column,
                                            output_gate_input_column):
 
-        if self.use_dropout:
-            output_gate_memory_state_column = \
-                F.dropout(mdlstm_parameters.
-                          compute_output_gate_memory_state_weighted_input(previous_memory_state_column),
-                          p=0.2, training=self.training)
-        else:
-            output_gate_memory_state_column = \
-                mdlstm_parameters.compute_output_gate_memory_state_weighted_input(previous_memory_state_column)
+        # if self.use_dropout:
+        #     output_gate_memory_state_column = \
+        #         F.dropout(mdlstm_parameters.
+        #                   compute_output_gate_memory_state_weighted_input(previous_memory_state_column),
+        #                   p=0.2, training=self.training)
+        # else:
+        output_gate_memory_state_column = \
+            mdlstm_parameters.compute_output_gate_memory_state_weighted_input(previous_memory_state_column)
 
         if self.clamp_gradients:
             output_gate_memory_state_column = InsideModelGradientClamping.\

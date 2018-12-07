@@ -22,6 +22,7 @@ from modules.xavier_weight_initialization_correction_for_grouping import XavierW
 # number of groups > 1, each group has its own set of convolutions
 # that processes one chunk of the input and produces one chunk of the output
 
+
 class ParallelMultipleInputConvolutionsComputation(Module):
     def __init__(self, hidden_states_size: int,
                  number_of_input_convolutions: int,
@@ -91,11 +92,10 @@ class ParallelMultipleInputConvolutionsComputation(Module):
         # print("parallel_multiple_input_convolutions_computation - compute_convolution_result")
         # print(" - input_tensor.size(): " + str(input_tensor.size()))
 
-        if self.use_dropout:
-                # print("Applying dropout...")
-                # TODO: which probability to use for dropout?
-                result = F.dropout(self.parallel_convolution(input_tensor), p=0.2, training=self.training)
-                return result
+        # if self.use_dropout:
+        #         # print("Applying dropout...")
+        #         result = F.dropout(self.parallel_convolution(input_tensor), p=0.2, training=self.training)
+        #         return result
         result = self.parallel_convolution(input_tensor)
 
         if self.clamp_gradients:

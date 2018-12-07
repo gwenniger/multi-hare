@@ -966,7 +966,7 @@ def iam_line_recognition(model_opt, checkpoint):
 
             compute_multi_directional = True
             # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
-            use_dropout = False
+            use_dropout = opt.use_dropout
 
             # TODO: Add gradient clipping? This might also make training more stable?
             # Interesting link with tips on how to fix training:

@@ -247,8 +247,6 @@ def train_opts(parser):
                        help="""If the norm of the gradient vector exceeds this,
                        renormalize it to have the norm equal to
                        max_grad_norm""")
-    group.add_argument('-dropout', type=float, default=0.3,
-                       help="Dropout probability; applied in LSTM stacks.")
     group.add_argument('-adam_beta1', type=float, default=0.9,
                        help="""The beta1 parameter used by Adam.
                        Almost without exception a value of 0.9 is used in
@@ -267,6 +265,13 @@ def train_opts(parser):
                        suggested a value of 0.98 for beta2, this parameter may
                        not work well for normal models / default
                        baselines.""")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('-use_dropout', dest='use_dropout',
+                       help="""Whether or not to use dropout.""",
+                       action='store_true')
+    group.add_argument('-no_dropout', dest='use_dropout',
+                       help="""Whether or not to use dropout.""",
+                       action='store_false')
     # learning rate
     group = parser.add_argument_group('Optimization- Rate')
     group.add_argument('-learning_rate', type=float, default=1.0,
