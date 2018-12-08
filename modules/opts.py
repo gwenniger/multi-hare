@@ -135,6 +135,11 @@ def train_opts(parser):
                        action='store_true',
                        help="Using this flag, a manual reset of the adam state can be forced")
 
+    # Number of MDLSTM nodes for layers
+    group.add_argument('-mdlstm_layer_sizes', default=[], nargs='+', type=int, required=True,
+                       help="A list specifying the sizes of the MDLSTM (or Leak-LP) cell layers."
+                            "For examples \"-mdlstm_layer_sizes 2 10 50\"")
+
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('-use_four_pixel_input_blocks', dest='use_four_pixel_input_blocks',
                        action='store_true')

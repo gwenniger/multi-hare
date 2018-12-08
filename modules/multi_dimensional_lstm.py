@@ -870,7 +870,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         else:
             # print(">>> x.size(): " + str(x.size()))
             original_image_columns = examples.size(3)
-            skewed_image_rows = skewed_images_variable.size(2)
+            # skewed_image_rows = skewed_images_variable.size(2)
 
             activations_unskewed = ImageInputTransformer. \
                 extract_unskewed_activations_from_activation_columns(activations, original_image_columns)
@@ -945,9 +945,11 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         #     print("MDLSTM - result[" + str(i) + "].size(): " + str(element.size()))
 
         # Dropout is applied to the output of the MDLSTM layer, as in the paper
-        "Dropout improves Recurrent Neural Networks for Handwriting Recognition"
+        # "Dropout improves Recurrent Neural Networks for Handwriting Recognition"
         if self.use_dropout:
-            result = F.dropout(result, p=0.5, training=self.training)
+            for example_result in result:
+                # Dropout is done in place, to save memory
+                F.dropout(example_result, p=0.5, training=self.training, inplace=True)
 
         return result
 

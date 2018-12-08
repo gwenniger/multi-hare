@@ -319,6 +319,7 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
                  clamp_gradients: bool, data_set_name: str, inputs_and_outputs_are_lists: bool,
                  use_example_packing: bool, device_ids: list, use_block_mdlstm: bool,
                  use_leaky_lp_cells: bool, use_network_structure_bluche: bool,
+                 mdlstm_layer_sizes: list,
                  share_weights_across_directions_in_fully_connected_layer: bool,
                  block_strided_convolution_layers_using_weight_sharing: list):
 
@@ -373,7 +374,8 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
         multi_dimensional_rnn = MultiDimensionalLSTMLayerPairStacking. \
             create_mdlstm_two_and_half_layer_pair_network_with_two_channels_per_direction_first_mdlstm_layer(
                 input_channels, block_strided_convolution_block_size,
-                compute_multi_directional, clamp_gradients, use_dropout, opt.use_bias_in_block_strided_convolution,
+                mdlstm_layer_sizes, compute_multi_directional, clamp_gradients, use_dropout,
+                opt.use_bias_in_block_strided_convolution,
                 use_example_packing, use_leaky_lp_cells,
                 block_strided_convolution_layers_using_weight_sharing
               )
@@ -632,6 +634,7 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
                     use_block_mdlstm: bool,
                     use_leaky_lp_cells: bool,
                     use_network_structure_bluche: bool,
+                    mdlstm_layer_sizes: list,
                     share_weights_across_directions_in_fully_connected_layer: bool,
                     block_strided_convolution_layers_using_weight_sharing: list,
                     perform_horizontal_batch_padding_in_data_loader,
@@ -669,6 +672,7 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
                                use_block_mdlstm,
                                use_leaky_lp_cells,
                                use_network_structure_bluche,
+                               mdlstm_layer_sizes,
                                share_weights_across_directions_in_fully_connected_layer,
                                block_strided_convolution_layers_using_weight_sharing)
 
@@ -901,6 +905,14 @@ def create_iam_data_loaders(opt, iam_lines_dataset,
     return train_loader, validation_loader, test_loader
 
 
+def get_and_check_mdlstm_layer_sizes(model_opt):
+    mdlstm_layer_sizes = model_opt.mdlstm_layer_sizes
+    if len(mdlstm_layer_sizes) != 3:
+        raise RuntimeError("Error: expected a list of mdlstm layer sizes of length 3, but got: "
+                           + str(mdlstm_layer_sizes))
+    return mdlstm_layer_sizes
+
+
 def iam_line_recognition(model_opt, checkpoint):
         print("opt.language_model_file_path: " + str(opt.language_model_file_path))
 
@@ -925,7 +937,6 @@ def iam_line_recognition(model_opt, checkpoint):
         # So that if for example gpus 2 and 3 are used, gpu 2 will become the default gpu
         # for everything within this function
         with torch.cuda.device(device_ids[0]):
-
 
             iam_lines_dataset = IamLinesDataset.create_iam_lines_dataset_from_input_files(
                 lines_file_path, iam_database_line_images_root_folder_path, opt.vocabulary_file_path)
@@ -977,6 +988,7 @@ def iam_line_recognition(model_opt, checkpoint):
             use_example_packing = True
             use_leaky_lp_cells = opt.use_leaky_lp_cells
             use_network_structure_bluche = opt.use_network_structure_bluche
+            mdlstm_layer_sizes = get_and_check_mdlstm_layer_sizes(model_opt)
             share_weights_across_directions_in_fully_connected_layer = \
                 opt.share_weights_across_directions_in_fully_connected_layer
             block_strided_convolution_layers_using_weight_sharing =\
@@ -994,6 +1006,7 @@ def iam_line_recognition(model_opt, checkpoint):
                             use_block_mdlstm,
                             use_leaky_lp_cells,
                             use_network_structure_bluche,
+                            mdlstm_layer_sizes,
                             share_weights_across_directions_in_fully_connected_layer,
                             block_strided_convolution_layers_using_weight_sharing,
                             perform_horizontal_batch_padding_in_data_loader,

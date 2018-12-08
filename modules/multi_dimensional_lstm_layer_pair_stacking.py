@@ -372,6 +372,7 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
             input_channels,
             mdlstm_block_size: SizeTwoDimensional,
             block_strided_convolution_block_size: SizeTwoDimensional,
+            mdlstm_layer_sizes: list,
             parameter_creation_function,
             block_strided_convolution_layers_using_weight_sharing: list,
             use_dropout: bool):
@@ -381,10 +382,8 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
         #                                      block_strided_convolution_block_size.height
         # output_channels = number_of_elements_reduction_factor * first_mdlstm_hidden_states_size_per_direction
 
-        if use_dropout:
-            first_mdlstm_hidden_states_size_per_direction = 4
-        else:
-            first_mdlstm_hidden_states_size_per_direction = 2
+        first_mdlstm_hidden_states_size_per_direction = mdlstm_layer_sizes[0]
+        print("first_mdlstm_hidden_states_size_per_direction: " + str(first_mdlstm_hidden_states_size_per_direction))
 
         output_channels = 6
 
@@ -396,13 +395,8 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
 
         # Layer pair two
         input_channels = output_channels
-        # Here the number of mdstlm_hidden_states and output channels are increased with a factor that is
-        # equal to the layer number
-        if use_dropout:
-            second_mdlstm_hidden_states_size_per_direction = 20
-        else:
-            second_mdlstm_hidden_states_size_per_direction = 10
-
+        second_mdlstm_hidden_states_size_per_direction = mdlstm_layer_sizes[1]
+        print("second_mdlstm_hidden_states_size_per_direction: " + str(second_mdlstm_hidden_states_size_per_direction))
         output_channels = 20
 
         pair_two_specific_parameters = parameter_creation_function(
@@ -451,10 +445,13 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
         input_channels = 20
         # Here the number of mdstlm_hidden_states and output channels are increased with a factor that is
         # equal to the layer number
-        if use_dropout:
-            third_mdlstm_hidden_states_size_per_direction = 100
-        else:
-            third_mdlstm_hidden_states_size_per_direction = 50
+        # if use_dropout:
+        #     third_mdlstm_hidden_states_size_per_direction = 100
+        # else:
+        # Use MDLSTM layers of size 2, 20, 50  with dropout in the second and third MDLSTM layer.
+        # Doubling (also) the size of the third MDLSTM layer doesn't help for IAM, according to
+        # "Dropout improves Recurrent Neural Networks for Handwriting Recognition"
+        third_mdlstm_hidden_states_size_per_direction = 50
         output_channels = 50
 
         pair_three_specific_parameters = parameter_creation_function(
@@ -568,6 +565,7 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
     def create_mdlstm_two_and_half_layer_pair_network_with_two_channels_per_direction_first_mdlstm_layer(
             input_channels,
             block_strided_convolution_block_size: SizeTwoDimensional,
+            mdlstm_layer_sizes: list,
             compute_multi_directional: bool,
             clamp_gradients: bool, use_dropout: bool,
             use_bias_with_block_strided_convolution: bool,
@@ -602,6 +600,7 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
             create_first_two_layer_pair_parameters_with_two_channels_per_direction_first_mdlstm_layer(
                 input_channels, None,
                 block_strided_convolution_block_size,
+                mdlstm_layer_sizes,
                 MultiDimensionalLSTMLayerPairStacking.mdlstm_parameter_creation_function,
                 block_strided_convolution_layers_using_weight_sharing,
                 use_dropout
@@ -618,10 +617,10 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
         layer_index = 2
         last_layer_pair = multi_dimensional_lstm_layer_pairs[-1]
         input_channels = last_layer_pair.get_number_of_output_channels()
-        if use_dropout:
-            mdlstm_hidden_states_size = 100
-        else:
-            mdlstm_hidden_states_size = 50
+
+        mdlstm_hidden_states_size = mdlstm_layer_sizes[2]
+
+        print("third_mdlstm_hidden_states_size_per_direction: " + str(mdlstm_layer_sizes))
         third_mdlstm_layer = MultiDimensionalLSTM. \
             create_multi_dimensional_lstm_fully_parallel(layer_index, input_channels, mdlstm_hidden_states_size,
                                                          compute_multi_directional,
