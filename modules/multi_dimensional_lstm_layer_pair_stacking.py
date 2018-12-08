@@ -620,7 +620,7 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
 
         mdlstm_hidden_states_size = mdlstm_layer_sizes[2]
 
-        print("third_mdlstm_hidden_states_size_per_direction: " + str(mdlstm_layer_sizes))
+        print("third_mdlstm_hidden_states_size_per_direction: " + str(mdlstm_layer_sizes[2]))
         third_mdlstm_layer = MultiDimensionalLSTM. \
             create_multi_dimensional_lstm_fully_parallel(layer_index, input_channels, mdlstm_hidden_states_size,
                                                          compute_multi_directional,

@@ -14,7 +14,7 @@ from data_preprocessing.padding_strategy import PaddingStrategy
 from data_preprocessing.last_minute_padding import LastMinutePadding
 from util.tensor_block_stacking import TensorBlockStacking
 from modules.size_two_dimensional import SizeTwoDimensional
-
+import math
 
 class IamLinesDataset(Dataset):
     EXAMPLE_TYPES_OK = "ok"
@@ -85,6 +85,9 @@ class IamLinesDataset(Dataset):
     @staticmethod
     def create_iam_dataset(iam_lines_dictionary: IamExamplesDictionary,
                            save_word_to_string_mapping_table_path: str,
+                           block_strided_convolution_block_size: SizeTwoDimensional =
+                           SizeTwoDimensional.create_size_two_dimensional(4, 2),
+                           number_of_block_strided_convolution_layers: int = 3,
                            example_types: str = EXAMPLE_TYPES_ALL,
                            transformation=None
                            ):
@@ -94,9 +97,19 @@ class IamLinesDataset(Dataset):
             create_or_load_string_to_index_mapping_table(examples_line_information,
                                                          save_word_to_string_mapping_table_path)
 
-        # TODO : compute these from an input parameter
+        # There is a trade-of between reducing horizontal and vertical padding. Only examples
+        # of the same height can be packed together. Therefore, minimizing vertical padding
+        # can easily go at the expense of reducing the possibility to horizontally pack examples,
+        # especially for small batch sizes. For this reason, when using packing, it is better to
+        # do a bit more than the necessary vertical padding, so that horizontal packing is more
+        # effective. For this reason, we just hard-code the "step-size" of vertical example
+        # sizes to 64, so that each example is a multiple of height 64 pixels.
         height_required_per_network_output_row = 64
-        width_required_per_network_output_column = 8
+        # height_required_per_network_output_row = int(math.pow(
+        #     block_strided_convolution_block_size.height,
+        #     number_of_block_strided_convolution_layers))
+        width_required_per_network_output_column = int(math.pow(
+            block_strided_convolution_block_size.width, number_of_block_strided_convolution_layers))
 
         print("string_to_index_mapping_table: " + str(string_to_index_mapping_table))
         return IamLinesDataset(iam_lines_dictionary, examples_line_information, string_to_index_mapping_table,
@@ -106,20 +119,28 @@ class IamLinesDataset(Dataset):
     @staticmethod
     def create_iam_words_dataset_from_input_files(
             iam_database_lines_file_path: str, iam_database_line_images_root_folder_path: str,
-                vocabulary_file_path: str, example_types: str = EXAMPLE_TYPES_ALL, transformation=None):
+            vocabulary_file_path: str,
+            block_strided_convolution_block_size: SizeTwoDimensional,
+            number_of_block_strided_convolution_layers: int,
+            example_types: str = EXAMPLE_TYPES_ALL, transformation=None):
         iam_words_dicionary = IamExamplesDictionary. \
             create_iam_words_dictionary(iam_database_lines_file_path,
                                         iam_database_line_images_root_folder_path,
                                         False)
         iam_words_dataset = IamLinesDataset.create_iam_dataset(iam_words_dicionary,
                                                                vocabulary_file_path,
+                                                               block_strided_convolution_block_size,
+                                                               number_of_block_strided_convolution_layers,
                                                                example_types, transformation)
         return iam_words_dataset
 
     @staticmethod
     def create_iam_lines_dataset_from_input_files(
             iam_database_lines_file_path: str, iam_database_line_images_root_folder_path: str,
-            vocabulary_file_path: str, example_types: str = EXAMPLE_TYPES_ALL,
+            vocabulary_file_path: str,
+            block_strided_convolution_block_size: SizeTwoDimensional,
+            number_of_block_strided_convolution_layers: int,
+            example_types: str = EXAMPLE_TYPES_ALL,
             transformation=None):
         print("Loading IAM dataset...")
         iam_lines_dicionary = IamExamplesDictionary. \
@@ -127,6 +148,8 @@ class IamLinesDataset(Dataset):
                                         iam_database_line_images_root_folder_path, True)
         iam_lines_dataset = IamLinesDataset.create_iam_dataset(iam_lines_dicionary,
                                                                vocabulary_file_path,
+                                                               block_strided_convolution_block_size,
+                                                               number_of_block_strided_convolution_layers,
                                                                example_types, transformation)
         return iam_lines_dataset
 

@@ -938,8 +938,12 @@ def iam_line_recognition(model_opt, checkpoint):
         # for everything within this function
         with torch.cuda.device(device_ids[0]):
 
+            block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
+            number_of_block_strided_convolution_layers_for_computing_padding = 2
+
             iam_lines_dataset = IamLinesDataset.create_iam_lines_dataset_from_input_files(
-                lines_file_path, iam_database_line_images_root_folder_path, opt.vocabulary_file_path)
+                lines_file_path, iam_database_line_images_root_folder_path, opt.vocabulary_file_path,
+                block_strided_convolution_block_size, number_of_block_strided_convolution_layers_for_computing_padding)
 
             # This vocab_list will be used by the decoder
             vocab_list = iam_lines_dataset.get_vocabulary_list()
