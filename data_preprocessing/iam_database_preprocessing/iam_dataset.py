@@ -99,15 +99,16 @@ class IamLinesDataset(Dataset):
 
         # There is a trade-of between reducing horizontal and vertical padding. Only examples
         # of the same height can be packed together. Therefore, minimizing vertical padding
-        # can easily go at the expense of reducing the possibility to horizontally pack examples,
-        # especially for small batch sizes. For this reason, when using packing, it is better to
-        # do a bit more than the necessary vertical padding, so that horizontal packing is more
-        # effective. For this reason, we just hard-code the "step-size" of vertical example
-        # sizes to 64, so that each example is a multiple of height 64 pixels.
-        height_required_per_network_output_row = 64
-        # height_required_per_network_output_row = int(math.pow(
-        #     block_strided_convolution_block_size.height,
-        #     number_of_block_strided_convolution_layers))
+        # could go at the expense of reducing the possibility to horizontally pack examples,
+        # especially for small batch sizes. However, empirically we find that not many line
+        # strips are short enough (compared to the longest one in a batch) to fit two short ones
+        # in one row. For this reason, it pays off more to go for vertical savings when working
+        # with lines, so we minimize the vertical padding, even though this makes horizontal
+        # packing harder.
+        # height_required_per_network_output_row = 64
+        height_required_per_network_output_row = int(math.pow(
+            block_strided_convolution_block_size.height,
+            number_of_block_strided_convolution_layers))
         width_required_per_network_output_column = int(math.pow(
             block_strided_convolution_block_size.width, number_of_block_strided_convolution_layers))
 
