@@ -497,6 +497,13 @@ def test_tensor_list_block_chunking_followed_by_dechunking_reconstructs_original
                                                                                  tensors_all_have_same_height)
 
 
+def test_tensor_list_chunking_produces_memory_leak():
+    while True:
+        test_tensor_list_block_chunking_followed_by_dechunking_reconstructs_original_multiple_block_rows(
+            True)
+        test_tensor_list_block_chunking_followed_by_dechunking_reconstructs_original_multiple_block_rows(
+            False)
+
 def main():
     test_tensor_list_block_chunking_followed_by_dechunking_reconstructs_original_single_block_row(False)
     test_tensor_list_block_chunking_followed_by_dechunking_reconstructs_original_multiple_block_rows(False)

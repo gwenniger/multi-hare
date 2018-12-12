@@ -1258,9 +1258,11 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
                  parallel_input_column_computation,
                  output_gate_memory_state_convolution
                  ):
-        super(MultiDirectionalMultiDimensionalLSTMParametersFullyParallel, self).__init__(hidden_states_size,
-                                                                                                                 input_channels,
-                                                                                                                 use_dropout)
+        super(MultiDirectionalMultiDimensionalLSTMParametersFullyParallel, self).__init__(
+            hidden_states_size, input_channels, use_dropout)
+
+        print("Entered MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.init...")
+
         self.number_of_directions = number_of_directions
 
         self.parallel_hidden_and_memory_state_column_computation = \
@@ -1277,8 +1279,22 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
         self.node_hidden_state_columns = None
         self.node_memory_state_columns = None
         self.previous_memory_state_column = None
+        print("multi_dimensional_lstm_parameters."
+              "setting self.next_input_column_index to zero...")
+
+        # For some hard to understand reason these values get reset to zero
+        # when using (custom) DataParallel (with two gpus) after every example.
+        # While this gives the desired behavior, it is not at all clear why this is happening!
         self.next_input_column_index = 0
+        # Used to show how this variable "automatically" resets to zero when using
+        # data parallel, but not when data parallel is omitted
+        # TODO Try to simplify this functionality bug and ask on pytorch forums
+        # why this happens
+        # self.bladie_input_column_index = 0
         self.skewed_images_variable = None
+
+    def reset_next_input_column_index(self):
+        self.next_input_column_index = 0
 
     @staticmethod
     def create_multi_directional_mdlstm_or_leaky_lp_cell_parameters_fully_parallel(
@@ -1446,6 +1462,10 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
                                                                        self.number_of_directions, 1)
         previous_memory_state_columns_split_by_direction = torch.chunk(previous_memory_state_column,
                                                                        self.number_of_directions, 1)
+        # print("multi_dimensional_lstm_parameters - self.next_input_column_index: " +
+        #           str(self.next_input_column_index))
+        # print("multi_dimensional_lstm_parameters - self.bladie_input_column_index: "
+        #      + str(self.bladie_input_column_index))
         input_column = self.skewed_images_variable[:, :, :, self.next_input_column_index]
 
         # print("prepare_computation_next_column_functions - input_column: " + str(input_column))
@@ -1469,9 +1489,9 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
                     input_columns_split_by_direction)
 
         # Sanity check that the number of output pairs is as expected
-        if len(node_hidden_and_memory_state_columns) != (MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution.
-                                                         num_paired_hidden_and_memory_state_weightings() *
-                                                         self.number_of_directions):
+        if len(node_hidden_and_memory_state_columns) != \
+                (MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution.
+                    num_paired_hidden_and_memory_state_weightings() * self.number_of_directions):
             raise RuntimeError("Error: there are " + str(self.number_of_directions) + " directions, " +
                                "therefore expected " +
                                str(MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution.
@@ -1489,6 +1509,7 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
 
         # Increment the next input column index
         self.next_input_column_index += 1
+        self.bladie_input_column_index += 1
 
     def compute_output_gate_memory_state_weighted_input(self, previous_memory_state_column):
         if TensorUtils.number_of_dimensions(previous_memory_state_column) != 3:

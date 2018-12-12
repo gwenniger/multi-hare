@@ -54,11 +54,13 @@ def scatter_kwargs(inputs, kwargs, target_gpus, dim=0):
     kwargs = tuple(kwargs)
     return inputs, kwargs
 
+
 def is_list_of_lists(out):
     if isinstance(out, list):
         if len(out) > 0 and isinstance(out[0], list):
             return True
     return False
+
 
 def gather(outputs, target_device, dim=0):
     r"""

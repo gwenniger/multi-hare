@@ -333,7 +333,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
     def compute_multi_dimensional_lstm(self, mdlstm_parameters, examples):
 
-        skewed_images_variable, mask, number_of_images, mdlstm_examples_packing = self.prepare_skewed_images_and_mask(examples)
+        skewed_images_variable, mask, number_of_images, mdlstm_examples_packing = \
+            self.prepare_skewed_images_and_mask(examples)
 
         # print("skewed_images_variable: " + str(skewed_images_variable))
 
@@ -363,6 +364,8 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         # + str(mdlstm_parameters.input_input_convolution.bias))
 
         # Prepare input convolutions if applicable
+        # This reset is necessary to set the index of the next input columns to zero
+        mdlstm_parameters.reset_next_input_column_index()
         mdlstm_parameters.prepare_input_convolutions(skewed_images_variable)
 
         # if self.clamp_gradients:
@@ -709,8 +712,17 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         previous_hidden_state_column, previous_memory_state_column = self.prepare_initial_states(
             image_height, number_of_images, device)
 
+        print("compute_leaky_lp_cell - previous_hidden_state_column.size(): " +
+              str(previous_hidden_state_column.size()))
+        print("compute_leaky_lp_cell - skewed_images_variable.size(): " +
+              str(skewed_images_variable.size()))
+
+        print("skewed_images_variable.size(): " + str(skewed_images_variable.size()))
+
         skewed_image_columns = skewed_images_variable.size(3)
 
+        # This reset is necessary to set the index of the next input columns to zero
+        mdlstm_parameters.reset_next_input_column_index()
         # Prepare input convolutions if applicable
         mdlstm_parameters.prepare_input_convolutions(skewed_images_variable)
 
@@ -720,6 +732,9 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         # print("starting Leaky LP cell column computation...")
 
         for column_index in range(0, skewed_image_columns):
+
+            print("column_index: " + str(column_index))
+
             # Apply a binary mask to zero out entries in the activation_column
             # and new_memory_state that are not corresponding to valid states,
             # but that are an artifact of the computation by convolution using
@@ -930,8 +945,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
         # activations_unskewed = self.compute_multi_dimensional_lstm(self.mdlstm_parameters,
         #                                                           x)
-        activations_unskewed = self.compute_leaky_lp_cell(self.mdlstm_parameters,
-                                                                   x)
+        activations_unskewed = self.compute_leaky_lp_cell(self.mdlstm_parameters, x)
 
         # print("len(activations_unskewed: " + str(len(activations_unskewed)))
         # print("activations_unskewed.size(): " + str(activations_unskewed.size()))

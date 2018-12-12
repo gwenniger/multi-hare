@@ -603,8 +603,8 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
                 mdlstm_layer_sizes,
                 MultiDimensionalLSTMLayerPairStacking.mdlstm_parameter_creation_function,
                 block_strided_convolution_layers_using_weight_sharing,
-                use_dropout
-        )
+                use_dropout)
+
         print("layers_pairs_specific_parameters_list: " + str(layer_pairs_specific_parameters_list))
 
         multi_dimensional_lstm_layer_pairs =  MultiDimensionalLSTMLayerPairStacking.\

@@ -458,7 +458,11 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
         print("after loading checkpoint: network.get_weight_fully_connected_layer()" +
               str(network.get_weight_fully_connected_layer()))
 
-    network = custom_data_parallel.data_parallel.DataParallel(network, device_ids=device_ids)
+    #network = custom_data_parallel.data_parallel.DataParallel(network, device_ids=device_ids)
+    if len(device_ids) > 1:
+        network = custom_data_parallel.data_parallel.DataParallel(network, device_ids=device_ids)
+    else:
+        print("Only one device, so not using (custom) data parallel...")
 
     return network
 
@@ -761,14 +765,14 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
         # Run evaluation
         # multi_dimensional_rnn.set_training(False) # Normal case
 
-        network.module.set_training(False)  # When using DataParallel
+        real_model.set_training(False)  # When using DataParallel
         Evaluator.evaluate_mdrnn(test_loader, network, device, vocab_list, blank_symbol,
                                  width_reduction_factor, image_input_is_unsigned_int,
                                  perform_horizontal_batch_padding,
                                  LanguageModelParameters(opt.language_model_file_path,
                                                          opt.language_model_weight,
                                                          opt.word_insertion_penalty), None, None, None)
-        network.module.set_training(True)  # When using DataParallel
+        real_model.set_training(True)  # When using DataParallel
         print("</test evaluation, model epoch " + str(opt.epochs) + " >")
 
 
@@ -858,6 +862,10 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     use_network_structure_bluche = opt.use_network_structure_bluche
     share_weights_across_directions_in_fully_connected_layer = \
         opt.share_weights_across_directions_in_fully_connected_layer
+    block_strided_convolution_layers_using_weight_sharing = \
+        opt.block_strided_convolution_layers_using_weight_sharing
+    device_ids = get_device_ids_from_opt(opt)
+    mdlstm_layer_sizes = get_and_check_mdlstm_layer_sizes(model_opt)
     train_mdrnn_ctc(model_opt, checkpoint, train_loader, test_loader,
                     test_loader, input_channels,
                     hidden_states_size, batch_size,
@@ -867,8 +875,11 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
                     use_block_mdlstm,
                     use_leaky_lp_cells,
                     use_network_structure_bluche,
+                    mdlstm_layer_sizes,
                     share_weights_across_directions_in_fully_connected_layer,
-                    perform_horizontal_batch_padding_in_data_loader)
+                    block_strided_convolution_layers_using_weight_sharing,
+                    perform_horizontal_batch_padding_in_data_loader,
+                    device_ids)
 
     #print(prof)
 

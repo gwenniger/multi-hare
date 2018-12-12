@@ -123,7 +123,6 @@ class MDLSTMExamplesPacking:
                 reordered_index += 1
         return original_index_to_reordered_index_table
 
-
     @staticmethod
     def get_mdlstm_computation_rows_skewing_overhead(examples_height):
         skewing_overhead = examples_height - 1
@@ -967,6 +966,8 @@ def test_create_vertically_and_horizontally_packed_examples():
     print("Visualizing packed examples mask...")
     util.image_visualization.imshow_tensor_2d(packed_examples_mask.cpu())
 
+    return mdlstm_examples_packing
+
 
 def test_pack_examples():
     print("Test pack examples...")
@@ -1004,6 +1005,11 @@ def test_pack_examples_of_same_height():
     for packed_examples_row in packed_examples:
         print("packed_examples row: " + str(packed_examples_row))
         print("\n")
+
+
+def test_pack_examples_produces_memory_leak():
+    while True:
+        test_pack_examples()
 
 
 def main():
