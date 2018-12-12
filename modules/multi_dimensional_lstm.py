@@ -712,12 +712,12 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         previous_hidden_state_column, previous_memory_state_column = self.prepare_initial_states(
             image_height, number_of_images, device)
 
-        print("compute_leaky_lp_cell - previous_hidden_state_column.size(): " +
-              str(previous_hidden_state_column.size()))
-        print("compute_leaky_lp_cell - skewed_images_variable.size(): " +
-              str(skewed_images_variable.size()))
-
-        print("skewed_images_variable.size(): " + str(skewed_images_variable.size()))
+        # print("compute_leaky_lp_cell - previous_hidden_state_column.size(): " +
+        #       str(previous_hidden_state_column.size()))
+        # print("compute_leaky_lp_cell - skewed_images_variable.size(): " +
+        #       str(skewed_images_variable.size()))
+        #
+        # print("skewed_images_variable.size(): " + str(skewed_images_variable.size()))
 
         skewed_image_columns = skewed_images_variable.size(3)
 
@@ -733,7 +733,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
 
         for column_index in range(0, skewed_image_columns):
 
-            print("column_index: " + str(column_index))
+            # print("column_index: " + str(column_index))
 
             # Apply a binary mask to zero out entries in the activation_column
             # and new_memory_state that are not corresponding to valid states,

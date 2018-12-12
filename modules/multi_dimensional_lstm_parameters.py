@@ -1509,7 +1509,7 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
 
         # Increment the next input column index
         self.next_input_column_index += 1
-        self.bladie_input_column_index += 1
+        # self.bladie_input_column_index += 1
 
     def compute_output_gate_memory_state_weighted_input(self, previous_memory_state_column):
         if TensorUtils.number_of_dimensions(previous_memory_state_column) != 3:
