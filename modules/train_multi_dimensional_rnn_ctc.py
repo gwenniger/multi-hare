@@ -379,7 +379,10 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
                 use_example_packing, use_leaky_lp_cells,
                 block_strided_convolution_layers_using_weight_sharing
               )
-        input_network_produces_multiple_output_directions = True
+        if compute_multi_directional:
+            input_network_produces_multiple_output_directions = True
+        else:
+            input_network_produces_multiple_output_directions = False
 
     else:
         input_network_produces_multiple_output_directions = False
@@ -842,7 +845,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     # Possibly a batch size of 128 leads to more instability in training?
     #batch_size = 128
 
-    compute_multi_directional = True
+    compute_multi_directional = False
     # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
     use_dropout = False
 
@@ -857,7 +860,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     image_input_is_unsigned_int = False
     use_block_mdlstm = False
     perform_horizontal_batch_padding_in_data_loader = False
-    use_example_packing = True
+    use_example_packing = False
     use_leaky_lp_cells = opt.use_leaky_lp_cells
     use_network_structure_bluche = opt.use_network_structure_bluche
     share_weights_across_directions_in_fully_connected_layer = \

@@ -431,6 +431,10 @@ class MultiDimensionalLSTMParametersOneDirectionFast(OneDirectionalMultiDimensio
         return MultiDimensionalLSTMParametersOneDirectionFast(hidden_states_size, input_channels,
                                                               clamp_gradients, use_dropout)
 
+    def reset_next_input_column_index(self):
+        # Implemented for compatibility with multi_dimensional_lst class
+        return
+
     def prepare_input_convolutions(self, skewed_images_variable):
         self.input_matrices = self.parallel_multiple_input_convolutions_computation.\
             compute_result_and_split_into_output_elements(skewed_images_variable)
@@ -532,7 +536,11 @@ class MultiDimensionalLSTMParametersOneDirectionFast(OneDirectionalMultiDimensio
         # Needs to be implemented in the subclasses
 
     def set_bias_everything_to_zero(self):
-        raise RuntimeError("not implemented")
+        # Set bias to zero
+        with torch.no_grad():
+            self.parallel_hidden_state_column_computation.parallel_convolution.bias.zero_()
+            self.parallel_memory_state_column_computation.parallel_convolution.bias.zero_()
+            self.parallel_multiple_input_convolutions_computation.parallel_convolution.bias.zero_()
 
     def set_training(self, training):
         self.parallel_hidden_state_column_computation.set_training(training)

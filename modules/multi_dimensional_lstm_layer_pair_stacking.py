@@ -621,14 +621,26 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
         mdlstm_hidden_states_size = mdlstm_layer_sizes[2]
 
         print("third_mdlstm_hidden_states_size_per_direction: " + str(mdlstm_layer_sizes[2]))
-        third_mdlstm_layer = MultiDimensionalLSTM. \
-            create_multi_dimensional_lstm_fully_parallel(layer_index, input_channels, mdlstm_hidden_states_size,
-                                                         compute_multi_directional,
-                                                         clamp_gradients,
-                                                         use_dropout,
-                                                         use_example_packing,
-                                                         use_leaky_lp_cells,
-                                                         nonlinearity)
+
+        if compute_multi_directional:
+            third_mdlstm_layer = MultiDimensionalLSTM. \
+                create_multi_dimensional_lstm_fully_parallel(layer_index, input_channels, mdlstm_hidden_states_size,
+                                                             compute_multi_directional,
+                                                             clamp_gradients,
+                                                             use_dropout,
+                                                             use_example_packing,
+                                                             use_leaky_lp_cells,
+                                                             nonlinearity)
+        else:
+            third_mdlstm_layer = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(
+                layer_index, input_channels, mdlstm_hidden_states_size,
+                compute_multi_directional,
+                clamp_gradients,
+                use_dropout,
+                use_example_packing,
+                use_leaky_lp_cells,
+                nonlinearity)
+
         multi_dimensional_lstm_layer_pairs.append(third_mdlstm_layer)
 
         return MultiDimensionalLSTMLayerPairStacking(multi_dimensional_lstm_layer_pairs)

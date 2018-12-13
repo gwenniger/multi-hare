@@ -195,7 +195,6 @@ class MultiDimensionalRNNBase(torch.nn.Module):
 
         self.layer_index = layer_index
         self.input_channels = input_channels
-        self.selection_tensors_dictionary = dict([])
         self.nonlinearity = nonlinearity
         self.hidden_states_size = hidden_states_size
         self.compute_multi_directional_flag = compute_multi_directional
@@ -206,6 +205,73 @@ class MultiDimensionalRNNBase(torch.nn.Module):
         if self.compute_multi_directional():
             result = result * 4
         return result
+
+    # Needs to be implemented in the subclasses
+    @abstractmethod
+    def _compute_multi_dimensional_function_one_direction(self, function_input):
+        raise RuntimeError("not implemented")
+
+    @staticmethod
+    def use_cuda():
+        return torch.cuda.is_available()
+
+    def get_activation_function(self):
+        if self.nonlinearity == "tanh":
+            activation_function = F.tanh
+        elif self.nonlinearity == "relu":
+            # func = self._backend.RNNReLUCell
+            activation_function = F.relu
+        elif self.nonlinearity == "sigmoid":
+            activation_function = F.sigmoid
+        else:
+            raise RuntimeError(
+                "Unknown nonlinearity: {}".format(self.nonlinearity))
+        return activation_function
+
+    @staticmethod
+    def compute_state_convolution_and_remove_bottom_padding(convolution_layer,
+                                                            previous_state_column,
+                                                            image_height):
+        # print("previous_state_column: " + str(previous_state_column))
+
+        # Compute convolution on previous state column vector padded with zeros
+        state_column_both_sides_padding = convolution_layer(previous_state_column)
+        # Throw away the last element, which comes from padding on the bottom, as
+        # there seems to be no way in pytorch to get the padding only on one side
+        state_column = state_column_both_sides_padding[:, :, 0:image_height]
+        return state_column
+
+    @staticmethod
+    def compute_states_plus_input(input_column,  state_columns_combined):
+        # print("compute_states_plus_input - input_matrix.size(): " + str(input_matrix.size()))
+
+        # print("input_column.size(): " + str(input_column.size()))
+        # print("state_columns_combined.size(): " + str(state_columns_combined.size()))
+        state_plus_input = state_columns_combined + input_column
+        # print("input_column: " + str(input_column))
+        # print("state_plus_input: " + str(state_plus_input))
+        return state_plus_input
+
+    def get_hidden_states_size(self):
+        return self.hidden_states_size
+
+    def compute_multi_directional(self):
+        return self.compute_multi_directional_flag
+
+
+class MultiDimensionalRNNAbstract(MultiDimensionalRNNBase):
+    def __init__(self, layer_index: int, input_channels: int, hidden_states_size, batch_size,
+                 compute_multi_directional: bool, use_dropout: bool, training: bool,
+                 nonlinearity="tanh"):
+        super(MultiDimensionalRNNAbstract, self).__init__(layer_index, input_channels, hidden_states_size, batch_size,
+                                                          compute_multi_directional,
+                                                          nonlinearity)
+        self.input_convolution = nn.Conv2d(self.input_channels,
+                                           self.hidden_states_size, 1)
+        # For multi-directional rnn
+        self.use_dropout = use_dropout
+        self.training = training
+        self.selection_tensors_dictionary = dict([])
 
     # Selection tensors are dynamically stored in a dictionary or retrieved from it
     # if already present. This avoids the need to keep a batch size to have a "default"
@@ -278,72 +344,6 @@ class MultiDimensionalRNNBase(torch.nn.Module):
         # It is nescessary to output a tensor of size 10, for 10 different output classes
         result = activations_one_dimensional
         return result
-
-    # Needs to be implemented in the subclasses
-    @abstractmethod
-    def _compute_multi_dimensional_function_one_direction(self, function_input):
-        raise RuntimeError("not implemented")
-
-    @staticmethod
-    def use_cuda():
-        return torch.cuda.is_available()
-
-    def get_activation_function(self):
-        if self.nonlinearity == "tanh":
-            activation_function = F.tanh
-        elif self.nonlinearity == "relu":
-            # func = self._backend.RNNReLUCell
-            activation_function = F.relu
-        elif self.nonlinearity == "sigmoid":
-            activation_function = F.sigmoid
-        else:
-            raise RuntimeError(
-                "Unknown nonlinearity: {}".format(self.nonlinearity))
-        return activation_function
-
-    @staticmethod
-    def compute_state_convolution_and_remove_bottom_padding(convolution_layer,
-                                                            previous_state_column,
-                                                            image_height):
-        # print("previous_state_column: " + str(previous_state_column))
-
-        # Compute convolution on previous state column vector padded with zeros
-        state_column_both_sides_padding = convolution_layer(previous_state_column)
-        # Throw away the last element, which comes from padding on the bottom, as
-        # there seems to be no way in pytorch to get the padding only on one side
-        state_column = state_column_both_sides_padding[:, :, 0:image_height]
-        return state_column
-
-    @staticmethod
-    def compute_states_plus_input(input_column,  state_columns_combined):
-        # print("compute_states_plus_input - input_matrix.size(): " + str(input_matrix.size()))
-
-        # print("input_column.size(): " + str(input_column.size()))
-        # print("state_columns_combined.size(): " + str(state_columns_combined.size()))
-        state_plus_input = state_columns_combined + input_column
-        # print("input_column: " + str(input_column))
-        # print("state_plus_input: " + str(state_plus_input))
-        return state_plus_input
-
-    def get_hidden_states_size(self):
-        return self.hidden_states_size
-
-    def compute_multi_directional(self):
-        return self.compute_multi_directional_flag
-
-
-class MultiDimensionalRNNAbstract(MultiDimensionalRNNBase):
-    def __init__(self, layer_index: int, input_channels: int, hidden_states_size, batch_size,
-                 compute_multi_directional: bool, use_dropout: bool, training: bool,
-                 nonlinearity="tanh"):
-        super(MultiDimensionalRNNAbstract, self).__init__(layer_index, input_channels, hidden_states_size, batch_size,
-                                                          compute_multi_directional,
-                                                          nonlinearity)
-        self.input_convolution = nn.Conv2d(self.input_channels,
-                                           self.hidden_states_size, 1)
-        # For multi-directional rnn
-        self.use_dropout = use_dropout
-        self.training = training
 
     # Needs to be implemented in the subclasses
     # This method compute the state update for the two input dimension and

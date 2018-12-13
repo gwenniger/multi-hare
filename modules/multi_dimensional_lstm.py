@@ -152,12 +152,13 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                            clamp_gradients: bool,
                                            use_dropout: bool,
                                            use_example_packing: bool,
+                                            use_leaky_lp_cells: bool,
                                            nonlinearity="tanh"):
 
         mdlstm_parameters = MultiDimensionalLSTM.create_mdlstm_paramters(
             MultiDimensionalLSTMParametersCreatorFast(),
             compute_multi_directional, hidden_states_size, input_channels,
-            use_dropout, clamp_gradients, False)
+            use_dropout, clamp_gradients, use_leaky_lp_cells)
 
         return MultiDimensionalLSTM(layer_index, input_channels, hidden_states_size, compute_multi_directional,
                                     clamp_gradients, use_dropout,
