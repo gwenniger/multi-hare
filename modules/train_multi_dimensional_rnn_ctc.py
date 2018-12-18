@@ -845,7 +845,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     # Possibly a batch size of 128 leads to more instability in training?
     #batch_size = 128
 
-    compute_multi_directional = False
+    compute_multi_directional = True
     # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
     use_dropout = False
 
@@ -860,7 +860,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     image_input_is_unsigned_int = False
     use_block_mdlstm = False
     perform_horizontal_batch_padding_in_data_loader = False
-    use_example_packing = False
+    use_example_packing = True
     use_leaky_lp_cells = opt.use_leaky_lp_cells
     use_network_structure_bluche = opt.use_network_structure_bluche
     share_weights_across_directions_in_fully_connected_layer = \

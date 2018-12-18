@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
-from modules.multi_dimensional_rnn import StateUpdateBlock
+from modules.state_update_block import StateUpdateBlock
 from torch.nn.modules.module import Module
 import torch
 from modules.inside_model_gradient_clipping import InsideModelGradientClamping
@@ -190,7 +190,9 @@ class ParallelMultipleStateWeightingsComputation(ParallelMultipleStateWeightings
     def create_parallel_multiple_state_weighting_computation_multiple_groups(
             hidden_states_size: int, number_of_paired_input_weightings_per_group: list,
             clamp_gradients: bool, use_dropout: bool):
+        print(">>> number_of_paired_input_weightings_per_group: " + str(number_of_paired_input_weightings_per_group))
         number_of_paired_input_weightings = sum(number_of_paired_input_weightings_per_group)
+        print(">>> number_of_paired_input_weightings: " + str(number_of_paired_input_weightings))
         input_states_size = number_of_paired_input_weightings * hidden_states_size
         output_states_size = hidden_states_size * number_of_paired_input_weightings * 2
 
@@ -238,7 +240,18 @@ class ParallelMultipleStateWeightingsComputation(ParallelMultipleStateWeightings
     # Where to apply dropout:
     # https://stats.stackexchange.com/questions/240305/where-should-i-place-dropout-layers-in-a-neural-network
     def compute_convolution_result_and_apply_mask(self, previous_state_column: torch.Tensor, mask: torch.Tensor):
+
+        # This call seems to be causing a memory leak.
+        # This seems to be the memory leak root cause, basically just the call to
+        # the 2D convolution with multiple groups. Perhaps there are too many groups,
+        # e.g. 28 * 2. But it is not clear how to fix this. The bug seems to happen
+        # in pytorch 0.4.0 and 0.4.1 at least.
+        # print("self.number_of_paired_input_weightings_per_group: " +
+        #       str(self.number_of_paired_input_weightings_per_group))
         result = self.compute_convolution_result(previous_state_column)
+        # self.parallel_convolution(previous_state_column)
+        # result = None
+        # return None
 
         if self.clamp_gradients:
             # print("ParallelMultipleStateWeightingsComputation - register gradient clamping...")
@@ -255,6 +268,10 @@ class ParallelMultipleStateWeightingsComputation(ParallelMultipleStateWeightings
         # For this reason, we must mask not only the states computed for the next iteration
         # during MDLSTM computation but also for the convolution computation the entries that
         # are not valid
+        # print("result.size(): " + str(result.size()))
+        # print("mask.size(): " + str(mask.size()))
+        # print("self.number_of_paired_input_weighting: " +
+        #       str(self.get_number_of_paired_input_weightings()))
         if not(mask is None):
             result = TensorUtils.apply_binary_mask(result, mask)
 
@@ -266,14 +283,18 @@ class ParallelMultipleStateWeightingsComputation(ParallelMultipleStateWeightings
 
         # print("compute_result_and_split_into_output_pairs - previous_state_column: " + str(previous_state_column))
 
+        # This call already seems to cause a memory leak
         convolution_result = self.compute_convolution_result_and_apply_mask(previous_state_column, mask)
+
         return self.split_convolution_result_subtensor_into_output_pairs(convolution_result)
 
     def compute_result_and_split_into_pairs_with_second_pair_element_shifted(self, previous_state_column,
                                                                              mask: torch.Tensor=None):
+        # This call seems to be causing (already) a memory leak
         convolution_result_pairs = self.compute_result_and_split_into_output_pairs(previous_state_column, mask)
+
         return ParallelMultipleStateWeightingsComputationBase.\
-            create_second_pair_element_shifted_pair_list(convolution_result_pairs, self.clamp_gradients)
+           create_second_pair_element_shifted_pair_list(convolution_result_pairs, self.clamp_gradients)
 
     def compute_result_and_split_into_pairs_with_second_pair_element_shifted_multiple_groups(
             self, previous_state_columns, mask: torch.Tensor = None):
@@ -281,8 +302,15 @@ class ParallelMultipleStateWeightingsComputation(ParallelMultipleStateWeightings
         #      "compute_result_and_split_into_pairs_with_second_pair_element_shifted_multiple_groups...")
         previous_state_column_all_groups = self.compute_previous_state_column_all_groups(previous_state_columns)
         # print("previous_state_column_all_groups.size(): " + str(previous_state_column_all_groups.size()))
-        return self.compute_result_and_split_into_pairs_with_second_pair_element_shifted(
-            previous_state_column_all_groups, mask)
+
+        # This next computation seems to be causing a memory leak
+        result =  self.compute_result_and_split_into_pairs_with_second_pair_element_shifted(
+           previous_state_column_all_groups, mask)
+        previous_state_column_all_groups = None
+        return result
+
+        # return None
+
 
     @staticmethod
     def compute_summed_outputs_every_pair_static(convolution_result_pairs):
@@ -377,9 +405,9 @@ class ParallelMultipleInputWeightingsComputation(ParallelMultipleStateWeightings
         #       "  output_states_size: " + str(output_states_size))
         number_of_groups = number_of_single_input_weightings
 
-        # print("number of groups: " + str(number_of_groups))
-        # print("input states size: " + str(input_states_size))
-        # print("output states size: " + str(output_states_size))
+        print("number of groups: " + str(number_of_groups))
+        print("input states size: " + str(input_states_size))
+        print("output states size: " + str(output_states_size))
         parallel_convolution = nn.Conv1d(input_states_size, output_states_size, 1,
                                          groups=number_of_groups)
 
@@ -430,7 +458,7 @@ class ParallelMultipleInputWeightingsComputation(ParallelMultipleStateWeightings
         return convolution_result_chunks
 
     def compute_convolution_results(self, input_tensor: torch.Tensor):
-        # print("input_tensor.size(): " + str(input_tensor.size()))
+        print("input_tensor.size(): " + str(input_tensor.size()))
         result = self.compute_convolution_result(input_tensor)
         # print("result.size(): " + str(result.size()))
 

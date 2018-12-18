@@ -133,7 +133,7 @@ class MDLSTMExamplesPacking:
         result = 0
         for indexed_example_size in packed_examples_row:
             result += indexed_example_size.example_size.width
-        return  result
+        return result
 
     @staticmethod
     def get_packed_example_widths_plus_skewing_overhead(packed_examples_row: list):
@@ -957,14 +957,16 @@ def test_create_vertically_and_horizontally_packed_examples():
     packed_examples, packed_examples_mask = mdlstm_examples_packing.\
         create_vertically_and_horizontally_packed_examples_and_mask_one_direction(examples_list)
 
+    mdlstm_examples_packing.extract_unskewed_activations_from_activation_tensor(packed_examples)
+
     # Visualize the packed_examples and the packed_examples_mask to check
     # that they are as expected
-    packed_examples_2d = packed_examples.squeeze(1)
-    packed_examples_2d = packed_examples_2d.squeeze(0)
-    print("Visualizing packed examples...")
-    util.image_visualization.imshow_tensor_2d(packed_examples_2d.cpu())
-    print("Visualizing packed examples mask...")
-    util.image_visualization.imshow_tensor_2d(packed_examples_mask.cpu())
+    # packed_examples_2d = packed_examples.squeeze(1)
+    # packed_examples_2d = packed_examples_2d.squeeze(0)
+    # print("Visualizing packed examples...")
+    # util.image_visualization.imshow_tensor_2d(packed_examples_2d.cpu())
+    # print("Visualizing packed examples mask...")
+    # util.image_visualization.imshow_tensor_2d(packed_examples_mask.cpu())
 
     return mdlstm_examples_packing
 
@@ -1008,8 +1010,19 @@ def test_pack_examples_of_same_height():
 
 
 def test_pack_examples_produces_memory_leak():
+    """
+    There appears to be a memory leak somewhere in the code, which seems to occur
+    when examples packing is used. The aim is to find where exactly the leak occurs.
+    This function attempts to isolate the problem. If the problem can be reproduced
+    in such a simpler setting, that is one step in the direction of finding the exact
+    cause.
+
+    :return:
+    """
+    
     while True:
-        test_pack_examples()
+        # test_pack_examples()
+        test_create_vertically_and_horizontally_packed_examples()
 
 
 def main():

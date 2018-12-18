@@ -1341,7 +1341,10 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
     @staticmethod
     def create_multi_directional_multi_dimensional_leaky_lp_cell_parameters_fully_parallel(
             hidden_states_size, input_channels, clamp_gradients: bool, use_dropout: bool, number_of_directions: int):
-        print(">>>create_multi_directional_multi_dimensional_leaky_lp_cell_parameters_fully_parallel...")
+        print(">>>create_multi_directional_multi_dimensional_leaky_lp_cell_parameters_fully_parallel... ")
+        print("hidden_states_size: " + str(hidden_states_size))
+        print("input_channels: " + str(input_channels))
+        print("number of directions: " + str(number_of_directions))
         output_gate_memory_state_convolution = nn.Conv1d(
             hidden_states_size * number_of_directions,
             hidden_states_size * number_of_directions * 2, 1,
@@ -1485,33 +1488,38 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
             computation_arguments_list.append(previous_hidden_state_columns_split_by_direction[i])
             computation_arguments_list.append(previous_memory_state_columns_split_by_direction[i])
 
+        # The computation of node_hidden_and_memory_state_columns appears to be the
+        # first call in this function that causes a memory leak. With everything
+        # after it commented out, the memory leak does not seem to appear. With
+        # everything after it commented out, but itself not commented out, the
+        # memory leak appears.
         node_hidden_and_memory_state_columns = \
             self.parallel_hidden_and_memory_state_column_computation.\
             compute_result_and_split_into_pairs_with_second_pair_element_shifted_multiple_groups(
                 computation_arguments_list,
                 mask)
-
-        input_convolution_result_columns = \
-            self.parallel_input_column_computation.\
-            compute_result_and_split_into_columns_multiple_groups(
-                    input_columns_split_by_direction)
-
-        # Sanity check that the number of output pairs is as expected
-        if len(node_hidden_and_memory_state_columns) != \
-                (MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution.
-                    num_paired_hidden_and_memory_state_weightings() * self.number_of_directions):
-            raise RuntimeError("Error: there are " + str(self.number_of_directions) + " directions, " +
-                               "therefore expected " +
-                               str(MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution.
-                                   num_paired_hidden_and_memory_state_weightings()) + " * " +
-                               str(self.number_of_directions) + " output pairs, but got" +
-                               str(len(node_hidden_and_memory_state_columns)))
-
-        self.node_hidden_state_columns = self.get_next_node_hidden_state_columns(node_hidden_and_memory_state_columns)
-        self.node_memory_state_columns = self.get_next_node_memory_state_columns(node_hidden_and_memory_state_columns)
-        self.input_columns = self.get_next_input_columns(input_convolution_result_columns)
-
-        self.previous_memory_state_column = previous_memory_state_column
+        #
+        # input_convolution_result_columns = \
+        #     self.parallel_input_column_computation.\
+        #     compute_result_and_split_into_columns_multiple_groups(
+        #             input_columns_split_by_direction)
+        #
+        # # Sanity check that the number of output pairs is as expected
+        # if len(node_hidden_and_memory_state_columns) != \
+        #         (MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution.
+        #             num_paired_hidden_and_memory_state_weightings() * self.number_of_directions):
+        #     raise RuntimeError("Error: there are " + str(self.number_of_directions) + " directions, " +
+        #                        "therefore expected " +
+        #                        str(MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution.
+        #                            num_paired_hidden_and_memory_state_weightings()) + " * " +
+        #                        str(self.number_of_directions) + " output pairs, but got" +
+        #                        str(len(node_hidden_and_memory_state_columns)))
+        #
+        # self.node_hidden_state_columns = self.get_next_node_hidden_state_columns(node_hidden_and_memory_state_columns)
+        # self.node_memory_state_columns = self.get_next_node_memory_state_columns(node_hidden_and_memory_state_columns)
+        # self.input_columns = self.get_next_input_columns(input_convolution_result_columns)
+        #
+        # self.previous_memory_state_column = previous_memory_state_column
 
         # print("finished prepare_computation_next_column_functions")
 
