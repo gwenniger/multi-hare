@@ -458,7 +458,7 @@ class ParallelMultipleInputWeightingsComputation(ParallelMultipleStateWeightings
         return convolution_result_chunks
 
     def compute_convolution_results(self, input_tensor: torch.Tensor):
-        print("input_tensor.size(): " + str(input_tensor.size()))
+        # print("input_tensor.size(): " + str(input_tensor.size()))
         result = self.compute_convolution_result(input_tensor)
         # print("result.size(): " + str(result.size()))
 
