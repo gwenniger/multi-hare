@@ -304,7 +304,7 @@ class ParallelMultipleStateWeightingsComputation(ParallelMultipleStateWeightings
         # print("previous_state_column_all_groups.size(): " + str(previous_state_column_all_groups.size()))
 
         # This next computation seems to be causing a memory leak
-        result =  self.compute_result_and_split_into_pairs_with_second_pair_element_shifted(
+        result = self.compute_result_and_split_into_pairs_with_second_pair_element_shifted(
            previous_state_column_all_groups, mask)
         previous_state_column_all_groups = None
         return result
