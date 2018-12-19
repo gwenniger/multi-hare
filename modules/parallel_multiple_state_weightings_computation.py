@@ -73,6 +73,7 @@ class ParallelMultipleStateWeightingsComputationBase(Module):
         # print("final len(cat_list): " + str(len(cat_list)))
         # print("cat_list: " + str(cat_list))
         previous_state_column_all_groups = torch.cat(cat_list, 1)
+        # cat_list = None
         return previous_state_column_all_groups
 
     def forward(self, x):

@@ -1,5 +1,6 @@
 import torch
 import modules.multi_dimensional_lstm_parameters
+import torch.nn as nn
 
 
 class TestMultiDimensionalLSTMParameters:
@@ -18,6 +19,14 @@ class TestMultiDimensionalLSTMParameters:
 
     @staticmethod
     def test_mdlstm_parameters_not_leaking_memory():
+        """
+        This test strives to test if mdlstm parameters are leaking memory, by observing
+        memory usage over time with top while running this test. However, looking at
+        virtual and reserved memory with top, it is not very clear whether memory is actually leaked.
+        What is clear is that the involved methods cause memory usag to fluctuate quite a bit.
+
+        :return:
+        """
 
         mdlstm_parameters = modules.multi_dimensional_lstm_parameters.\
             MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.\
@@ -54,10 +63,30 @@ class TestMultiDimensionalLSTMParameters:
                     previous_memory_state_column,
                     mask)
 
+    @staticmethod
+    def test_conv1d_with_grouping_itself_leaks_memory():
+        """
+        This test tries to establish whether a conv1d with grouping by itself causes memory loss.
+        However, this does not seem to be the case.
+        :return:
+        """
+        groups = 56
+        input_states_size = TestMultiDimensionalLSTMParameters.HIDDEN_STATES_SIZE * groups
+        output_states_size = TestMultiDimensionalLSTMParameters.HIDDEN_STATES_SIZE * groups
+        parallel_convolution = nn.Conv1d(input_states_size, output_states_size, 1,
+                                         groups=groups)
+
+        while True:
+            input_tensor = torch.zeros(
+                    1, input_states_size,
+                    TestMultiDimensionalLSTMParameters.IMAGE_HEIGHT)
+            parallel_convolution.forward(input_tensor)
+
 
 def main():
     print("Testing...")
     TestMultiDimensionalLSTMParameters.test_mdlstm_parameters_not_leaking_memory()
+    # TestMultiDimensionalLSTMParameters.test_conv1d_with_grouping_itself_leaks_memory()
 
 
 if __name__ == "__main__":
