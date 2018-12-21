@@ -324,20 +324,20 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         # for element in activations_per_example_list:
         #     print(">>> activations list element size - " + str(element.size()))
 
-        if not input_network_produces_multiple_output_directions:
-            raise RuntimeError("input_network_produces_multiple_output_directions = "
-                               + str(input_network_produces_multiple_output_directions))
+        #if not input_network_produces_multiple_output_directions:
+        #    raise RuntimeError("input_network_produces_multiple_output_directions = "
+        #                       + str(input_network_produces_multiple_output_directions))
 
         activations_height_one = list([])
         for example_activations in activations_per_example_list:
 
-            if input_network_produces_multiple_output_directions:
-                # In this case the example_activations tensor is four dimensional, with
+            #if input_network_produces_multiple_output_directions:
+            # In this case the example_activations tensor is four dimensional, with
                 # the second and third dimension being the height and width respectively
-                if not example_activations.size(0) == 1:
-                    raise RuntimeError("Expected dimension zero to be of size 1")
-                # Remove the first (bogus) dimension
-                example_activations = example_activations.squeeze(0)
+            if not example_activations.size(0) == 1:
+                raise RuntimeError("Expected dimension zero to be of size 1")
+            # Remove the first (bogus) dimension
+            example_activations = example_activations.squeeze(0)
 
             if example_activations.size(1) > 1:
                 # print("example_activations.size(): " + str(example_activations.size()))
@@ -384,6 +384,7 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         return activations_single_tensor, examples_activation_heights, examples_activation_widths
 
     def compute_activations_with_block_mdlstm(self, x):
+        # print(">>>Entered compute_activations_with_block_mdlstm...")
         # print("network_to_softmax_network - network input x sizes: " )
         # for element in x:
         #     print(">>> input list element size - " + str(element.size()))
@@ -419,8 +420,13 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         # de-chunk the chunked activations
         activations = NetworkToSoftMaxNetwork.dechunk_activations(activations_chunked, tensor_list_chunking)
 
+        #return NetworkToSoftMaxNetwork.get_activations_single_tensor_and_activation_heights_and_widths(
+        #    activations, self.input_network_produces_multiple_output_directions)
+        multiple_output_directions =  self.input_network_produces_multiple_output_directions or self.use_example_packing 
+        # print(">>> multiple_output_directions: " + str(multiple_output_directions))
         return NetworkToSoftMaxNetwork.get_activations_single_tensor_and_activation_heights_and_widths(
-            activations, self.input_network_produces_multiple_output_directions)
+            activations, multiple_output_directions)
+
 
     @staticmethod
     def resize_activations_block_mdlstm_minimal_padding(activations):
@@ -506,9 +512,14 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
                 # Retrieve the original order
                 activations = TensorListChunking.retrieve_original_order(activations_reordered, original_indices)
                 # activations = self.network(reordered_elements_list)
+                
+                #activations, examples_activation_heights, examples_activation_widths = \
+                #    NetworkToSoftMaxNetwork.get_activations_single_tensor_and_activation_heights_and_widths(
+                #        activations, self.input_network_produces_multiple_output_directions)           
                 activations, examples_activation_heights, examples_activation_widths = \
                     NetworkToSoftMaxNetwork.get_activations_single_tensor_and_activation_heights_and_widths(
-                        activations, self.input_network_produces_multiple_output_directions)
+                        activations, True)
+
 
             else:
                 last_minute_padding = LastMinutePadding(self.get_height_reduction_factor(),

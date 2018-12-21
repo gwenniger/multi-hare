@@ -645,6 +645,68 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
 
         return MultiDimensionalLSTMLayerPairStacking(multi_dimensional_lstm_layer_pairs)
 
+    @staticmethod
+    def create_mdlstm_half_layer_pair_network(
+            input_channels,
+            block_strided_convolution_block_size: SizeTwoDimensional,
+            mdlstm_layer_sizes: list,
+            compute_multi_directional: bool,
+            clamp_gradients: bool, use_dropout: bool,
+            use_bias_with_block_strided_convolution: bool,
+            use_example_packing: bool,
+            use_leaky_lp_cells: bool,
+            block_strided_convolution_layers_using_weight_sharing: list):
+
+        """
+        This class is mainly for testing purposes, to see if a memory leak occurs when only MLSTM layers 
+        are used, in order to make sure a memory leak is not located in the BlockStridedConvolution class.     
+        """
+
+        nonlinearity = "tanh"
+        layer_pairs_specific_parameters_list = MultiDimensionalLSTMLayerPairStacking. \
+            create_first_two_layer_pair_parameters_with_two_channels_per_direction_first_mdlstm_layer(
+                input_channels, None,
+                block_strided_convolution_block_size,
+                mdlstm_layer_sizes,
+                MultiDimensionalLSTMLayerPairStacking.mdlstm_parameter_creation_function,
+                block_strided_convolution_layers_using_weight_sharing,
+                use_dropout)
+
+        print("layers_pairs_specific_parameters_list: " + str(layer_pairs_specific_parameters_list))
+
+        multi_dimensional_lstm_layer_pairs = list([]) 
+        # Single Layer three (first two layers are layer pairs)
+        layer_index = 0
+
+        mdlstm_hidden_states_size = mdlstm_layer_sizes[0]
+
+        print("third_mdlstm_hidden_states_size_per_direction: " + str(mdlstm_layer_sizes[2]))
+
+        if compute_multi_directional:
+            third_mdlstm_layer = MultiDimensionalLSTM. \
+                create_multi_dimensional_lstm_fully_parallel(layer_index, input_channels, mdlstm_hidden_states_size,
+                                                             compute_multi_directional,
+                                                             clamp_gradients,
+                                                             use_dropout,
+                                                             use_example_packing,
+                                                             use_leaky_lp_cells,
+                                                             nonlinearity)
+        else:
+            third_mdlstm_layer = MultiDimensionalLSTM.create_multi_dimensional_lstm_fast(
+                layer_index, input_channels, mdlstm_hidden_states_size,
+                compute_multi_directional,
+                clamp_gradients,
+                use_dropout,
+                use_example_packing,
+                use_leaky_lp_cells,
+                nonlinearity)
+
+        multi_dimensional_lstm_layer_pairs.append(third_mdlstm_layer)
+
+        return MultiDimensionalLSTMLayerPairStacking(multi_dimensional_lstm_layer_pairs)
+
+
+
 
     @staticmethod
     def create_one_layer_pair_plus_second_block_convolution_layer_network(

@@ -942,6 +942,16 @@ class MDLSTMExamplesPacking:
 
         return result
 
+def create_test_activation_columns(height: int, number_of_columns: int):
+    result = list([])
+    for i in range(0, number_of_columns):
+        column = torch.ones(1, 1, height)
+        column = column.cuda()
+        result.append(column)
+    return result
+
+   
+
 
 def test_create_vertically_and_horizontally_packed_examples():
     print("test_create_vertically_and_horizontally_packed_examples...")
@@ -956,8 +966,16 @@ def test_create_vertically_and_horizontally_packed_examples():
     mdlstm_examples_packing = MDLSTMExamplesPacking.created_mdlstm_examples_packing(examples_list, 1)
     packed_examples, packed_examples_mask = mdlstm_examples_packing.\
         create_vertically_and_horizontally_packed_examples_and_mask_one_direction(examples_list)
+    
+    print("packed_examples.size(): " + str(packed_examples.size()))
+    height = packed_examples.size(2)
+    number_of_columns  = packed_examples.size(3)
+    test_activation_columns = create_test_activation_columns(height, number_of_columns)
+    mdlstm_examples_packing.extract_unskewed_examples_activations_from_activation_columns(test_activation_columns)    
 
-    mdlstm_examples_packing.extract_unskewed_activations_from_activation_tensor(packed_examples)
+    unskewed_activations = mdlstm_examples_packing.extract_unskewed_activations_from_activation_tensor(packed_examples)
+    for unskewed_activation_element in unskewed_activations:
+         print("unskewed_activation_element.size(): " + str(unskewed_activation_element.size()))
 
     # Visualize the packed_examples and the packed_examples_mask to check
     # that they are as expected
@@ -1022,7 +1040,7 @@ def test_pack_examples_produces_memory_leak():
     
     while True:
         # test_pack_examples()
-        test_create_vertically_and_horizontally_packed_examples()
+        mdlstm_examples_packing = test_create_vertically_and_horizontally_packed_examples()
 
 
 def main():

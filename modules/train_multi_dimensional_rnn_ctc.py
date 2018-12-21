@@ -371,6 +371,18 @@ def create_model(checkpoint, data_height: int, input_channels: int, hidden_state
     block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
 
     if use_network_structure_bluche:
+        
+        ### This is a test network for debugging a meory leak. Using this network instead of the 
+        # two and half layper pair network enables exculiding block-strided convolution layers as 
+        # a cause of the memory leak, enabling to narrow down the possible causes in the code. 
+        #multi_dimensional_rnn = MultiDimensionalLSTMLayerPairStacking.\
+        #    create_mdlstm_half_layer_pair_network(
+        #        input_channels, block_strided_convolution_block_size,
+        #        mdlstm_layer_sizes, compute_multi_directional, clamp_gradients, use_dropout,
+        #        opt.use_bias_in_block_strided_convolution,
+        #        use_example_packing, use_leaky_lp_cells,
+        #        block_strided_convolution_layers_using_weight_sharing)
+
         multi_dimensional_rnn = MultiDimensionalLSTMLayerPairStacking. \
             create_mdlstm_two_and_half_layer_pair_network_with_two_channels_per_direction_first_mdlstm_layer(
                 input_channels, block_strided_convolution_block_size,
@@ -845,7 +857,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     # Possibly a batch size of 128 leads to more instability in training?
     #batch_size = 128
 
-    compute_multi_directional = True
+    compute_multi_directional = False
     # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
     use_dropout = False
 
@@ -860,7 +872,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     image_input_is_unsigned_int = False
     use_block_mdlstm = False
     perform_horizontal_batch_padding_in_data_loader = False
-    use_example_packing = True
+    use_example_packing = False
     use_leaky_lp_cells = opt.use_leaky_lp_cells
     use_network_structure_bluche = opt.use_network_structure_bluche
     share_weights_across_directions_in_fully_connected_layer = \

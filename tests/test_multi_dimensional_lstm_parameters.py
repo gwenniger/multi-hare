@@ -23,7 +23,7 @@ class TestMultiDimensionalLSTMParameters:
         This test strives to test if mdlstm parameters are leaking memory, by observing
         memory usage over time with top while running this test. However, looking at
         virtual and reserved memory with top, it is not very clear whether memory is actually leaked.
-        What is clear is that the involved methods cause memory usag to fluctuate quite a bit.
+        What is clear is that the involved methods cause memory usage to fluctuate quite a bit.
 
         :return:
         """
