@@ -35,7 +35,14 @@ class Evaluator:
 
         result = ''.join([vocab[x] for x in tokens[0:seq_len]])
 
-        # print("convert_to_string - result: " + str(result))
+        # Somehow the decoder with language model sometimes produces output
+        # that ends with a word separator. This can never be right, so the last 
+        # word separator is deterministically removed in this case. 
+        # TODO: This is of course a hack, though an acceptable one, but it should rather be fixed in the decoder
+        if result.endswith(Evaluator.WORD_SEPARATOR_SYMBOL):
+            result = result[0:len(result) - 1]	
+
+	# print("convert_to_string - result: " + str(result))
         return result
 
     @staticmethod
