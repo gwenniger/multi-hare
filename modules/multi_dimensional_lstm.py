@@ -814,9 +814,10 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # previous memory state column. This is following the Leifert technical report, which shows a digram of 
             # the Leaky LP cell. See: http://ftp.math.uni-rostock.de/pub/preprint/2012/pre12_04.pdf
             # This is a fix, earlier was uing "previous_memory_state_column" here, which was also giving decent results.
+            # output_gates_memory_state_column = \
+            #    mdlstm_parameters.compute_output_gate_memory_state_weighted_input(new_memory_state)
             output_gates_memory_state_column = \
-                mdlstm_parameters.compute_output_gate_memory_state_weighted_input(new_memory_state)
-
+                mdlstm_parameters.compute_output_gate_memory_state_weighted_input(previous_memory_state_column)
             # print(">>>> output_gates_memory_state_column: " + str(output_gates_memory_state_column))
             # print(">>>> output_gates_memory_state_column.size(): " + str(output_gates_memory_state_column.size()))
             output_gates_memory_state_columns = torch.chunk(output_gates_memory_state_column, 2, 1)

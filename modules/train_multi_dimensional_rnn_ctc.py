@@ -774,6 +774,18 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
 
         print('Finished Training')
 
+        print('Evaluation on validation set with language model...')
+
+        print("<validation evaluation, model epoch " + str(opt.epochs) + " >")
+        Evaluator.evaluate_mdrnn(validation_loader, network, device, vocab_list, blank_symbol,
+                                 width_reduction_factor, image_input_is_unsigned_int,
+                                 perform_horizontal_batch_padding,
+                                 LanguageModelParameters(opt.language_model_file_path,
+                                                         opt.language_model_weight,
+                                                         opt.word_insertion_penalty), None, None, None)
+
+        print("</validation evaluation, model epoch " + str(opt.epochs) + " >")
+
         print('Evaluation on test set...')
 
         print("<test evaluation, model epoch " + str(opt.epochs) + " >")
@@ -781,6 +793,13 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
         # multi_dimensional_rnn.set_training(False) # Normal case
 
         real_model.set_training(False)  # When using DataParallel
+        # Test evaluation without language model
+        print("Perform test evaluation without language model...")
+        Evaluator.evaluate_mdrnn(test_loader, network, device, vocab_list, blank_symbol,
+                                 width_reduction_factor, image_input_is_unsigned_int,
+                                 perform_horizontal_batch_padding, None, None, None, None)
+        # Test evaluation with language model
+        print("Perform test evaluation with language model...")
         Evaluator.evaluate_mdrnn(test_loader, network, device, vocab_list, blank_symbol,
                                  width_reduction_factor, image_input_is_unsigned_int,
                                  perform_horizontal_batch_padding,
@@ -1018,7 +1037,7 @@ def iam_line_recognition(model_opt, checkpoint):
             use_example_packing = True
             use_leaky_lp_cells = opt.use_leaky_lp_cells
             use_network_structure_bluche = opt.use_network_structure_bluche
-            mdlstm_layer_sizes = get_and_check_mdlstm_layer_sizes(model_opt)
+            mdlstm_layer_sizes = get_and_check_mdlstm_layer_sizes(opt)
             share_weights_across_directions_in_fully_connected_layer = \
                 opt.share_weights_across_directions_in_fully_connected_layer
             block_strided_convolution_layers_using_weight_sharing =\
