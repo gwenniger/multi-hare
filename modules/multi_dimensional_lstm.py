@@ -292,8 +292,17 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                     create_vertically_and_horizontally_packed_examples_and_mask_one_direction(examples)
                 number_of_images = 1
         else:
-            # Create a binary mask that tells which of the cell positions are valid and which are not
-            skewed_images_variable = ImageInputTransformer.create_skewed_images_variable_four_dim(examples)
+            if self.compute_multi_directional():
+                skewed_images_variable_direction_one = \
+                    ImageInputTransformer.create_skewed_images_variable_four_dim(examples)
+                tensor_flippings = MDLSTMExamplesPacking.create_four_directions_tensor_flippings()
+                skewed_images_variable = MDLSTMExamplesPacking.\
+                    create_multi_directional_examples_stacked_on_channel_direction(
+                        skewed_images_variable_direction_one, tensor_flippings)
+            else:
+                # Create a binary mask that tells which of the cell positions are valid and which are not
+                skewed_images_variable = ImageInputTransformer.create_skewed_images_variable_four_dim(examples)
+
             mask = ImageInputTransformer.create_skewed_images_mask_two_dim(examples)
             number_of_images = examples.size(0)
             mdlstm_examples_packing = None
@@ -814,10 +823,10 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # previous memory state column. This is following the Leifert technical report, which shows a digram of 
             # the Leaky LP cell. See: http://ftp.math.uni-rostock.de/pub/preprint/2012/pre12_04.pdf
             # This is a fix, earlier was uing "previous_memory_state_column" here, which was also giving decent results.
-            # output_gates_memory_state_column = \
-            #    mdlstm_parameters.compute_output_gate_memory_state_weighted_input(new_memory_state)
             output_gates_memory_state_column = \
-                mdlstm_parameters.compute_output_gate_memory_state_weighted_input(previous_memory_state_column)
+                mdlstm_parameters.compute_output_gate_memory_state_weighted_input(new_memory_state)
+            # output_gates_memory_state_column = \
+            #    mdlstm_parameters.compute_output_gate_memory_state_weighted_input(previous_memory_state_column)
             # print(">>>> output_gates_memory_state_column: " + str(output_gates_memory_state_column))
             # print(">>>> output_gates_memory_state_column.size(): " + str(output_gates_memory_state_column.size()))
             output_gates_memory_state_columns = torch.chunk(output_gates_memory_state_column, 2, 1)
@@ -963,7 +972,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         #       + str(util.timing.milliseconds_since(time_start_network_forward)))
 
         # for i, element in enumerate(result):
-        #     print("MDLSTM - result[" + str(i) + "].size(): " + str(element.size()))
+        #    print("MDLSTM - result[" + str(i) + "].size(): " + str(element.size()))
 
         # Dropout is applied to the output of the MDLSTM layer, as in the paper
         # "Dropout improves Recurrent Neural Networks for Handwriting Recognition"
@@ -971,6 +980,10 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             for example_result in result:
                 # Dropout is done in place, to save memory
                 F.dropout(example_result, p=0.5, training=self.training, inplace=True)
+
+        if self.compute_multi_directional() and not self.use_example_packing:
+            # Concatenate the list of 3D tensors in result on the zeroth dimension
+            result = torch.stack(result, 0)
 
         return result
 

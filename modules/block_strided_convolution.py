@@ -144,6 +144,12 @@ class BlockStridedConvolution(Module):
         # result = InsideModelGradientClamping.register_gradient_clamping(result)
         return result
 
+    @staticmethod
+    def chunk_four_parts_on_channel_dimension_and_sum(tensor):
+        results_per_direction = torch.chunk(tensor, 4, 1)
+        result = torch.sum(torch.stack(results_per_direction, 0), 0)
+        return result
+
     def compute_forward_from_chunked_input(self, x_chunked, tensor_list_chunking):
 
         result = self.compute_forward_one_directional(x_chunked)
@@ -164,8 +170,7 @@ class BlockStridedConvolution(Module):
         # If the weights are shared across directions, this summation has already been done over the inputs
         # before computing the convolution
         if self.compute_multi_directional and not self.share_weights_across_directions:
-            results_per_direction = torch.chunk(result, 4, 1)
-            result = torch.sum(torch.stack(results_per_direction, 0), 0)
+            result = BlockStridedConvolution.chunk_four_parts_on_channel_dimension_and_sum(result)
             # result = TensorUtils.sum_list_of_tensors(results_per_direction)
 
         if self.use_example_packing:
@@ -230,6 +235,16 @@ class BlockStridedConvolution(Module):
         #     check_dechunking_chunked_tensor_list_recovers_original(tensor_list_chunking, x_three_dim, x_chunked)
         return x_chunked, tensor_list_chunking
 
+    @staticmethod
+    def sum_channels_four_directions(x_chunked):
+        # print("x_chunked.size(): " + str(x_chunked.size()))
+        x_chunked_split_by_channels = torch.chunk(x_chunked, 4, 1)
+        stacked_channels = torch.stack(x_chunked_split_by_channels, 0)
+        # print("stacked_channels.size(): " + str(stacked_channels.size()))
+        x_chunked_summed_channels = torch.sum(stacked_channels, 0)
+        # print("x_chunked_summed_channels.size(): " + str(x_chunked_summed_channels.size()))
+        return x_chunked_summed_channels
+
     def forward(self, x):
 
         """
@@ -258,12 +273,7 @@ class BlockStridedConvolution(Module):
             if self.compute_multi_directional:
 
                 if self.share_weights_across_directions:
-                    # print("x_chunked.size(): " + str(x_chunked.size()))
-                    x_chunked_split_by_channels = torch.chunk(x_chunked, 4, 1)
-                    stacked_channels = torch.stack(x_chunked_split_by_channels, 0)
-                    # print("stacked_channels.size(): " + str(stacked_channels.size()))
-                    x_chunked_summed_channels = torch.sum(stacked_channels, 0)
-                    # print("x_chunked_summed_channels.size(): " + str(x_chunked_summed_channels.size()))
+                    x_chunked_summed_channels = BlockStridedConvolution.sum_channels_four_directions(x_chunked)
                     activations_summed = self.compute_forward_from_chunked_input(
                         x_chunked_summed_channels, tensor_list_chunking)
 
@@ -297,7 +307,16 @@ class BlockStridedConvolution(Module):
                     x_chunked, tensor_list_chunking)
                 return activations
         else:
-            return self.compute_forward_one_directional(x)
+            if self.compute_multi_directional:
+                if self.share_weights_across_directions:
+                    x_summed_channels = BlockStridedConvolution.sum_channels_four_directions(x)
+                    return self.compute_forward_one_directional(x_summed_channels)
+                else:
+                    result = self.compute_forward_one_directional(x)
+                    result = BlockStridedConvolution.chunk_four_parts_on_channel_dimension_and_sum(result)
+                    return result
+            else:
+                return self.compute_forward_one_directional(x)
 
     def get_width_reduction_factor(self):
         return self.block_size.width

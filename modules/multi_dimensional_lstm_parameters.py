@@ -1479,9 +1479,15 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
         #      + str(self.bladie_input_column_index))
         input_column = self.skewed_images_variable[:, :, :, self.next_input_column_index]
 
-        # print("prepare_computation_next_column_functions - input_column: " + str(input_column))
+        if input_column.size(1) < self.number_of_directions:
+            raise RuntimeError("Error: input_column.size(1) = " + str(input_column.size(1)) +
+                               ", but it should be a multiple of self.number_of_directions = " +
+                               str(self.number_of_directions))
+        # print("prepare_computation_next_column_functions - input_column.size(): " + str(input_column.size()))
         input_columns_split_by_direction = torch.chunk(input_column,
                                                        self.number_of_directions, 1)
+        # print(">>> self.number_of_directions: " + str(self.number_of_directions))
+        # print(">>> len(input_columns_split_by_direction): " + str(len(input_columns_split_by_direction)))
 
         computation_arguments_list = list([])
         for i in range(0, self.number_of_directions):

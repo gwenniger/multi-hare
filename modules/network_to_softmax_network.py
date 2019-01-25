@@ -427,7 +427,6 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
         return NetworkToSoftMaxNetwork.get_activations_single_tensor_and_activation_heights_and_widths(
             activations, multiple_output_directions)
 
-
     @staticmethod
     def resize_activations_block_mdlstm_minimal_padding(activations):
         # In this case there is no batch dimension, activations has three dimensions:
@@ -451,8 +450,13 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
 
         activations_with_swapped_channels_and_width = activations_height_removed.transpose(1, 2)
         # Change view to remove the batch dimension
+        # activations_resized_no_batch_dimension = activations_with_swapped_channels_and_width.contiguous(). \
+        #    view(-1, self.number_of_output_channels)
+        # Use activations.size(1) to determine number of output channels, because self.number_of_output_channels
+        # does not include the directions so gives the wrong number here
+        number_of_output_channels = activations.size(1)
         activations_resized_no_batch_dimension = activations_with_swapped_channels_and_width.contiguous(). \
-            view(-1, self.number_of_output_channels)
+            view(-1, number_of_output_channels)
         return activations_resized_no_batch_dimension
 
     @staticmethod
@@ -568,14 +572,16 @@ class NetworkToSoftMaxNetwork(torch.nn.Module):
 
         # Restructure the activations to be 2-dimensional, with the first dimension
         # the number of activations and the second dimension the number of channels
+        # print(">>> network_to_softmax_network: activations.size(): " +
+        #      str(activations.size()))
         if (self.use_block_mdlstm or self.use_example_packing) and self.input_is_list:
             activations_resized_two_dimensional = \
                 NetworkToSoftMaxNetwork.resize_activations_block_mdlstm_minimal_padding(activations)
         else:
             activations_resized_two_dimensional = self.resize_activations_padded_batch(activations)
 
-
-        # print("activations_resized_no_height: " + str(activations_resized_no_height))
+        # print(">>> network_to_softmax_network: activations_resized_two_dimensional.size(): " +
+        #      str(activations_resized_two_dimensional.size()))
         class_activations = self.fully_connected_layer(activations_resized_two_dimensional)
 
         if self.clamp_gradients:

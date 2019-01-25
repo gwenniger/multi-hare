@@ -928,6 +928,8 @@ class MDLSTMExamplesPacking:
         tensor_flipping_list = MDLSTMExamplesPacking.create_four_directions_tensor_flippings()
         result = list([])
         for tensor in activations_unskewed:
+            # print(">>> extract_flipped_back_activations_from_unskewed_activations - tensor.size(): " + str(tensor.size()))
+
             direction_tensors = torch.chunk(tensor, 4, 1)
 
             cat_list = list([])
