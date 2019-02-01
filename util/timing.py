@@ -28,7 +28,11 @@ def date_time_start():
     return datetime.datetime.now()
 
 
-def milliseconds_since(since: datetime):
+def seconds_since(since: datetime):
     b = datetime.datetime.now()
     c = b - since
-    return c.total_seconds() * 1000
+    return c.total_seconds()
+
+
+def milliseconds_since(since: datetime):
+    return seconds_since(since) * 1000
