@@ -183,8 +183,7 @@ class Evaluator:
     def epoch_statistics_line_part(epoch_statistics: EpochStatistics):
         result = ""
         for gpu_index in epoch_statistics.gpus_memory_usage_statistics.keys():
-            gpu_memory_usage_statistics: GpuMemoryUsageStatistics = \
-                epoch_statistics.gpus_memory_usage_statistics[gpu_index]
+            gpu_memory_usage_statistics = epoch_statistics.gpus_memory_usage_statistics[gpu_index]
             result += str(gpu_memory_usage_statistics.get_min_memory_usage()) + "," + \
                 str(gpu_memory_usage_statistics.get_max_memory_usage()) + "," + \
                 str(Evaluator.reduce_decimals(gpu_memory_usage_statistics.get_mean_memory_usage(), 2)) + "," + \
