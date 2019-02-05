@@ -388,7 +388,7 @@ class TensorListChunking:
     """
     def dechunk_block_tensor_concatenated_along_batch_dimension_changed_block_size(self, tensor: torch.tensor,
                                                                                    block_size: SizeTwoDimensional):
-        time_start = util.timing.date_time_start()
+        time_start = util.timing.date_time_now()
 
         number_of_examples = len(self.original_sizes)
 

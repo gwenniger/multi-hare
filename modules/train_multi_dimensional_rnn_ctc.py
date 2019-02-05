@@ -24,7 +24,9 @@ from modules.trainer import ModelProperties
 from modules.trainer import Trainer
 from modules.evaluator import Evaluator
 from modules.evaluator import LanguageModelParameters
+from modules.evaluator import EpochStatistics
 from modules.optim import Optim
+from util.nvidia_smi_memory_usage_statistics_collector import NvidiaSmiMemoryStatisticsCollector
 import os
 import opts
 
@@ -752,11 +754,23 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
             # print("Time used for this batch: " + str(util.timing.time_since(time_start_batch)))
 
             input_is_list = perform_horizontal_batch_padding and not perform_horizontal_batch_padding_in_data_loader
-            average_loss_per_minibatch = trainer.train_one_epoch(
+            nvidia_memory_statistics_collector = \
+                NvidiaSmiMemoryStatisticsCollector.create_nvidai_smi_memory_statistics_collector(1, device_ids)
+            handle = nvidia_memory_statistics_collector.collect_statistics_threaded()
+            time_start = util.timing.date_time_now()
+            average_loss_per_minibatch,  total_examples = trainer.train_one_epoch(
                 train_loader, epoch, start, batch_size, device, input_is_list)
+            # nvidia_memory_statistics_collector runs the memory usage statistics collection in a separate
+            # thread. Therefore, the flag "perform_collection" must be set to false by calling the "stop_collecting"
+            # method, so that the method "collect_statistics_threaded" knows it has to stop collecting.
+            nvidia_memory_statistics_collector.stop_collecting()
+            handle.join()
 
             # Update the iteration / minibatch number
             iteration += 1
+            time_end = util.timing.date_time_now()
+            epoch_statistics = EpochStatistics(total_examples, average_loss_per_minibatch, time_start, time_end,
+                                               nvidia_memory_statistics_collector.gpus_memory_usage_statistics)
 
             print("<validation evaluation epoch " + str(epoch) + " >")
             # Run evaluation
@@ -766,7 +780,7 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
                                                         width_reduction_factor, image_input_is_unsigned_int,
                                                         perform_horizontal_batch_padding, None,
                                                         opt.save_score_table_file_path, epoch,
-                                                        average_loss_per_minibatch)
+                                                        epoch_statistics)
             real_model.set_training(True)  # When using DataParallel
             print("</validation evaluation epoch " + str(epoch) + " >")
 
@@ -876,7 +890,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     # Possibly a batch size of 128 leads to more instability in training?
     #batch_size = 128
 
-    compute_multi_directional = False
+    compute_multi_directional = True
     # https://discuss.pytorch.org/t/dropout-changing-between-training-mode-and-eval-mode/6833
     use_dropout = False
 

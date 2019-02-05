@@ -8,8 +8,10 @@ from modules.validation_stats import ValidationStats
 from modules.network_to_softmax_network import NetworkToSoftMaxNetwork
 import evaluation_metrics.character_error_rate
 import evaluation_metrics.word_error_rate
+from util.nvidia_smi_memory_usage_statistics_collector import GpuMemoryUsageStatistics
 import re
 import os
+import util.timing
 
 
 class LanguageModelParameters:
@@ -20,6 +22,29 @@ class LanguageModelParameters:
         self.language_model_file_path = language_model_file_path
         self.language_model_weight = language_model_weight
         self.word_insertion_penalty = word_insertion_penalty
+
+
+class EpochStatistics:
+    def __init__(self, total_examples: int,
+                 average_loss_per_minibatch: float, time_start, time_end,
+                 gpus_memory_usage_statistics: dict):
+        self.total_examples = total_examples
+        self.average_loss_per_minibatch = average_loss_per_minibatch
+        self.time_start = time_start
+        self.time_end = time_end
+        self.gpus_memory_usage_statistics = gpus_memory_usage_statistics
+
+    def time_passed_in_seconds(self):
+        return util.timing.seconds_since_static(self.time_start, self.time_end)
+
+    def get_number_of_used_gpus(self):
+        return len(self.gpus_memory_usage_statistics.keys())
+
+    def get_number_of_examples(self):
+        return self.total_examples
+
+    def get_number_of_examples_per_second(self):
+        return float(self.get_number_of_examples()) / self.time_passed_in_seconds()
 
 
 class Evaluator:
@@ -42,7 +67,7 @@ class Evaluator:
         if result.endswith(Evaluator.WORD_SEPARATOR_SYMBOL):
             result = result[0:len(result) - 1]	
 
-	# print("convert_to_string - result: " + str(result))
+        # print("convert_to_string - result: " + str(result))
         return result
 
     @staticmethod
@@ -134,19 +159,58 @@ class Evaluator:
         return sequence_lengths
 
     @staticmethod
-    def score_table_header(dev_set_size: int):
+    def gpu_index_prefix(gpu_index):
+        return "gpu_" + str(gpu_index) + "_"
+
+    @staticmethod
+    def epoch_statistics_header_part(epoch_statistics: EpochStatistics):
+        result = ""
+        for gpu_index in epoch_statistics.gpus_memory_usage_statistics.keys():
+            # gpu_memory_usage_statistics = epoch_statistics.gpus_memory_usage_statistics[gpu_index]
+            result += Evaluator.gpu_index_prefix(gpu_index) + "min_memory_usage" + "," + \
+                      Evaluator.gpu_index_prefix(gpu_index) + "max_memory_usage" + "," + \
+                      Evaluator.gpu_index_prefix(gpu_index) + "mean_memory_usage" + "," + \
+                      Evaluator.gpu_index_prefix(gpu_index) + "stdev_memory_usage" + ","
+        return result
+
+    @staticmethod
+    def reduce_decimals(input_number: float, decimals: int):
+        format_string = "{0:." + str(decimals) + "f}"
+        # print("format_string: " + str(format_string))
+        return float(format_string.format(input_number))
+
+    @staticmethod
+    def epoch_statistics_line_part(epoch_statistics: EpochStatistics):
+        result = ""
+        for gpu_index in epoch_statistics.gpus_memory_usage_statistics.keys():
+            gpu_memory_usage_statistics: GpuMemoryUsageStatistics = \
+                epoch_statistics.gpus_memory_usage_statistics[gpu_index]
+            result += str(gpu_memory_usage_statistics.get_min_memory_usage()) + "," + \
+                str(gpu_memory_usage_statistics.get_max_memory_usage()) + "," + \
+                str(Evaluator.reduce_decimals(gpu_memory_usage_statistics.get_mean_memory_usage(), 2)) + "," + \
+                str(Evaluator.reduce_decimals(gpu_memory_usage_statistics.get_stdev_memory_usage(), 2)) + ","
+        return result
+
+    @staticmethod
+    def score_table_header(dev_set_size: int, epoch_statistics: EpochStatistics):
         result = "Scores on the development set of size: " + str(dev_set_size) +"\n"
         result += "\nepoch_number,total_correct,accuracy,CER_including_word_separators[%]," \
-                  "CER_excluding_word_separators[%],WER[%],Average_training_CTC_loss_per_minibatch\n"
+                  "CER_excluding_word_separators[%],WER[%],Average_training_CTC_loss_per_minibatch," \
+                  "time_in_seconds,number_of_examples,examples_per_second," + \
+                  Evaluator.epoch_statistics_header_part(epoch_statistics) + "\n"
         return result
 
     @staticmethod
     def score_table_line(epoch_number: int, total_correct: int, accuracy: float,
                          cer_including_word_separators: float, cer_excluding_word_separator: float,
-                         wer: float, average_loss_per_minibatch: float):
+                         wer: float, epoch_statistics: EpochStatistics):
         result = str(epoch_number) + "," + str(total_correct) + "," + str(accuracy) + "," +\
                  str(cer_including_word_separators) + "," + str(cer_excluding_word_separator) + "," + str(wer) +\
-                 "," + str(average_loss_per_minibatch)
+                 "," + str(epoch_statistics.average_loss_per_minibatch) + "," +\
+                 str(epoch_statistics.time_passed_in_seconds()) + "," +\
+                 str(epoch_statistics.get_number_of_examples()) + "," +\
+                 str(epoch_statistics.get_number_of_examples_per_second()) + "," +\
+                 Evaluator.epoch_statistics_line_part(epoch_statistics)
         return result
 
     @staticmethod
@@ -154,7 +218,7 @@ class Evaluator:
                        vocab_list: list, blank_symbol: str, horizontal_reduction_factor: int,
                        image_input_is_unsigned_int: bool, minimize_horizontal_padding: bool,
                        language_model_parameters: LanguageModelParameters,
-                       save_score_table_file_path: str, epoch_number: int, average_loss_per_minibatch: float):
+                       save_score_table_file_path: str, epoch_number: int, epoch_statistics: EpochStatistics):
 
         correct = 0
         total = 0
@@ -294,12 +358,12 @@ class Evaluator:
             # Opens the file in append-mode, create if it doesn't exists
             with open(save_score_table_file_path, "a") as scores_table_file:
                 if not score_file_existed:
-                    scores_table_file.write(Evaluator.score_table_header(total_examples))
+                    scores_table_file.write(Evaluator.score_table_header(total_examples, epoch_statistics))
                 scores_table_file.write(Evaluator.score_table_line(epoch_number, correct,
                                                                    validation_stats.get_accuracy(),
                                                                    cer_including_word_separators,
                                                                    cer_excluding_word_separators,
                                                                    wer,
-                                                                   average_loss_per_minibatch) + "\n")
+                                                                   epoch_statistics) + "\n")
 
         return validation_stats

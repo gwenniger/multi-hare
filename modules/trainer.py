@@ -83,7 +83,7 @@ class Trainer:
             train_loader: the train loader,
             start: time in seconds training started
 
-        return: Average loss per minibatch
+        return: Average loss per minibatch, total_examples
 
         """
         # if isinstance(self.model, torch.nn.DataParallel):
@@ -95,6 +95,7 @@ class Trainer:
         gradient_norms_sum = 0
         running_loss = 0.0
         total_summed_loss_epoch = 0.0
+        total_examples = 0
         number_of_minibatches = 0
         time_start = time.time()
         for i, data in enumerate(train_loader, 0):
@@ -145,7 +146,7 @@ class Trainer:
             # print("train_multi_dimensional_rnn_ctc.train_mdrnn - inputs.size(): " + str(inputs.size()))
             # print("train_multi_dimensional_rnn_ctc.train_mdrnn - inputs: " + str(inputs))
 
-            time_start_network_forward = util.timing.date_time_start()
+            time_start_network_forward = util.timing.date_time_now()
             max_input_width = NetworkToSoftMaxNetwork.get_max_input_width(inputs)
             outputs = self.model(inputs, max_input_width)
             # print("Time used for network forward: " + str(util.timing.milliseconds_since(time_start_network_forward)))
@@ -166,12 +167,13 @@ class Trainer:
             else:
                 number_of_examples = inputs.size(0)
 
-            time_start_ctc_loss_computation = util.timing.date_time_start()
+            time_start_ctc_loss_computation = util.timing.date_time_now()
             # print("trainer - outputs.size(): " + str(outputs.size()))
             loss = self.warp_ctc_loss_interface.compute_ctc_loss(outputs,
                                                                  labels,
                                                                  number_of_examples,
                                                                  self.model_properties.width_reduction_factor)
+            total_examples += number_of_examples
 
             # print("Time used for ctc loss computation: " +
             # str(util.timing.milliseconds_since(time_start_ctc_loss_computation)))
@@ -192,7 +194,7 @@ class Trainer:
             # print("loss: " + str(loss))
             # loss = criterion(outputs, labels)
 
-            time_start_loss_backward = util.timing.date_time_start()
+            time_start_loss_backward = util.timing.date_time_now()
 
             # zero the parameter gradients
             self.optimizer.zero_grad()
@@ -260,10 +262,10 @@ class Trainer:
                 print(">>> Time used in current epoch: " +
                       str(util.timing.time_since_and_expected_remaining_time(time_start, percent)))
                 sys.stdout.flush()
-            number_of_minibatches +=1
+            number_of_minibatches += 1
 
         average_loss_per_minibatch = total_summed_loss_epoch / number_of_minibatches
-        return average_loss_per_minibatch
+        return average_loss_per_minibatch,  total_examples
 
     def get_real_model(self):
         real_model = custom_data_parallel.data_parallel.get_real_model(self.model)

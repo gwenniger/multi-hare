@@ -27,6 +27,7 @@ def get_train_set():
 
     root = project_root + '/data'
     download = False  # download MNIST dataset or not
+    # download = True  # download MNIST dataset or not
 
     # Scaling to size 32*32
     trans = transforms.Compose(
@@ -49,6 +50,7 @@ def get_test_set():
 
     root = project_root + '/data'
     download = False  # download MNIST dataset or not
+    # download = True  # download MNIST dataset or not
 
     # Scaling to size 32*32
     trans = transforms.Compose(

@@ -24,15 +24,25 @@ def time_since_and_expected_remaining_time(since, percent):
     return '%s (- "expected time remaining: %s)' % (as_minutes(s), as_minutes(rs))
 
 
-def date_time_start():
+def date_time_now():
     return datetime.datetime.now()
 
 
-def seconds_since(since: datetime):
-    b = datetime.datetime.now()
-    c = b - since
+def seconds_since_static(time_start: datetime, time_end: datetime):
+    c = time_end - time_start
     return c.total_seconds()
 
 
+def seconds_since(since: datetime):
+    time_end = datetime.datetime.now()
+    return seconds_since_static(since, time_end)
+
+
+def milliseconds_since_static(time_start: datetime, time_end: datetime):
+    c = time_end - time_start
+    return c.total_seconds() * 1000
+
+
 def milliseconds_since(since: datetime):
-    return seconds_since(since) * 1000
+    time_end = datetime.datetime.now()
+    return milliseconds_since_static(since, time_end) * 1000
