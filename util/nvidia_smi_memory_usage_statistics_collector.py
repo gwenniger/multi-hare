@@ -114,13 +114,18 @@ class NvidiaSmiMemoryStatisticsCollector:
         #        'nvidia-smi', '--query-gpu=memory.used',
         #        '--format=csv,nounits,noheader'
         #    ], encoding='utf-8')
-        
+
         # For python 3.5
         result = subprocess.check_output(
             [
                 'nvidia-smi', '--query-gpu=memory.used',
                 '--format=csv,nounits,noheader'
             ])
+        # In python 3.5 the "encoding" argument is not available, in order to get text
+        # therefore manual decoding is necessary, see:
+        # https://docs.python.org/3/library/subprocess.html#subprocess.check_output
+        # Convert byte stream to text
+        result = result.decode('utf-8')
         # Convert lines into a dictionary
         gpu_memory = [int(x) for x in result.strip().split('\n')]
         gpu_memory_map = dict(zip(range(len(gpu_memory)), gpu_memory))
