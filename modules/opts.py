@@ -37,6 +37,15 @@ def model_opts(parser):
     group.add_argument('-use_regular_mdlstm_layers', dest='use_block_mdlstm',
                        action='store_false')
 
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('-use_example_packing', dest='use_example_packing',
+                       help="""Whether or not to use example packing for more efficient 
+                       computation.""",
+                       action='store_true')
+    group.add_argument('-no_example_packing', dest='use_example_packing',
+                       help="""Whether or not to use example packing for more efficient 
+                           computation.""",
+                       action='store_false')
 
 
 def preprocess_opts(parser):

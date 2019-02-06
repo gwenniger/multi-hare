@@ -26,6 +26,7 @@ from modules.evaluator import Evaluator
 from modules.evaluator import LanguageModelParameters
 from modules.evaluator import EpochStatistics
 from modules.optim import Optim
+import data_preprocessing.padding_strategy
 from util.nvidia_smi_memory_usage_statistics_collector import NvidiaSmiMemoryStatisticsCollector
 import os
 import opts
@@ -972,6 +973,30 @@ def get_and_check_mdlstm_layer_sizes(model_opt):
     return mdlstm_layer_sizes
 
 
+def check_data_loader_has_right_collate_function(data_loader, perform_horizontal_batch_padding_in_data_loader: bool):
+    """
+    This function checks for inconsistencies between the data_loader's collate function and the requirement
+    that the data loader must perform (last-minute) horizontal batch padding through the collate
+    function. Because these two things must be consistent for the network to run without errors.
+
+    :param data_loader:
+    :param perform_horizontal_batch_padding_in_data_loader:
+    :return:
+    """
+    if perform_horizontal_batch_padding_in_data_loader:
+        print(">>> train_multi_dimensional_rnn_ctc - train_loader.collate_fn: " + str(data_loader.collate_fn))
+        if data_loader.collate_fn == data_preprocessing.padding_strategy.MinimalHorizontalPaddingStrategyBase. \
+                simple_collate_no_data_padding:
+            raise RuntimeError("Error : data loader uses simple collate function with no padding, "
+                               "but a collate function performing last-minute-padding inside the "
+                               "data loader "
+                               "(MinimalHorizontalPaddingStrategy.collate_horizontal_last_minute_data_padding) "
+                               "is required when using "
+                               "\"perform_horizontal_batch_padding_in_data_loader=True\" .\n"
+                               "Perhaps you are loading an earlier created dataloader that was "
+                               "created with perform_horizontal_batch_padding_in_data_loader=False?")
+
+
 def iam_line_recognition(model_opt, checkpoint):
         print("opt.language_model_file_path: " + str(opt.language_model_file_path))
 
@@ -1013,7 +1038,16 @@ def iam_line_recognition(model_opt, checkpoint):
             image_input_is_unsigned_int = False
             minimize_vertical_padding = True
             minimize_horizontal_padding = True
-            perform_horizontal_batch_padding_in_data_loader = False
+            
+            use_example_packing = opt.use_example_packing   #True
+
+            if use_example_packing:
+                perform_horizontal_batch_padding_in_data_loader = False
+            else:
+                perform_horizontal_batch_padding_in_data_loader = True
+
+            # perform_horizontal_batch_padding_in_data_loader = False
+  
             use_four_pixel_input_blocks = opt.use_four_pixel_input_blocks
 
             if use_four_pixel_input_blocks:
@@ -1027,6 +1061,8 @@ def iam_line_recognition(model_opt, checkpoint):
                 opt, iam_lines_dataset, batch_size, minimize_vertical_padding, minimize_horizontal_padding,
                 image_input_is_unsigned_int, perform_horizontal_batch_padding_in_data_loader,
                 use_four_pixel_input_blocks, permutation_save_or_load_file_path, dataset_save_or_load_file_path)
+            check_data_loader_has_right_collate_function(train_loader, perform_horizontal_batch_padding_in_data_loader)
+
 
             print("Loading IAM dataset: DONE")
 
@@ -1048,7 +1084,6 @@ def iam_line_recognition(model_opt, checkpoint):
             # https://discuss.pytorch.org/t/about-torch-nn-utils-clip-grad-norm/13873
             # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191
 
-            use_example_packing = True
             use_leaky_lp_cells = opt.use_leaky_lp_cells
             use_network_structure_bluche = opt.use_network_structure_bluche
             mdlstm_layer_sizes = get_and_check_mdlstm_layer_sizes(opt)
