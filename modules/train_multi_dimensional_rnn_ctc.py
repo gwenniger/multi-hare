@@ -987,14 +987,17 @@ def check_data_loader_has_right_collate_function(data_loader, perform_horizontal
         print(">>> train_multi_dimensional_rnn_ctc - train_loader.collate_fn: " + str(data_loader.collate_fn))
         if data_loader.collate_fn == data_preprocessing.padding_strategy.MinimalHorizontalPaddingStrategyBase. \
                 simple_collate_no_data_padding:
-            raise RuntimeError("Error : data loader uses simple collate function with no padding, "
+            print("Warning : data loader uses simple collate function with no padding, "
                                "but a collate function performing last-minute-padding inside the "
                                "data loader "
                                "(MinimalHorizontalPaddingStrategy.collate_horizontal_last_minute_data_padding) "
                                "is required when using "
                                "\"perform_horizontal_batch_padding_in_data_loader=True\" .\n"
                                "Perhaps you are loading an earlier created dataloader that was "
-                               "created with perform_horizontal_batch_padding_in_data_loader=False?")
+                               "created with perform_horizontal_batch_padding_in_data_loader=False?"
+                               "Replacing collate function to fix this...")
+            data_loader.collate_fn = data_preprocessing.padding_strategy.\
+                MinimalHorizontalPaddingStrategy.collate_horizontal_last_minute_data_padding
 
 
 def iam_line_recognition(model_opt, checkpoint):
@@ -1062,6 +1065,10 @@ def iam_line_recognition(model_opt, checkpoint):
                 image_input_is_unsigned_int, perform_horizontal_batch_padding_in_data_loader,
                 use_four_pixel_input_blocks, permutation_save_or_load_file_path, dataset_save_or_load_file_path)
             check_data_loader_has_right_collate_function(train_loader, perform_horizontal_batch_padding_in_data_loader)
+            check_data_loader_has_right_collate_function(validation_loader,
+                                                         perform_horizontal_batch_padding_in_data_loader)
+            check_data_loader_has_right_collate_function(test_loader,
+                                                         perform_horizontal_batch_padding_in_data_loader)
 
 
             print("Loading IAM dataset: DONE")
