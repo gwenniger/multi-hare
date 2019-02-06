@@ -973,7 +973,8 @@ def get_and_check_mdlstm_layer_sizes(model_opt):
     return mdlstm_layer_sizes
 
 
-def check_data_loader_has_right_collate_function(data_loader, perform_horizontal_batch_padding_in_data_loader: bool):
+def check_data_loader_has_right_collate_function_and_replace_if_necessary(
+        data_loader, perform_horizontal_batch_padding_in_data_loader: bool):
     """
     This function checks for inconsistencies between the data_loader's collate function and the requirement
     that the data loader must perform (last-minute) horizontal batch padding through the collate
@@ -988,14 +989,14 @@ def check_data_loader_has_right_collate_function(data_loader, perform_horizontal
         if data_loader.collate_fn == data_preprocessing.padding_strategy.MinimalHorizontalPaddingStrategyBase. \
                 simple_collate_no_data_padding:
             print("Warning : data loader uses simple collate function with no padding, "
-                               "but a collate function performing last-minute-padding inside the "
-                               "data loader "
-                               "(MinimalHorizontalPaddingStrategy.collate_horizontal_last_minute_data_padding) "
-                               "is required when using "
-                               "\"perform_horizontal_batch_padding_in_data_loader=True\" .\n"
-                               "Perhaps you are loading an earlier created dataloader that was "
-                               "created with perform_horizontal_batch_padding_in_data_loader=False?"
-                               "Replacing collate function to fix this...")
+                  "but a collate function performing last-minute-padding inside the ""
+                  "data loader "
+                  "(MinimalHorizontalPaddingStrategy.collate_horizontal_last_minute_data_padding) "
+                  "is required when using "
+                  "\"perform_horizontal_batch_padding_in_data_loader=True\" .\n"
+                  "Perhaps you are loading an earlier created dataloader that was "
+                  "created with perform_horizontal_batch_padding_in_data_loader=False?"
+                  "Replacing collate function to fix this...")
             data_loader.collate_fn = data_preprocessing.padding_strategy.\
                 MinimalHorizontalPaddingStrategy.collate_horizontal_last_minute_data_padding
 
@@ -1064,11 +1065,11 @@ def iam_line_recognition(model_opt, checkpoint):
                 opt, iam_lines_dataset, batch_size, minimize_vertical_padding, minimize_horizontal_padding,
                 image_input_is_unsigned_int, perform_horizontal_batch_padding_in_data_loader,
                 use_four_pixel_input_blocks, permutation_save_or_load_file_path, dataset_save_or_load_file_path)
-            check_data_loader_has_right_collate_function(train_loader, perform_horizontal_batch_padding_in_data_loader)
-            check_data_loader_has_right_collate_function(validation_loader,
-                                                         perform_horizontal_batch_padding_in_data_loader)
-            check_data_loader_has_right_collate_function(test_loader,
-                                                         perform_horizontal_batch_padding_in_data_loader)
+            check_data_loader_has_right_collate_function_and_replace_if_necessary(train_loader, perform_horizontal_batch_padding_in_data_loader)
+            check_data_loader_has_right_collate_function_and_replace_if_necessary(validation_loader,
+                                                                                  perform_horizontal_batch_padding_in_data_loader)
+            check_data_loader_has_right_collate_function_and_replace_if_necessary(test_loader,
+                                                                                  perform_horizontal_batch_padding_in_data_loader)
 
 
             print("Loading IAM dataset: DONE")
