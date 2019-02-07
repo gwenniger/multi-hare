@@ -39,15 +39,14 @@ class Trainer:
     # Reading the data and preserving it in this type is sort of tricky, so it is
     # best to check that the inputs is indeed of the expected type
     @staticmethod
-    def check_inputs_is_right_type(inputs, minimize_horizontal_padding: bool):
+    def check_inputs_is_right_type(inputs, input_is_list: bool):
         if Utils.use_cuda():
             expected_type_instance = torch.cuda.ByteTensor()
         else:
             expected_type_instance = torch.ByteTensor()
 
-        # If minimize_horizontal_padding is used, the inputs will be a list
-        # in this case just check the first element of the list
-        if minimize_horizontal_padding:
+        # If inputs is a list, check the first element of the list
+        if input_is_list:
             item_to_compare = inputs[0]
         else:
             item_to_compare = inputs

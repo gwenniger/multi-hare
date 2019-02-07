@@ -215,7 +215,7 @@ class Evaluator:
     @staticmethod
     def evaluate_mdrnn(test_loader, multi_dimensional_rnn, device,
                        vocab_list: list, blank_symbol: str, horizontal_reduction_factor: int,
-                       image_input_is_unsigned_int: bool, minimize_horizontal_padding: bool,
+                       image_input_is_unsigned_int: bool, input_is_list: bool,
                        language_model_parameters: LanguageModelParameters,
                        save_score_table_file_path: str, epoch_number: int, epoch_statistics: EpochStatistics):
 
@@ -231,7 +231,7 @@ class Evaluator:
             if Utils.use_cuda():
                 labels = labels.to(device)
 
-                if minimize_horizontal_padding:
+                if input_is_list:
                     inputs = Utils.move_tensor_list_to_device(inputs, device)
                 else:
                     inputs = inputs.to(device)
@@ -240,7 +240,7 @@ class Evaluator:
             # be converted to floats (after moving to GPU, i.e. directly on GPU
             # which is faster)
             if image_input_is_unsigned_int:
-                Trainer.check_inputs_is_right_type(inputs, minimize_horizontal_padding)
+                Trainer.check_inputs_is_right_type(inputs, input_is_list)
                 inputs = IamLinesDataset.convert_unsigned_int_image_tensor_or_list_to_float_image_tensor_or_list(inputs)
 
             # https://github.com/pytorch/pytorch/issues/235

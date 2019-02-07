@@ -685,7 +685,8 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
 
         data_height = get_data_height(train_loader)
         clamp_gradients = False
-        inputs_and_outputs_are_lists = perform_horizontal_batch_padding and not perform_horizontal_batch_padding_in_data_loader
+        inputs_and_outputs_are_lists = perform_horizontal_batch_padding and not \
+            perform_horizontal_batch_padding_in_data_loader
         network = create_model(checkpoint, data_height, input_channels, hidden_states_size,
                                compute_multi_directional, use_dropout, vocab_list,
                                clamp_gradients, data_set_name, inputs_and_outputs_are_lists,
@@ -779,7 +780,7 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
             real_model.set_training(False)  # When using DataParallel
             validation_stats = Evaluator.evaluate_mdrnn(validation_loader, network, device, vocab_list, blank_symbol,
                                                         width_reduction_factor, image_input_is_unsigned_int,
-                                                        perform_horizontal_batch_padding, None,
+                                                        inputs_and_outputs_are_lists, None,
                                                         opt.save_score_table_file_path, epoch,
                                                         epoch_statistics)
             real_model.set_training(True)  # When using DataParallel
@@ -794,7 +795,7 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
         print("<validation evaluation, model epoch " + str(opt.epochs) + " >")
         Evaluator.evaluate_mdrnn(validation_loader, network, device, vocab_list, blank_symbol,
                                  width_reduction_factor, image_input_is_unsigned_int,
-                                 perform_horizontal_batch_padding,
+                                 inputs_and_outputs_are_lists,
                                  LanguageModelParameters(opt.language_model_file_path,
                                                          opt.language_model_weight,
                                                          opt.word_insertion_penalty), None, None, None)
@@ -812,12 +813,12 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
         print("Perform test evaluation without language model...")
         Evaluator.evaluate_mdrnn(test_loader, network, device, vocab_list, blank_symbol,
                                  width_reduction_factor, image_input_is_unsigned_int,
-                                 perform_horizontal_batch_padding, None, None, None, None)
+                                 inputs_and_outputs_are_lists, None, None, None, None)
         # Test evaluation with language model
         print("Perform test evaluation with language model...")
         Evaluator.evaluate_mdrnn(test_loader, network, device, vocab_list, blank_symbol,
                                  width_reduction_factor, image_input_is_unsigned_int,
-                                 perform_horizontal_batch_padding,
+                                 inputs_and_outputs_are_lists,
                                  LanguageModelParameters(opt.language_model_file_path,
                                                          opt.language_model_weight,
                                                          opt.word_insertion_penalty), None, None, None)
@@ -989,7 +990,7 @@ def check_data_loader_has_right_collate_function_and_replace_if_necessary(
         if data_loader.collate_fn == data_preprocessing.padding_strategy.MinimalHorizontalPaddingStrategyBase. \
                 simple_collate_no_data_padding:
             print("Warning : data loader uses simple collate function with no padding, "
-                  "but a collate function performing last-minute-padding inside the ""
+                  "but a collate function performing last-minute-padding inside the "
                   "data loader "
                   "(MinimalHorizontalPaddingStrategy.collate_horizontal_last_minute_data_padding) "
                   "is required when using "
@@ -1065,11 +1066,12 @@ def iam_line_recognition(model_opt, checkpoint):
                 opt, iam_lines_dataset, batch_size, minimize_vertical_padding, minimize_horizontal_padding,
                 image_input_is_unsigned_int, perform_horizontal_batch_padding_in_data_loader,
                 use_four_pixel_input_blocks, permutation_save_or_load_file_path, dataset_save_or_load_file_path)
-            check_data_loader_has_right_collate_function_and_replace_if_necessary(train_loader, perform_horizontal_batch_padding_in_data_loader)
-            check_data_loader_has_right_collate_function_and_replace_if_necessary(validation_loader,
-                                                                                  perform_horizontal_batch_padding_in_data_loader)
-            check_data_loader_has_right_collate_function_and_replace_if_necessary(test_loader,
-                                                                                  perform_horizontal_batch_padding_in_data_loader)
+            check_data_loader_has_right_collate_function_and_replace_if_necessary(
+                train_loader, perform_horizontal_batch_padding_in_data_loader)
+            check_data_loader_has_right_collate_function_and_replace_if_necessary(
+                validation_loader, perform_horizontal_batch_padding_in_data_loader)
+            check_data_loader_has_right_collate_function_and_replace_if_necessary(
+                test_loader, perform_horizontal_batch_padding_in_data_loader)
 
 
             print("Loading IAM dataset: DONE")
