@@ -1160,8 +1160,12 @@ def iam_word_recognition(model_opt, checkpoint):
     with torch.cuda.device(device_ids[0]):
 
         print("Loading IAM dataset...")
+        block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
+        number_of_block_strided_convolution_layers_for_computing_padding = 2
+
         iam_words_dataset = IamLinesDataset.create_iam_words_dataset_from_input_files(
-            lines_file_path, iam_database_word_images_root_folder_path, opt.vocabulary_file_path)
+            lines_file_path, iam_database_word_images_root_folder_path, opt.vocabulary_file_path, 
+            block_strided_convolution_block_size, number_of_block_strided_convolution_layers_for_computing_padding)
 
         # This vocab_list will be used by the decoder
         vocab_list = iam_words_dataset.get_vocabulary_list()
@@ -1216,6 +1220,7 @@ def iam_word_recognition(model_opt, checkpoint):
         use_block_mdlstm = opt.use_block_mdlstm
         use_leaky_lp_cells = opt.use_leaky_lp_cells
         use_network_structure_bluche = opt.use_network_structure_bluche
+        mdlstm_layer_sizes = get_and_check_mdlstm_layer_sizes(opt)
         share_weights_across_directions_in_fully_connected_layer = \
             opt.share_weights_across_directions_in_fully_connected_layer
 
@@ -1230,6 +1235,7 @@ def iam_word_recognition(model_opt, checkpoint):
                         use_block_mdlstm,
                         use_leaky_lp_cells,
                         use_network_structure_bluche,
+                        mdlstm_layer_sizes,
                         share_weights_across_directions_in_fully_connected_layer,
                         block_strided_convolution_layers_using_weight_sharing,
                         perform_horizontal_batch_padding_in_data_loader,
