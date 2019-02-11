@@ -756,6 +756,7 @@ def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test
             # print("Time used for this batch: " + str(util.timing.time_since(time_start_batch)))
 
             input_is_list = perform_horizontal_batch_padding and not perform_horizontal_batch_padding_in_data_loader
+            print(">>> input_is_list: " + str(input_is_list))
             nvidia_memory_statistics_collector = \
                 NvidiaSmiMemoryStatisticsCollector.create_nvidai_smi_memory_statistics_collector(1, device_ids)
             handle = nvidia_memory_statistics_collector.collect_statistics_threaded()
@@ -963,6 +964,15 @@ def create_iam_data_loaders(opt, iam_lines_dataset,
                 perform_horizontal_batch_padding_in_data_loader,
                 opt.save_dev_set_file_path,
                 opt.save_test_set_file_path)
+
+    # Fix the collate functions if necessary
+    check_data_loader_has_right_collate_function_and_replace_if_necessary(
+        train_loader, perform_horizontal_batch_padding_in_data_loader)
+    check_data_loader_has_right_collate_function_and_replace_if_necessary(
+        validation_loader, perform_horizontal_batch_padding_in_data_loader)
+    check_data_loader_has_right_collate_function_and_replace_if_necessary(
+        test_loader, perform_horizontal_batch_padding_in_data_loader)
+
     return train_loader, validation_loader, test_loader
 
 
@@ -1000,6 +1010,18 @@ def check_data_loader_has_right_collate_function_and_replace_if_necessary(
                   "Replacing collate function to fix this...")
             data_loader.collate_fn = data_preprocessing.padding_strategy.\
                 MinimalHorizontalPaddingStrategy.collate_horizontal_last_minute_data_padding
+
+
+def get_use_example_packing_and_perform_horizontal_batch_packing_in_data_loader():
+    use_example_packing = opt.use_example_packing   #True
+
+    if use_example_packing:
+        perform_horizontal_batch_padding_in_data_loader = False
+        print(">>> Use example packing...")
+    else:
+        perform_horizontal_batch_padding_in_data_loader = True
+        print(">>> Don't use example packing, perform (last-minute) horizontal batch padding in data loader...")
+    return use_example_packing, perform_horizontal_batch_padding_in_data_loader
 
 
 def iam_line_recognition(model_opt, checkpoint):
@@ -1044,14 +1066,10 @@ def iam_line_recognition(model_opt, checkpoint):
             minimize_vertical_padding = True
             minimize_horizontal_padding = True
             
-            use_example_packing = opt.use_example_packing   #True
-
-            if use_example_packing:
-                perform_horizontal_batch_padding_in_data_loader = False
-            else:
-                perform_horizontal_batch_padding_in_data_loader = True
-
+          
             # perform_horizontal_batch_padding_in_data_loader = False
+            use_example_packing, perform_horizontal_batch_padding_in_data_loader =\
+                get_use_example_packing_and_perform_horizontal_batch_packing_in_data_loader()
   
             use_four_pixel_input_blocks = opt.use_four_pixel_input_blocks
 
@@ -1066,12 +1084,7 @@ def iam_line_recognition(model_opt, checkpoint):
                 opt, iam_lines_dataset, batch_size, minimize_vertical_padding, minimize_horizontal_padding,
                 image_input_is_unsigned_int, perform_horizontal_batch_padding_in_data_loader,
                 use_four_pixel_input_blocks, permutation_save_or_load_file_path, dataset_save_or_load_file_path)
-            check_data_loader_has_right_collate_function_and_replace_if_necessary(
-                train_loader, perform_horizontal_batch_padding_in_data_loader)
-            check_data_loader_has_right_collate_function_and_replace_if_necessary(
-                validation_loader, perform_horizontal_batch_padding_in_data_loader)
-            check_data_loader_has_right_collate_function_and_replace_if_necessary(
-                test_loader, perform_horizontal_batch_padding_in_data_loader)
+
 
 
             print("Loading IAM dataset: DONE")
@@ -1176,8 +1189,8 @@ def iam_word_recognition(model_opt, checkpoint):
         minimize_vertical_padding = True
         minimize_horizontal_padding = True
         image_input_is_unsigned_int = False
-        perform_horizontal_batch_padding_in_data_loader = False
-        use_example_packing = True
+        use_example_packing, perform_horizontal_batch_padding_in_data_loader =\
+            get_use_example_packing_and_perform_horizontal_batch_packing_in_data_loader()
 
         dataset_save_or_load_file_path = opt.dataset_save_or_load_file_path
         use_four_pixel_input_blocks = opt.use_four_pixel_input_blocks
