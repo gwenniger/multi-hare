@@ -25,8 +25,13 @@ class TestMultiDimensionalLSTMParameters:
         virtual and reserved memory with top, it is not very clear whether memory is actually leaked.
         What is clear is that the involved methods cause memory usage to fluctuate quite a bit.
 
+        Update 13-6-2019: Adapted the code to use the GPU
+
         :return:
         """
+
+        # http://pytorch.org/docs/master/notes/cuda.html
+        device = torch.device("cuda:0")
 
         mdlstm_parameters = modules.multi_dimensional_lstm_parameters.\
             MultiDirectionalMultiDimensionalLSTMParametersFullyParallel.\
@@ -36,24 +41,29 @@ class TestMultiDimensionalLSTMParameters:
                     TestMultiDimensionalLSTMParameters.CLAMP_GRADIENTS,
                     TestMultiDimensionalLSTMParameters.USE_DROPOUT,
                     TestMultiDimensionalLSTMParameters.NUMBER_OF_DIRECTIONS)
+        mdlstm_parameters =  mdlstm_parameters.to(device)
         mask_width = TestMultiDimensionalLSTMParameters.NUMBER_OF_COLUMNS + \
             TestMultiDimensionalLSTMParameters.IMAGE_HEIGHT - 1
         mask = torch.ones(1, 2800,
                           TestMultiDimensionalLSTMParameters.IMAGE_HEIGHT)
+        mask = mask.to(device)
         skewed_images_variable = torch.ones(1,
                                             TestMultiDimensionalLSTMParameters.INPUT_CHANNELS *
                                             TestMultiDimensionalLSTMParameters.NUMBER_OF_DIRECTIONS,
                                             TestMultiDimensionalLSTMParameters.IMAGE_HEIGHT,
                                             mask_width)
+        skewed_images_variable = skewed_images_variable.to(device)
         while True:
             mdlstm_parameters.reset_next_input_column_index()
             for i in range(0, TestMultiDimensionalLSTMParameters.NUMBER_OF_COLUMNS):
                 previous_hidden_state_column = torch.zeros(
                     1, TestMultiDimensionalLSTMParameters.HIDDEN_STATES_SIZE * 4,
                     TestMultiDimensionalLSTMParameters.IMAGE_HEIGHT)
+                previous_hidden_state_column = previous_hidden_state_column.to(device)
                 previous_memory_state_column = torch.zeros(
                     1, TestMultiDimensionalLSTMParameters.HIDDEN_STATES_SIZE * 4,
                     TestMultiDimensionalLSTMParameters.IMAGE_HEIGHT)
+                previous_memory_state_column = previous_memory_state_column.to(device)
                 # This function call does not yet seem to cause a memory leak
                 mdlstm_parameters.prepare_input_convolutions(skewed_images_variable)
 
@@ -85,6 +95,7 @@ class TestMultiDimensionalLSTMParameters:
 
 def main():
     print("Testing...")
+    print("torch.cuda.is_available(): " + str(torch.cuda.is_available()))
     TestMultiDimensionalLSTMParameters.test_mdlstm_parameters_not_leaking_memory()
     # TestMultiDimensionalLSTMParameters.test_conv1d_with_grouping_itself_leaks_memory()
 

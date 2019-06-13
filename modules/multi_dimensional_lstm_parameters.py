@@ -825,6 +825,10 @@ class MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputCon
 
         return input_column_lists
 
+    def reset_next_input_column_index(self):
+        # Implemented for compatibility with multi_dimensional_lst class
+        return
+
     def prepare_input_convolutions(self, skewed_images_variable):
         # print("Entered MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution."
         #       "prepare_input_convolutions...")
