@@ -1,14 +1,15 @@
 #!/bin/bash
 
-#cd warp-ctc
-#mkdir build; cd build
-#cmake ..
-#make
-cd warp-ctc/warpctc/core
+cd warp-ctc
 mkdir build; cd build
-cmake ../../..
+cmake ..
 make
-cd ../../../
+cd ..
+#cd warp-ctc/warpctc_pytorch/core
+#mkdir build; cd build
+#cmake ../../..
+#make
+#cd ../../..
 
 
 
