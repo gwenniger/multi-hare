@@ -97,12 +97,12 @@ class BlockStridedConvolution(Module):
 
     def get_activation_function(self):
         if self.nonlinearity == "tanh":
-            activation_function = F.tanh
+            activation_function = torch.tanh
         elif self.nonlinearity == "relu":
             # func = self._backend.RNNReLUCell
             activation_function = F.relu
         elif self.nonlinearity == "sigmoid":
-            activation_function = F.sigmoid
+            activation_function = torch.sigmoid
         else:
             raise RuntimeError(
                 "Unknown nonlinearity: {}".format(self.nonlinearity))

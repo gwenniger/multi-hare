@@ -448,10 +448,10 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                                                       "mdlstm - input_states_plus_input")
 
             # Compute the input activation
-            input_activation_column = F.tanh(input_state_plus_input)
+            input_activation_column = torch.tanh(input_state_plus_input)
             #input_activation_column = F.relu(input_state_plus_input) # Relu can be used as an alternative to tanh
             # Compute the input gate activation
-            input_gate_activation_column = F.sigmoid(input_gate_weighted_states_plus_input)
+            input_gate_activation_column = torch.sigmoid(input_gate_weighted_states_plus_input)
 
             input_and_input_gate_combined = torch.mul(input_activation_column, input_gate_activation_column)
 
@@ -484,7 +484,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # print(">>> forget_gate_one_weighted_states_plus_input: " + str(forget_gate_one_weighted_states_plus_input))
 
             # Compute the forget gate one activation
-            forget_gate_one_activation_column = F.sigmoid(forget_gate_one_weighted_states_plus_input)
+            forget_gate_one_activation_column = torch.sigmoid(forget_gate_one_weighted_states_plus_input)
             # print("forget gate one activation column: " + str(forget_gate_one_activation_column))
 
             # Compute the activation for forget gate one
@@ -515,14 +515,14 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                         "mdlstm - forget_gate_two_weighted_states_plus_input")
 
             # Compute the forget gate two activation
-            forget_gate_two_activation_column = F.sigmoid(forget_gate_two_weighted_states_plus_input)
+            forget_gate_two_activation_column = torch.sigmoid(forget_gate_two_weighted_states_plus_input)
 
             # TensorUtils.print_max(forget_gate_one_activation_column, "forget_gate_one_activation_column")
             # TensorUtils.print_max(forget_gate_two_activation_column, "forget_gate_two_activation_column")
 
 
             # forget_gate_weighted_states_combined =  forget_gate_one_weighted_stated_plus_input + forget_gate_two_weighted_stated_plus_input
-            # forget_gates_combined_activation_column = F.sigmoid(forget_gate_weighted_states_combined)
+            # forget_gates_combined_activation_column = torch.sigmoid(forget_gate_weighted_states_combined)
             # forget_gates_combined_activation_multiplied_with_previous_memory_state = torch.mul(
             #    forget_gates_combined_activation_column, previous_memory_state_column)
 
@@ -581,7 +581,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # This additional tanh activation function taken from the NVIDIA diagram
             # was not in the deep learning book diagram, and does not seem to help
             # really ?
-            new_memory_state_activation_column = F.tanh(new_memory_state)
+            new_memory_state_activation_column = torch.tanh(new_memory_state)
 
             # This appears to be the first gradient component that gets nan input on the backward pass
             variable_identification_string = "layer: " + str(self.layer_index) + " column_index: " \
@@ -616,7 +616,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             # max element in output_gate_weighted_states_plus_input :tensor(1.4322e+10, device='cuda:0')
             # TensorUtils.print_max(output_gate_weighted_states_plus_input, "output_gate_weighted_states_plus_input")
 
-            # output_gate_activation_column = F.sigmoid(output_gate_weighted_states_plus_input)
+            # output_gate_activation_column = torch.sigmoid(output_gate_weighted_states_plus_input)
             output_gate_activation_column = torch.sigmoid(output_gate_weighted_states_plus_input)
 
 
@@ -773,10 +773,10 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                                   mdlstm_parameters)
 
             # Compute the input activation
-            input_activation_column = F.tanh(input_state_plus_input)
+            input_activation_column = torch.tanh(input_state_plus_input)
             # input_activation_column = F.relu(input_state_plus_input) # Relu can be used as an alternative to tanh
             # Compute the input gate activation
-            input_and_states_lambda_gate_activation_column_input = F.sigmoid(
+            input_and_states_lambda_gate_activation_column_input = torch.sigmoid(
                 input_and_states_lambda_gate_weighted_states_plus_input)
 
             input_and_states_lambda_gate_activation_column_states = \
@@ -792,7 +792,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                 mdlstm_parameters.get_forget_gate_two_memory_state_column(),
                 states_lambda_gate_input_column)
 
-            states_lambda_gate_activation_column_state_one = F.sigmoid(states_lambda_gate_weighted_states_plus_input)
+            states_lambda_gate_activation_column_state_one = torch.sigmoid(states_lambda_gate_weighted_states_plus_input)
             # print("states lambda gate activation column_S1: " +
             #       str(states_lambda_gate_activation_column_state_one))
 
@@ -849,9 +849,9 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                     output_gate_two_input_column)
 
             # Compute the output gate one activation
-            output_gate_one_activation_column = F.sigmoid(output_gate_one_weighted_states_plus_input)
+            output_gate_one_activation_column = torch.sigmoid(output_gate_one_weighted_states_plus_input)
             # Compute the output gate two activation
-            output_gate_two_activation_column = F.sigmoid(output_gate_two_weighted_states_plus_input)
+            output_gate_two_activation_column = torch.sigmoid(output_gate_two_weighted_states_plus_input)
 
             output_gate_one_output = torch.mul(states_lambda_gate_reweighted_memory_states,
                                                output_gate_one_activation_column)
@@ -862,7 +862,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             output_gates_combined_output = output_gate_one_output + output_gate_two_output
 
             # With final tanh as in the NVIDIA LSTM diagram
-            activation_column = F.tanh(output_gates_combined_output)
+            activation_column = torch.tanh(output_gates_combined_output)
 
             # # This is following the deep learning book
             # activation_column = output_gates_combined_output
