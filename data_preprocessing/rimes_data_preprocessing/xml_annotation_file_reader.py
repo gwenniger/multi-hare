@@ -53,11 +53,16 @@ class RimesLine:
         self.line_str = line_str
 
     @staticmethod
+    def corrected_bounding_box_value(bounding_box_value_string: str):
+        # Bounding box values are corrected by replacing negative values with 0
+        return max(0, int(bounding_box_value_string))
+
+    @staticmethod
     def create_rimes_line(rimes_line_element: ET.Element):
-        bottom = rimes_line_element.get(BOTTOM_STR)
-        right = rimes_line_element.get(RIGHT_STR)
-        left = rimes_line_element.get(LEFT_STR)
-        top = rimes_line_element.get(TOP_STR)
+        bottom = RimesLine.corrected_bounding_box_value(rimes_line_element.get(BOTTOM_STR))
+        right = RimesLine.corrected_bounding_box_value(rimes_line_element.get(RIGHT_STR))
+        left = RimesLine.corrected_bounding_box_value(rimes_line_element.get(LEFT_STR))
+        top = RimesLine.corrected_bounding_box_value(rimes_line_element.get(TOP_STR))
         line_str = rimes_line_element.get(VALUE_STR)
 
         bounding_box = BoundingBox(bottom, left, right, top)
