@@ -3,13 +3,13 @@ import cv2
 
 from data_preprocessing.rimes_data_preprocessing.xml_annotation_file_reader import XMLAnnotationFileReader
 from data_preprocessing.rimes_data_preprocessing.xml_annotation_file_reader import RimesLine
-from data_preprocessing.rimes_data_preprocessing.xml_annotation_file_reader import BoundingBox
+
+LINE_STRIPS_OUTPUT_FOLDER_NAME = "line_strips"
 
 class LineStripExtractor:
 
-    def __init__(self, rimes_pages: list, line_strips_output_folder: str, data_root_folder: str):
+    def __init__(self, rimes_pages: list, data_root_folder: str):
         self.rimes_pages = rimes_pages
-        self.line_strips_output_folder = line_strips_output_folder
         self.data_root_folder = data_root_folder
 
 
@@ -18,8 +18,28 @@ class LineStripExtractor:
                                     data_root_folder: str):
         xml_annotation_file_reader = XMLAnnotationFileReader(annotation_file_path)
         rimes_pages = xml_annotation_file_reader.extract_rimes_pages()
-        line_strips_output_folder = data_root_folder + "line_strips/"
-        return LineStripExtractor(rimes_pages, line_strips_output_folder, data_root_folder)
+        return LineStripExtractor(rimes_pages, data_root_folder)
+
+
+    @staticmethod
+    def line_strips_output_folder_static(data_root_folder):
+        return data_root_folder + LINE_STRIPS_OUTPUT_FOLDER_NAME + "/"
+
+    @staticmethod
+    def line_strip_image_output_file_name_static(data_root_folder: str,
+                                                 example_number: int):
+        output_name = LineStripExtractor.\
+                          line_strips_output_folder_static(data_root_folder) + \
+                      "example_" + str(example_number) + ".png"
+        return output_name
+
+    def line_strip_image_output_file_name(self, example_number: int):
+        return LineStripExtractor.line_strip_image_output_file_name_static(
+            self.data_root_folder, example_number)
+
+    def line_strips_output_folder(self):
+        return LineStripExtractor.line_strips_output_folder_static(
+            self.data_root_folder)
 
     def extract_line_strip(self, image_file_path, rimes_line: RimesLine, example_number: int):
         full_image_file_path = self.data_root_folder + image_file_path
@@ -33,8 +53,8 @@ class LineStripExtractor:
         min_y = rimes_line.bounding_box.top
         region_of_interest = image[min_y:max_y, min_x:max_x]
         print("miny: " + str(min_y) + " max_y: " + str(max_y))
-        output_name = self.line_strips_output_folder + "example_" \
-                      + str(example_number) + ".png"
+
+        output_name = self.line_strip_image_output_file_name(example_number)
         print("writing line strip to file: " + output_name)
         cv2.imwrite(output_name, region_of_interest)
 
