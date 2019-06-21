@@ -1,6 +1,7 @@
+import sys
 from skimage import io
 from collections import OrderedDict
-
+from data_preprocessing.rimes_data_preprocessing.rimes_line_information import RimesLineInformation
 
 class BoundingBox():
     def __init__(self, x: int, y: int, w: int, h: int):
@@ -33,6 +34,9 @@ class IamDataPointInformation():
 
     def is_ok(self):
         return self.ok
+
+    def line_id(self):
+        return line_id
 
 
 class IamWordInformation(IamDataPointInformation):
@@ -231,8 +235,9 @@ class IamExamplesDictionary():
             get_image_file_path_static(line_information,
                                        iam_database_line_images_root_folder_path,
                                        get_file_path_part_function)
+        print("iam_examples_dictionary - image file path: " + str(image_file_path))
         image = io.imread(image_file_path)
-        # print(">>> image_has_minimal_dimensions - image.shape: " + str(image.shape))
+        print(">>> image_has_minimal_dimensions - image.shape: " + str(image.shape))
         height, width = image.shape
         if height < IamExamplesDictionary.MIN_HEIGHT_REQUIRED or width < IamExamplesDictionary.MIN_WIDTH_REQUIRED:
             print("Rejecting image " + image_file_path + " of size " + str(image.shape) +
@@ -273,20 +278,20 @@ class IamExamplesDictionary():
                         image_is_acceptable = IamExamplesDictionary.image_has_minimal_dimensions(
                             line_information, iam_database_line_images_root_folder_path, get_file_path_part_function)
 
-                    if line_information.ok:
+                    if line_information.is_ok():
 
                         if not image_is_acceptable:
-                            size_rejected_images_lines_dictionary[line_information.line_id] = line_information
+                            size_rejected_images_lines_dictionary[line_information.line_id()] = line_information
                             number_of_rejected_images_labeled_ok += 1
                         else:
-                            ok_lines_dictionary[line_information.line_id] = line_information
+                            ok_lines_dictionary[line_information.line_id()] = line_information
                         total_ok_images += 1
                     else:
                         if not image_is_acceptable:
-                            size_rejected_images_lines_dictionary[line_information.line_id] = line_information
+                            size_rejected_images_lines_dictionary[line_information.line_id()] = line_information
                             number_of_rejected_images_labeled_error += 1
                         else:
-                            error_lines_dictionary[line_information.line_id] = line_information
+                            error_lines_dictionary[line_information.line_id()] = line_information
                         total_error_images += 1
 
             print("Rejected in total " + str(number_of_rejected_images_labeled_ok) + " of the " +
@@ -319,6 +324,17 @@ class IamExamplesDictionary():
                                                            IamWordInformation.create_iam_word_information,
                                                            require_min_image_size,
                                                            IamExamplesDictionary.get_file_sub_path_for_word)
+
+    @staticmethod
+    def create_rimes_lines_dictionary(lines_file_path: str,
+                                    iam_database_line_images_root_folder_path: str,
+                                    require_min_image_size: bool
+                                    ):
+        return IamExamplesDictionary.create_iam_dictionary(lines_file_path,
+                                                           iam_database_line_images_root_folder_path,
+                                                           RimesLineInformation.create_rimes_line_information,
+                                                           require_min_image_size,
+                                                           None)
 
     def get_ok_examples(self):
         print("get_ok_examples - number of OK examples: "
@@ -371,6 +387,10 @@ class IamExamplesDictionary():
                                    iam_database_line_images_root_folder_path: str,
                                    get_file_path_part_function
                                    ):
+
+        if isinstance(iam_line_information, RimesLineInformation):
+            return iam_line_information.image_file_path
+
         line_id = iam_line_information.line_id
         # print(">>> line_id: " + str(line_id))
         file_path = iam_database_line_images_root_folder_path
@@ -383,9 +403,10 @@ class IamExamplesDictionary():
         return result
 
     def get_image_file_path(self, iam_line_information: IamLineInformation):
+
         return IamExamplesDictionary.get_image_file_path_static(iam_line_information,
-                                                                self.iam_database_line_images_root_folder_path,
-                                                                self.get_file_path_part_function)
+                                                            self.iam_database_line_images_root_folder_path,
+                                                            self.get_file_path_part_function)
 
 
 def create_test_iam_line_information_one():
@@ -424,11 +445,12 @@ def test_iam_line_information():
         raise RuntimeError("Error: expected equivalence to reference_line_information")
 
 
-def test_iam_lines_dictionary():
-    lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
-    iam_database_line_images_root_folder_path = "/datastore/data/iam-database/lines"
+def test_iam_lines_dictionary(lines_file_path: str,
+                                line_images_root_folder_path: str):
+    #lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
+    #iam_database_line_images_root_folder_path = "/datastore/data/iam-database/lines"
     iam_lines_dicionary = IamExamplesDictionary.create_iam_lines_dictionary(lines_file_path,
-                                                                            iam_database_line_images_root_folder_path)
+                                                                            line_images_root_folder_path)
 
     reference_line_information_one = create_test_iam_line_information_one()
     if not(reference_line_information_one.line_id in iam_lines_dicionary.ok_lines_dictionary):
@@ -443,10 +465,35 @@ def test_iam_lines_dictionary():
 
     return
 
+def test_rimes_lines_dictionary(lines_file_path: str,
+                                line_images_root_folder_path: str):
+    rimes_lines_dicionary = IamExamplesDictionary.create_rimes_lines_dictionary(lines_file_path,
+                                                                            line_images_root_folder_path, True)
+
+    # reference_line_information_one = create_test_iam_line_information_one()
+    # if not(reference_line_information_one.line_id in iam_lines_dicionary.ok_lines_dictionary):
+    #     raise RuntimeError("Error: expected ok_lines_dictionary to contain: " +
+    #                        str(reference_line_information_one))
+    #
+    # for line_information_key in iam_lines_dicionary.ok_lines_dictionary:
+    #     # print("line_information_key: " + str(line_information_key))
+    #     line_information = iam_lines_dicionary.ok_lines_dictionary[line_information_key]
+    #     image_file_path = iam_lines_dicionary.get_image_file_path(line_information)
+    #     # print("image_file_path: " + str(image_file_path))
+
+
+
 
 def main():
-    test_iam_line_information()
-    test_iam_lines_dictionary()
+    if len(sys.argv) != 3:
+        for i in range(0, len(sys.argv)):
+            print("sys.argv[" + str(i) + "]: " + sys.argv[i])
+        raise RuntimeError("usage: test_iam_examples_dictionary LINES_FILE_PATH LINE_IMAGES_ROOT_FOLDER_PATH")
+    lines_file_path = sys.argv[1]
+    line_images_root_folder_path = sys.argv[2]
+    # test_iam_line_information()
+    # test_iam_lines_dictionary(lines_file_path, line_images_root_folder_path)
+    test_rimes_lines_dictionary(lines_file_path, line_images_root_folder_path)
 
 
 if __name__ == "__main__":

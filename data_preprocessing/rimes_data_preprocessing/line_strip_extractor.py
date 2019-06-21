@@ -44,7 +44,10 @@ class LineStripExtractor:
     def extract_line_strip(self, image_file_path, rimes_line: RimesLine, example_number: int):
         full_image_file_path = self.data_root_folder + image_file_path
         print("image file path: " + str(full_image_file_path))
-        image = cv2.imread(full_image_file_path)
+        # By default images are read with three color channels, to work with
+        # grayscale images this must be specified
+        # See: https://stackoverflow.com/questions/18870603/in-opencv-python-why-am-i-getting-3-channel-images-from-a-grayscale-image
+        image = cv2.imread(full_image_file_path, cv2.IMREAD_GRAYSCALE)
         #cv2.imshow('image', image)
         #cv2.waitKey(0)
         min_x = rimes_line.bounding_box.left
