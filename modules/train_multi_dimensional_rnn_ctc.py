@@ -962,6 +962,7 @@ def create_iam_data_loaders(opt, iam_lines_dataset,
                 dataset_save_or_load_file_path,
                 minimize_vertical_padding, minimize_horizontal_padding, image_input_is_unsigned_int,
                 perform_horizontal_batch_padding_in_data_loader,
+                use_four_pixel_input_blocks,
                 opt.save_dev_set_file_path,
                 opt.save_test_set_file_path)
 
@@ -1024,7 +1025,7 @@ def get_use_example_packing_and_perform_horizontal_batch_packing_in_data_loader(
     return use_example_packing, perform_horizontal_batch_padding_in_data_loader
 
 
-def iam_line_recognition(model_opt, checkpoint):
+def line_recognition(model_opt, checkpoint, lines_dataset: IamLinesDataset):
         print("opt.language_model_file_path: " + str(opt.language_model_file_path))
 
         # With the improved padding, the height of the images is 128,
@@ -1037,11 +1038,6 @@ def iam_line_recognition(model_opt, checkpoint):
         batch_size = opt.batch_size
         print("Using batch_size: " + str(batch_size))
 
-        #lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
-        lines_file_path = opt.iam_database_lines_file_path
-        print("lines_file_path: " + str(lines_file_path))
-        # iam_database_line_images_root_folder_path = "/datastore/data/iam-database/lines"
-        iam_database_line_images_root_folder_path = opt.iam_database_line_images_root_folder_path
         device_ids = get_device_ids_from_opt(opt)
 
         # Change the default cuda device to device_ids[0]
@@ -1049,16 +1045,9 @@ def iam_line_recognition(model_opt, checkpoint):
         # for everything within this function
         with torch.cuda.device(device_ids[0]):
 
-            block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
-            number_of_block_strided_convolution_layers_for_computing_padding = 2
-
-            iam_lines_dataset = IamLinesDataset.create_iam_lines_dataset_from_input_files(
-                lines_file_path, iam_database_line_images_root_folder_path, opt.vocabulary_file_path,
-                block_strided_convolution_block_size, number_of_block_strided_convolution_layers_for_computing_padding)
-
             # This vocab_list will be used by the decoder
-            vocab_list = iam_lines_dataset.get_vocabulary_list()
-            blank_symbol = iam_lines_dataset.get_blank_symbol()
+            vocab_list = lines_dataset.get_vocabulary_list()
+            blank_symbol = lines_dataset.get_blank_symbol()
 
             permutation_save_or_load_file_path = opt.data_permutation_file_path
 
@@ -1081,7 +1070,7 @@ def iam_line_recognition(model_opt, checkpoint):
             dataset_save_or_load_file_path = opt.dataset_save_or_load_file_path
 
             train_loader, validation_loader, test_loader = create_iam_data_loaders(
-                opt, iam_lines_dataset, batch_size, minimize_vertical_padding, minimize_horizontal_padding,
+                opt, lines_dataset, batch_size, minimize_vertical_padding, minimize_horizontal_padding,
                 image_input_is_unsigned_int, perform_horizontal_batch_padding_in_data_loader,
                 use_four_pixel_input_blocks, permutation_save_or_load_file_path, dataset_save_or_load_file_path)
 
@@ -1133,6 +1122,65 @@ def iam_line_recognition(model_opt, checkpoint):
                             perform_horizontal_batch_padding_in_data_loader,
                             device_ids
                             )
+
+
+def iam_line_recognition(model_opt, checkpoint):
+    print("opt.language_model_file_path: " + str(opt.language_model_file_path))
+
+    batch_size = opt.batch_size
+    print("Using batch_size: " + str(batch_size))
+
+    # lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
+    lines_file_path = opt.iam_database_lines_file_path
+    print("lines_file_path: " + str(lines_file_path))
+    # iam_database_line_images_root_folder_path = "/datastore/data/iam-database/lines"
+    iam_database_line_images_root_folder_path = opt.iam_database_line_images_root_folder_path
+    device_ids = get_device_ids_from_opt(opt)
+
+    # Change the default cuda device to device_ids[0]
+    # So that if for example gpus 2 and 3 are used, gpu 2 will become the default gpu
+    # for everything within this function
+    with torch.cuda.device(device_ids[0]):
+        block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(
+            4, 2)
+        number_of_block_strided_convolution_layers_for_computing_padding = 2
+
+        lines_dataset = IamLinesDataset.create_iam_lines_dataset_from_input_files(
+            lines_file_path, iam_database_line_images_root_folder_path,
+            opt.vocabulary_file_path,
+            block_strided_convolution_block_size,
+            number_of_block_strided_convolution_layers_for_computing_padding)
+        return line_recognition(model_opt, checkpoint, lines_dataset)
+
+
+def rimes_line_recognition(model_opt, checkpoint):
+    print("opt.language_model_file_path: " + str(opt.language_model_file_path))
+
+    batch_size = opt.batch_size
+    print("Using batch_size: " + str(batch_size))
+
+    # lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
+    lines_file_path = opt.iam_database_lines_file_path
+    print("lines_file_path: " + str(lines_file_path))
+    # iam_database_line_images_root_folder_path = "/datastore/data/iam-database/lines"
+    iam_database_line_images_root_folder_path = opt.iam_database_line_images_root_folder_path
+    device_ids = get_device_ids_from_opt(opt)
+
+    # Change the default cuda device to device_ids[0]
+    # So that if for example gpus 2 and 3 are used, gpu 2 will become the default gpu
+    # for everything within this function
+    with torch.cuda.device(device_ids[0]):
+        block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(
+            4, 2)
+        number_of_block_strided_convolution_layers_for_computing_padding = 2
+
+        lines_dataset = IamLinesDataset.create_rimes_lines_dataset_from_input_files(
+            lines_file_path, iam_database_line_images_root_folder_path,
+            opt.vocabulary_file_path,
+            block_strided_convolution_block_size,
+            number_of_block_strided_convolution_layers_for_computing_padding)
+        return line_recognition(model_opt, checkpoint, lines_dataset)
+
 
 
 def get_device_ids_from_opt(opts):
@@ -1271,7 +1319,8 @@ def main():
         model_opt = opt
 
     # mnist_recognition_fixed_length()
-    # mnist_recognition_variable_length(model_opt, checkpoint,)
+    #mnist_recognition_variable_length(model_opt, checkpoint,)
+    # rimes_line_recognition(model_opt, checkpoint)
 
     if opt.iam_database_data_type == "lines":
         iam_line_recognition(model_opt, checkpoint)

@@ -25,10 +25,10 @@ class LineStripAnnotationCreator:
         output_file = open(self.line_strips_annotation_file_path, "w")
         example_number = 1
         for rimes_page in self.rimes_pages:
-            print("image file path: " + str(rimes_page.image_file_name))
+            #print("image file path: " + str(rimes_page.image_file_name))
             rimes_lines = rimes_page.get_rimes_lines()
             for rimes_line in rimes_lines:
-                print(str(rimes_line))
+                #print(str(rimes_line))
                 line_strip_image_name = LineStripExtractor.line_strip_image_output_file_name_static(
                     self.data_root_folder, example_number)
                 output_file.write(line_strip_image_name + " ")

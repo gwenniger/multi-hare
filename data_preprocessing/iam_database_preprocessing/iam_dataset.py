@@ -154,6 +154,25 @@ class IamLinesDataset(Dataset):
                                                                example_types, transformation)
         return iam_lines_dataset
 
+    @staticmethod
+    def create_rimes_lines_dataset_from_input_files(
+            rimes_database_lines_file_path: str, rimes_database_line_images_root_folder_path: str,
+            vocabulary_file_path: str,
+            block_strided_convolution_block_size: SizeTwoDimensional,
+            number_of_block_strided_convolution_layers: int,
+            example_types: str = EXAMPLE_TYPES_ALL,
+            transformation=None):
+        print("Loading IAM dataset...")
+        iam_lines_dicionary = IamExamplesDictionary. \
+            create_rimes_lines_dictionary(rimes_database_lines_file_path,
+                                        rimes_database_line_images_root_folder_path, True)
+        rimes_lines_dataset = IamLinesDataset.create_iam_dataset(iam_lines_dicionary,
+                                                               vocabulary_file_path,
+                                                               block_strided_convolution_block_size,
+                                                               number_of_block_strided_convolution_layers,
+                                                               example_types, transformation)
+        return rimes_lines_dataset
+
     def split_random_train_set_validation_set_and_test_set(self,
                                                            train_examples_fraction,
                                                            validation_examples_fraction,
@@ -541,6 +560,7 @@ class IamLinesDataset(Dataset):
             minimize_vertical_padding: bool,
             minimize_horizontal_padding: bool, keep_unsigned_int_format: bool,
             perform_horizontal_batch_padding_in_data_loader: bool,
+            use_four_pixel_input_blocks: bool,
             save_dev_set_file_path: str, save_test_set_file_path: str
     ):
 
@@ -568,7 +588,8 @@ class IamLinesDataset(Dataset):
             batch_size, train_set, validation_set, test_set,
             minimize_vertical_padding,
             minimize_horizontal_padding, keep_unsigned_int_format,
-            perform_horizontal_batch_padding_in_data_loader)
+            perform_horizontal_batch_padding_in_data_loader,
+            use_four_pixel_input_blocks=use_four_pixel_input_blocks)
 
         self.save_dataset_to_file(dataset_save_or_load_file_path, train_loader, validation_loader, test_loader)
 
