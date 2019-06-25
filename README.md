@@ -1,10 +1,10 @@
 # README #
 
-This README would normally document whatever steps are necessary to get your application up and running.
 
 ### What is this repository for? ###
 
-This repository is for implementing Multidimensional Long Short Term Memory and neural networks for handwriting recogntion.
+This repository implements Multidimensional Long Short-Term Memory Recurrent Neural Networks for handwriting recogntion
+using PyTorch.
 
 Features include:
 
@@ -21,6 +21,15 @@ For running the pipeline code, you may need to execute:
 type of errors.
 Furthermore, this repository is written for python version3, you may need to 
 use a virtual environment to use it.
+
+### External libraries ###
+This repository uses several external libraries:
+1. *ctcdecode*:  https://github.com/parlance/ctcdecode. 
+This library implements a beam-search decoder with KenLM language model support.
+2. PyTorch bindings for warp-ctc: https://github.com/SeanNaren/warp-ctc
+This library provides PyTorch bindings for the fast CTC code developed by Baidu Research 
+available from: https://github.com/baidu-research/warp-ctc.
+3. KenLM: https://github.com/kpu/kenlm
 
 <!---
 
