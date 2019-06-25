@@ -6,13 +6,23 @@ This README would normally document whatever steps are necessary to get your app
 
 This repository is for implementing Multidimensional Long Short Term Memory and neural networks for handwriting recogntion.
 
+Features include:
+
+* Efficient Multi-directional Multi-Dimensional LSTM, using various optimizations described in the paper
+  "No Padding Please: Efficient Neural Handwriting Recognition" 
+* Pytorch data preparation for the ICDAR dataset
+* Automatic generation of a dataset for testing during development, based on 
+  variable length MNIST digit sequences.
+* An adaptation of DataParallel which works with lists of variable-sized examples
+
+### Setup and use ###
 For running the pipeline code, you may need to execute:
-" export PYTHONPATH='.' "
-in the console where you are running the script, to avoid "no module named X"
+" export PYTHONPATH='.' "in the console where you are running the script, to avoid "no module named X"
 type of errors.
 Furthermore, this repository is written for python version3, you may need to 
 use a virtual environment to use it.
 
+<!---
 
 * Quick summary
 * Version
@@ -37,3 +47,5 @@ use a virtual environment to use it.
 
 * Repo owner or admin
 * Other community or team contact
+
+-->

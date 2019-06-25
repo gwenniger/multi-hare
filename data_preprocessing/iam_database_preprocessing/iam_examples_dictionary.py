@@ -36,7 +36,7 @@ class IamDataPointInformation():
         return self.ok
 
     def line_id(self):
-        return line_id
+        return self.line_id
 
 
 class IamWordInformation(IamDataPointInformation):
