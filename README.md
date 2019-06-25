@@ -1,9 +1,8 @@
 # README #
 
+[GitHub repository](https://github.com/gwenniger/multi-hr) [arXiv paper](https://arxiv.org/abs/1902.11208)
 
 ### What is this repository for? ###
-
-[GitHub repository](https://github.com/gwenniger/multi-hr)[arXiv paper](https://arxiv.org/abs/1902.11208)
 
 This repository implements Multidimensional Long Short-Term Memory Recurrent Neural Networks for handwriting recogntion
 using PyTorch.
