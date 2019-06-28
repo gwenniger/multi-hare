@@ -1,6 +1,6 @@
 # README #
 
-[GitHub repository](https://github.com/gwenniger/multi-hr) [arXiv paper](https://arxiv.org/abs/1902.11208)
+[GitHub repository](https://github.com/gwenniger/multi-hare).[arXiv paper](https://arxiv.org/abs/1902.11208)
 
 ### What is this repository for? ###
 
@@ -15,6 +15,9 @@ Features include:
 * Automatic generation of a dataset for testing during development, based on 
   variable length MNIST digit sequences.
 * An adaptation of DataParallel which works with lists of variable-sized examples
+
+While allured by the * [March Hare](https://en.wikipedia.org/wiki/March_Hare) * from Alice in Wonderland,
+this software should not be confused by it. 
 
 ### Setup and use ###
 For running the pipeline code, you may need to execute:
