@@ -39,8 +39,19 @@ The Software and this license document are provided "AS IS" with NO EXPLICIT OR 
 
 =====================
 
-Contains code from better_exchook:
- - Website: https://github.com/albertz/py_better_exchook
- - BSD 2-clause "Simplified" License
- - Copyright (c) 2011--2016, Albert Zeyer. All rights reserved.
-- File: better_exchook.py
+Includes the following libraries:
+ warp-ctc 
+ - Website: https://github.com/SeanNaren/warp-ctc
+ - Apache License 2.0
+ - Copyright (c) 2015--2018, Sean Naren. All rights reserved.
+  (an extension of)
+ - Website: https://github.com/baidu-research/warp-ctc
+ - Apache License 2.0
+ - Copyright (c)  2015-2016 Baidu USA LLC. All rights reserved.
+
+ ctc-decode
+ - Website: https://github.com/parlance/ctcdecode
+ - MIT License
+ - Copyright (c) 2017 Ryan Leary
+
+
