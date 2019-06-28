@@ -54,4 +54,9 @@ Includes the following libraries:
  - MIT License
  - Copyright (c) 2017 Ryan Leary
 
-
+ KenLM
+ - Website: https://kheafield.com/code/kenlm/, https://github.com/kpu/kenlm
+ - (mostly) LGPL
+ - Copyright (c) Kenneth Heafield
+ -   
+ - 

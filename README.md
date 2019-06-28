@@ -16,7 +16,7 @@ Features include:
   variable length MNIST digit sequences.
 * An adaptation of DataParallel which works with lists of variable-sized examples
 
-While allured by the * [March Hare](https://en.wikipedia.org/wiki/March_Hare) * from Alice in Wonderland,
+While allured by the [March Hare](https://en.wikipedia.org/wiki/March_Hare)  from Alice in Wonderland,
 this software should not be confused by it. 
 
 ### Setup and use ###
