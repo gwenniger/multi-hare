@@ -74,7 +74,8 @@ class FullPaddingStrategy(PaddingStrategy):
         train_loader = torch.utils.data.DataLoader(
             dataset=train_set_pairs,
             batch_size=batch_size,
-            shuffle=shuffle)
+            shuffle=shuffle,
+            num_workers=8)
         return train_loader
 
 
@@ -127,7 +128,8 @@ class MinimalHorizontalPaddingStrategyBase(PaddingStrategy):
             batch_size=batch_size,
             shuffle=shuffle,
             collate_fn=self.get_collate_function(),
-            pin_memory=False)
+            pin_memory=False,
+            num_workers=8)
 
         return train_loader
 

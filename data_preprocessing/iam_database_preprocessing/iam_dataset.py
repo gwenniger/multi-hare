@@ -14,7 +14,15 @@ from data_preprocessing.padding_strategy import PaddingStrategy
 from data_preprocessing.last_minute_padding import LastMinutePadding
 from util.tensor_block_stacking import TensorBlockStacking
 from modules.size_two_dimensional import SizeTwoDimensional
+from data_preprocessing.iam_database_preprocessing.seperately_saved_examples_dataset import SeparatelySavedExamplesDataset
 import math
+
+TRAIN_LABEL = "train"
+DEV_LABEL = "dev"
+TEST_LABEL = "test"
+
+
+
 
 class IamLinesDataset(Dataset):
     EXAMPLE_TYPES_OK = "ok"
@@ -286,12 +294,37 @@ class IamLinesDataset(Dataset):
 
         return result, True
 
+    @staticmethod
+    def get_individual_file_train_folder(individual_files_save_folder_path: str):
+        return individual_files_save_folder_path +  "-" +TRAIN_LABEL + "-examples"
+
+    @staticmethod
+    def get_individual_file_dev_folder(
+            individual_files_save_folder_path: str):
+        return individual_files_save_folder_path + "-" + DEV_LABEL + "-examples"
+
+    @staticmethod
+    def get_individual_file_test_folder(
+            individual_files_save_folder_path: str):
+        return individual_files_save_folder_path + "-" + TEST_LABEL + "-examples"
+
     def get_data_loader_with_appropriate_padding(self, data_set, max_image_height,
                                                  max_image_width, max_labels_length,
                                                  batch_size: int, padding_strategy: PaddingStrategy,
                                                  keep_unsigned_int_format: bool,
                                                  shuffle: bool,
-                                                 use_four_pixel_input_blocks: bool):
+                                                 use_four_pixel_input_blocks: bool,
+                                                 save_examples_to_individual_files: bool = False,
+                                                 individual_files_save_folder_path: str = None,
+                                                 ):
+
+
+
+        if save_examples_to_individual_files:
+            # Create the folder for saving the individual preprocessed training examples if not existing
+            if not os.path.exists(individual_files_save_folder_path):
+                os.makedirs(individual_files_save_folder_path)
+
         to_tensor = ToTensor()
 
         train_set_pairs = list([])
@@ -475,7 +508,13 @@ class IamLinesDataset(Dataset):
                 get_labels_with_probabilities_length_and_real_sequence_length(labels_padded, image_width,
                                                                               labels_length)
 
-            train_set_pairs.append(tuple((image_padded, labels_padded)))
+            example =  tuple((image_padded, labels_padded))
+
+            if save_examples_to_individual_files:
+                SeparatelySavedExamplesDataset.save_example_to_file(individual_files_save_folder_path,
+                                                                    example, sample_index)
+            else:
+                train_set_pairs.append(example)
 
             percentage_complete = int((float(sample_index) / len(data_set)) * 100)
 
@@ -488,6 +527,9 @@ class IamLinesDataset(Dataset):
                 #      str(len(data_set)))
                 last_percentage_complete = percentage_complete
             sample_index += 1
+
+        if save_examples_to_individual_files:
+            train_set_pairs = SeparatelySavedExamplesDataset(individual_files_save_folder_path)
 
         data_loader = padding_strategy.create_data_loader(train_set_pairs, batch_size,
                                                            shuffle)
@@ -509,7 +551,10 @@ class IamLinesDataset(Dataset):
             minimize_vertical_padding: bool,
             minimize_horizontal_padding: bool, keep_unsigned_int_format: bool,
             perform_horizontal_batch_padding_in_data_loader_: bool,
-            use_four_pixel_input_blocks: bool):
+            use_four_pixel_input_blocks: bool,
+            save_examples_to_individual_files: bool = False,
+            dataset_save_or_load_file_path: str = None
+    ):
 
         print("Entered get_random_train_set_validation_set_test_set_data_loaders...")
 
@@ -528,18 +573,27 @@ class IamLinesDataset(Dataset):
         print("Prepare IAM data train loader...")
         train_loader = self.get_data_loader_with_appropriate_padding(
             train_set, max_image_height, max_image_width, max_labels_length, batch_size, padding_strategy,
-            keep_unsigned_int_format, shuffle=True, use_four_pixel_input_blocks=use_four_pixel_input_blocks)
+            keep_unsigned_int_format, shuffle=True, use_four_pixel_input_blocks=use_four_pixel_input_blocks,
+            save_examples_to_individual_files=save_examples_to_individual_files,
+            individual_files_save_folder_path=IamLinesDataset.get_individual_file_train_folder(dataset_save_or_load_file_path)
+        )
 
         print("Prepare IAM data validation loader...")
         validation_loader = self.get_data_loader_with_appropriate_padding(
             validation_set, max_image_height, max_image_width, max_labels_length, batch_size,
             padding_strategy, keep_unsigned_int_format, shuffle=False,
-            use_four_pixel_input_blocks=use_four_pixel_input_blocks)
+            use_four_pixel_input_blocks=use_four_pixel_input_blocks,
+            save_examples_to_individual_files=save_examples_to_individual_files,
+            individual_files_save_folder_path=IamLinesDataset.get_individual_file_dev_folder(dataset_save_or_load_file_path)
+        )
 
         print("Prepare IAM data test loader...")
         test_loader = self.get_data_loader_with_appropriate_padding(
             test_set, max_image_height, max_image_width, max_labels_length, batch_size, padding_strategy,
-            keep_unsigned_int_format, shuffle=False, use_four_pixel_input_blocks=use_four_pixel_input_blocks)
+            keep_unsigned_int_format, shuffle=False, use_four_pixel_input_blocks=use_four_pixel_input_blocks,
+            save_examples_to_individual_files=save_examples_to_individual_files,
+            individual_files_save_folder_path=IamLinesDataset.get_individual_file_test_folder(dataset_save_or_load_file_path)
+        )
 
         return train_loader, validation_loader, test_loader
 
@@ -561,11 +615,12 @@ class IamLinesDataset(Dataset):
             minimize_horizontal_padding: bool, keep_unsigned_int_format: bool,
             perform_horizontal_batch_padding_in_data_loader: bool,
             use_four_pixel_input_blocks: bool,
-            save_dev_set_file_path: str, save_test_set_file_path: str
+            save_dev_set_file_path: str, save_test_set_file_path: str,
+            use_on_demand_example_loading: bool
     ):
 
         if os.path.isfile(dataset_save_or_load_file_path):
-            return self.load_dataset_from_file(dataset_save_or_load_file_path)
+            return IamLinesDataset.load_dataset_from_file(dataset_save_or_load_file_path)
 
         IamLinesDataset.check_fractions_add_up_to_one(list([train_examples_fraction,
                                                             validation_examples_fraction,
@@ -589,9 +644,11 @@ class IamLinesDataset(Dataset):
             minimize_vertical_padding,
             minimize_horizontal_padding, keep_unsigned_int_format,
             perform_horizontal_batch_padding_in_data_loader,
-            use_four_pixel_input_blocks=use_four_pixel_input_blocks)
+            use_four_pixel_input_blocks=use_four_pixel_input_blocks,
+            save_examples_to_individual_files = use_on_demand_example_loading,
+            dataset_save_or_load_file_path=dataset_save_or_load_file_path)
 
-        self.save_dataset_to_file(dataset_save_or_load_file_path, train_loader, validation_loader, test_loader)
+        IamLinesDataset.save_dataset_to_file(dataset_save_or_load_file_path, train_loader, validation_loader, test_loader)
 
         return train_loader, validation_loader, test_loader
 
@@ -678,16 +735,21 @@ class IamLinesDataset(Dataset):
 
         return train_set, validation_set, test_set
 
-    def load_dataset_from_file(self, dataset_load_file_path: str):
+    @staticmethod
+    def load_dataset_from_file(dataset_load_file_path: str):
             print(">>>Loading data from saved file \"" + dataset_load_file_path + "\"...")
             train_loader, validation_loader, test_loader = torch.load(dataset_load_file_path)
             print("done.")
             return train_loader, validation_loader, test_loader
 
-    def save_dataset_to_file(self, dataset_save_file_path, train_loader, validation_loader, test_loader):
+    @staticmethod
+    def save_dataset_to_file(dataset_save_file_path, train_loader,
+                             validation_loader, test_loader):
         print(">>>Saving data to \"" + dataset_save_file_path + "\"...")
-        torch.save((train_loader, validation_loader, test_loader), dataset_save_file_path)
+        torch.save((train_loader, validation_loader, test_loader),
+                   dataset_save_file_path)
         print("done.")
+
 
     def get_train_set_validation_set_test_set_data_loaders_using_split_specification_files(
             self, batch_size: int, train_examples_split_file_path: str,
@@ -696,11 +758,12 @@ class IamLinesDataset(Dataset):
             minimize_horizontal_padding: bool, keep_unsigned_int_format: bool,
             perform_horizontal_batch_padding_in_data_loader: bool,
             use_four_pixel_input_blocks: bool,
-            dataset_save_or_load_file_path: str
+            dataset_save_or_load_file_path: str,
+            use_on_demand_example_loading: bool
     ):
 
         if os.path.isfile(dataset_save_or_load_file_path):
-            return self.load_dataset_from_file(dataset_save_or_load_file_path)
+            return IamLinesDataset.load_dataset_from_file(dataset_save_or_load_file_path)
 
         train_example_ids_set = IamLinesDataset.get_iam_example_ids_set_from_split_file(train_examples_split_file_path)
         dev_example_ids_set = IamLinesDataset.get_iam_example_ids_set_from_split_file(dev_examples_split_file_path)
@@ -714,9 +777,12 @@ class IamLinesDataset(Dataset):
             minimize_vertical_padding,
             minimize_horizontal_padding, keep_unsigned_int_format,
             perform_horizontal_batch_padding_in_data_loader,
-            use_four_pixel_input_blocks=use_four_pixel_input_blocks)
+            use_four_pixel_input_blocks=use_four_pixel_input_blocks,
+            save_examples_to_individual_files=use_on_demand_example_loading,
+            dataset_save_or_load_file_path=dataset_save_or_load_file_path
+        )
 
-        self.save_dataset_to_file(dataset_save_or_load_file_path, train_loader, validation_loader, test_loader)
+        IamLinesDataset.save_dataset_to_file(dataset_save_or_load_file_path, train_loader, validation_loader, test_loader)
 
         return train_loader, validation_loader, test_loader
 

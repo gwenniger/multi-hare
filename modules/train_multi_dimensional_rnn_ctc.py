@@ -935,22 +935,24 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     #print(prof)
 
 
-def create_iam_data_loaders(opt, iam_lines_dataset,
+def create_iam_data_loaders(model_opt, iam_lines_dataset,
                             batch_size: int, minimize_vertical_padding: bool,
                             minimize_horizontal_padding: bool, image_input_is_unsigned_int: bool,
                             perform_horizontal_batch_padding_in_data_loader: bool,
                             use_four_pixel_input_blocks: bool,
                             permutation_save_or_load_file_path: str,
-                            dataset_save_or_load_file_path: str
+                            dataset_save_or_load_file_path: str,
+                            use_on_demand_example_loading: bool
                             ):
-    if opt.use_split_files_specified_data_split:
+    if model_opt.use_split_files_specified_data_split:
         # Load the data and divide into train/dev/test using data-split specification files
         train_loader, validation_loader, test_loader = \
             iam_lines_dataset.get_train_set_validation_set_test_set_data_loaders_using_split_specification_files(
-                batch_size, opt.train_split_file_path, opt.dev_split_file_path, opt.test_split_file_path,
+                batch_size, model_opt.train_split_file_path, model_opt.dev_split_file_path, model_opt.test_split_file_path,
                 minimize_vertical_padding, minimize_horizontal_padding, image_input_is_unsigned_int,
                 perform_horizontal_batch_padding_in_data_loader, use_four_pixel_input_blocks,
-                dataset_save_or_load_file_path)
+                dataset_save_or_load_file_path,
+                use_on_demand_example_loading)
     else:
         # Load the data and divide into train/dev/test using hard-coded fractions and a loaded data permutation
         # file
@@ -963,8 +965,9 @@ def create_iam_data_loaders(opt, iam_lines_dataset,
                 minimize_vertical_padding, minimize_horizontal_padding, image_input_is_unsigned_int,
                 perform_horizontal_batch_padding_in_data_loader,
                 use_four_pixel_input_blocks,
-                opt.save_dev_set_file_path,
-                opt.save_test_set_file_path)
+                model_opt.save_dev_set_file_path,
+                model_opt.save_test_set_file_path,
+                use_on_demand_example_loading)
 
     # Fix the collate functions if necessary
     check_data_loader_has_right_collate_function_and_replace_if_necessary(
@@ -1068,11 +1071,13 @@ def line_recognition(model_opt, checkpoint, lines_dataset: IamLinesDataset):
                 input_channels = 1
 
             dataset_save_or_load_file_path = opt.dataset_save_or_load_file_path
+            use_on_demand_example_loading = opt.use_on_demand_example_loading
 
             train_loader, validation_loader, test_loader = create_iam_data_loaders(
                 opt, lines_dataset, batch_size, minimize_vertical_padding, minimize_horizontal_padding,
                 image_input_is_unsigned_int, perform_horizontal_batch_padding_in_data_loader,
-                use_four_pixel_input_blocks, permutation_save_or_load_file_path, dataset_save_or_load_file_path)
+                use_four_pixel_input_blocks, permutation_save_or_load_file_path, dataset_save_or_load_file_path,
+                use_on_demand_example_loading)
 
 
 
@@ -1242,11 +1247,13 @@ def iam_word_recognition(model_opt, checkpoint):
 
         dataset_save_or_load_file_path = opt.dataset_save_or_load_file_path
         use_four_pixel_input_blocks = opt.use_four_pixel_input_blocks
+        use_on_demand_example_loading = opt.use_on_demand_example_loading
 
         train_loader, validation_loader, test_loader = create_iam_data_loaders(
             opt, iam_words_dataset, batch_size, minimize_vertical_padding, minimize_horizontal_padding,
             image_input_is_unsigned_int, perform_horizontal_batch_padding_in_data_loader,
-            use_four_pixel_input_blocks, permutation_save_or_load_file_path, dataset_save_or_load_file_path)
+            use_four_pixel_input_blocks, permutation_save_or_load_file_path, dataset_save_or_load_file_path,
+            use_on_demand_example_loading)
 
         print("Loading IAM dataset: DONE")
 
@@ -1319,12 +1326,14 @@ def main():
         model_opt = opt
 
     # mnist_recognition_fixed_length()
-    #mnist_recognition_variable_length(model_opt, checkpoint,)
-    # rimes_line_recognition(model_opt, checkpoint)
-
-    if opt.iam_database_data_type == "lines":
+    #
+    if opt.examples_database_data_type == "variable_length_mnist":
+        mnist_recognition_variable_length(model_opt, checkpoint, )
+    elif opt.examples_database_data_type == "rimes_lines":
+        rimes_line_recognition(model_opt, checkpoint)
+    elif opt.examples_database_data_type == "iam_lines":
         iam_line_recognition(model_opt, checkpoint)
-    elif opt.iam_database_data_type == "words":
+    elif opt.examples_database_data_type == "iam_words":
         iam_word_recognition(model_opt, checkpoint)
     else:
         raise RuntimeError("Unrecognized data type")

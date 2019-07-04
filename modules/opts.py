@@ -18,8 +18,9 @@ def model_opts(parser):
     group.add_argument('-layer_pairs', type=int, default=-1,
                        help='Number of {BlockMDLSTM,BlockConvolution} layer pairs.')
     group.add_argument('-first_layer_hidden_states_size', type=int, default=8,
-                       help='Size of hidden states in the first layer',
-                       required=True)
+                       help='Size of hidden states in the first layer. This is only used when '
+                            '-use_network_structure_bluche is not used, otherwise '
+                            '-mdlstm_layer_sizes is used to set the layer sizes')
 
     # We want a boolean flag that is required, but that is allowed to be either true or false
     # The way below works to do this
@@ -80,10 +81,15 @@ def train_opts(parser):
                        help="Path to the IAM database (ascii) lines file",
                        required=True)
 
-    group.add_argument('-iam_database_data_type',
+    group.add_argument('-examples_database_data_type',
                        type=str,
-                       help="The data type to train and test for: words or lines",
-                       choices=["words", "lines"],
+                       help="The data type to train and test for: "
+                            "variable_length_mnist: an artificial dataset of MNIST "
+                            "character sequences of variable length. Mainly used for development/debugging."
+                            "rimes_lines: the rimes lines dataset"
+                            "iam_words: the iam words dataset"
+                            "iam_ lines: the iam lines dataset",
+                       choices=["variable_length_mnist", "rimes_lines", "iam_words", "iam_lines"],
                        required=True)
 
     group.add_argument('-data_permutation_file_path', type=str,
@@ -121,6 +127,7 @@ def train_opts(parser):
     group.add_argument("-dataset_save_or_load_file_path", type=str,
                        help="path used to save the dataset to",
                        default=None, required=True)
+
 
     group.add_argument('-block_strided_convolution_layers_using_weight_sharing', default=[], nargs='+', type=int,
                        help="Use weight-sharing across directions for one or more block-strided convolution"
@@ -160,6 +167,22 @@ def train_opts(parser):
                        action='store_true')
     group.add_argument('-use_normal_mdlstm_cells', dest='use_leaky_lp_cells',
                        action='store_false')
+
+
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('-use_on_demand_example_loading', dest='use_on_demand_example_loading',
+                       help="""Use on-demand example loading, 
+                       which saves all pre-processed examples individually to disk 
+                       and loads them on the fly as needed, saving memory. This setting is essential
+                       when the entire dataset does not fit properly in working memory. 
+                       """,
+                       action='store_true')
+    group.add_argument('-load_entire_dataset_beforehand', dest='use_on_demand_example_loading',
+                       help="""Load the entire dataset beforehand rather than loading 
+                       individual example on demand. Use this only when you have enough memory.""",
+                       action='store_false')
+
+
 
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('-use_network_structure_bluche', dest='use_network_structure_bluche',
