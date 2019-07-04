@@ -5,6 +5,7 @@ from data_preprocessing.rimes_data_preprocessing.xml_annotation_file_reader impo
 from data_preprocessing.rimes_data_preprocessing.xml_annotation_file_reader import RimesLine
 
 LINE_STRIPS_OUTPUT_FOLDER_NAME = "line_strips"
+LINE_STRIPS_IMPROVED_OUTPUT_FOLDER_NAME = "line_strips_improved"
 
 class LineStripExtractor:
 
@@ -26,6 +27,10 @@ class LineStripExtractor:
         return data_root_folder + LINE_STRIPS_OUTPUT_FOLDER_NAME + "/"
 
     @staticmethod
+    def line_strips_improved_output_folder_static(data_root_folder):
+        return data_root_folder + LINE_STRIPS_IMPROVED_OUTPUT_FOLDER_NAME + "/"
+
+    @staticmethod
     def line_strip_image_output_file_name_static(data_root_folder: str,
                                                  example_number: int):
         output_name = LineStripExtractor.\
@@ -33,8 +38,20 @@ class LineStripExtractor:
                       "example_" + str(example_number) + ".png"
         return output_name
 
+    @staticmethod
+    def line_strip_image_improved_output_file_name_static(data_root_folder: str,
+                                                 example_number: int):
+        output_name = LineStripExtractor. \
+                          line_strips_improved_output_folder_static(data_root_folder) + \
+                      "example_" + str(example_number) + ".png"
+        return output_name
+
     def line_strip_image_output_file_name(self, example_number: int):
         return LineStripExtractor.line_strip_image_output_file_name_static(
+            self.data_root_folder, example_number)
+
+    def line_strip_image_improved_output_file_name(self, example_number: int):
+        return LineStripExtractor.line_strip_image_improved_output_file_name_static(
             self.data_root_folder, example_number)
 
     def line_strips_output_folder(self):
