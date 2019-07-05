@@ -28,6 +28,7 @@ from modules.evaluator import EpochStatistics
 from modules.optim import Optim
 import data_preprocessing.padding_strategy
 from util.nvidia_smi_memory_usage_statistics_collector import NvidiaSmiMemoryStatisticsCollector
+from data_preprocessing.iam_database_preprocessing.string_to_index_mapping_table import StringToIndexMappingTable
 import os
 import opts
 
@@ -646,7 +647,7 @@ def check_save_model_path():
         os.makedirs(model_dirname)
 
 
-def train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels: int,
+def train_mdrnn_ctc(checkpoint, train_loader, validation_loader, test_loader, input_channels: int,
                     hidden_states_size: int, batch_size,
                     compute_multi_directional: bool, use_dropout: bool,
                     vocab_list: list, blank_symbol: str,
@@ -904,7 +905,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191
 
     #with torch.autograd.profiler.profile(use_cuda=False) as prof:
-    blank_symbol = "_"
+    blank_symbol = StringToIndexMappingTable.get_blank_symbol()
     image_input_is_unsigned_int = False
     use_block_mdlstm = False
     perform_horizontal_batch_padding_in_data_loader = False
@@ -917,7 +918,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
         opt.block_strided_convolution_layers_using_weight_sharing
     device_ids = get_device_ids_from_opt(opt)
     mdlstm_layer_sizes = get_and_check_mdlstm_layer_sizes(model_opt)
-    train_mdrnn_ctc(model_opt, checkpoint, train_loader, test_loader,
+    train_mdrnn_ctc(checkpoint, train_loader, test_loader,
                     test_loader, input_channels,
                     hidden_states_size, batch_size,
                     compute_multi_directional, use_dropout, vocab_list, blank_symbol,
@@ -1112,7 +1113,7 @@ def line_recognition(model_opt, checkpoint, lines_dataset: IamLinesDataset):
 
         
             #with torch.autograd.profiler.profile(use_cuda=False) as prof:
-            train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels,
+            train_mdrnn_ctc(checkpoint, train_loader, validation_loader, test_loader, input_channels,
                             hidden_states_size,
                             batch_size, compute_multi_directional, use_dropout, vocab_list, blank_symbol,
                             image_input_is_unsigned_int, "IAM",
@@ -1295,7 +1296,7 @@ def iam_word_recognition(model_opt, checkpoint):
         block_strided_convolution_layers_using_weight_sharing = \
             opt.block_strided_convolution_layers_using_weight_sharing
 
-        train_mdrnn_ctc(model_opt, checkpoint, train_loader, validation_loader, test_loader, input_channels,
+        train_mdrnn_ctc(checkpoint, train_loader, validation_loader, test_loader, input_channels,
                         hidden_states_size,
                         batch_size, compute_multi_directional, use_dropout, vocab_list, blank_symbol,
                         image_input_is_unsigned_int, "IAM", minimize_horizontal_padding,

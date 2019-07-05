@@ -215,8 +215,9 @@ class IamLinesDataset(Dataset):
     def get_vocabulary_list(self):
         return self.string_to_index_mapping_table.get_vocabulary_list()
 
-    def get_blank_symbol(self):
-        return self.string_to_index_mapping_table.get_blank_symbol()
+    @staticmethod
+    def get_blank_symbol():
+        return StringToIndexMappingTable.get_blank_symbol()
 
     @staticmethod
     def get_labels_with_probabilities_length_and_real_sequence_length(labels_padded,

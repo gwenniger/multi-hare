@@ -3,7 +3,11 @@
 class StringToIndexMappingTable:
 
     #    BLANK_SYMBOL = "<BLANK>"
-    BLANK_SYMBOL = "_"
+    # BLANK_SYMBOL = "_"
+    # This symbol should not be used in the annotation, that is why the obscure
+    # "␣" symbol is used rather than the "_" symbol which still appears in some datasets
+    # See also https://en.wikipedia.org/wiki/Whitespace_character#Substitutes
+    BLANK_SYMBOL = "␣"
     WORD_KEY_SEPARATOR = "|||"
 
     def __init__(self, string_to_index_map: dict, index_to_string_table: list, last_added_index: int):
