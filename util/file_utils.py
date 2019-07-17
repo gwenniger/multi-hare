@@ -1,5 +1,6 @@
 from os import listdir
 from os.path import isfile, join, abspath
+import os.path
 
 
 class FileUtils:
@@ -24,5 +25,9 @@ class FileUtils:
         return only_files
 
 
-
-
+    @staticmethod
+    def file_exist_and_is_not_empty(path: str):
+        if os.path.exists(path) and os.path.getsize(path) > 0:
+            return True
+        else:
+            return False

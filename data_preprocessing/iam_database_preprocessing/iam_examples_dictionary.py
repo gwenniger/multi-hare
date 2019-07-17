@@ -244,7 +244,9 @@ class IamExamplesDictionary():
                   " since it is not satisfying the minimum height(" + str(IamExamplesDictionary.MIN_HEIGHT_REQUIRED) +
                   " and minimum width (" + str(IamExamplesDictionary.MIN_HEIGHT_REQUIRED) +
                   " requirements")
+            sys.stdout.flush()
             return False
+        sys.stdout.flush()
         return True
 
     @staticmethod

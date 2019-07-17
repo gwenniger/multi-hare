@@ -295,6 +295,11 @@ class IamLinesDataset(Dataset):
 
         return result, True
 
+
+    @staticmethod
+    def get_dataset_save_or_load_file_path_with_batch_size(dataset_save_or_load_file_path: str, batch_size: int):
+        return dataset_save_or_load_file_path + "_batch_size_" + str(batch_size)
+
     @staticmethod
     def get_individual_file_train_folder(individual_files_save_folder_path: str):
         return individual_files_save_folder_path +  "-" +TRAIN_LABEL + "-examples"
@@ -325,8 +330,6 @@ class IamLinesDataset(Dataset):
             # Create the folder for saving the individual preprocessed training examples if not existing
             if not os.path.exists(individual_files_save_folder_path):
                 os.makedirs(individual_files_save_folder_path)
-
-        to_tensor = ToTensor()
 
         train_set_pairs = list([])
 
@@ -378,144 +381,21 @@ class IamLinesDataset(Dataset):
         for sample in data_set:
             print("sample index: " + str(sample_index))
 
-            #if sample_index >= 32:   # Hack for fast testing
-            #    break
-
-            image_original = sample["image"]
-            image_original_dtype = image_original.dtype
-
-            # print("image_original: " + str(image_original))
-            # print("image_original.dtype: " + str(image_original.dtype))
-
-            image_height_original, image_width_original = image_original.shape
-
-            # Only images with both dimensions larger than the scale reduction factor
-            # are rescaled, to avoid errors in scaling
-            if image_height_original > scale_reduction_factor and image_width_original > scale_reduction_factor:
-                image_height = int(image_height_original / scale_reduction_factor)
-                image_width = int(image_width_original / scale_reduction_factor)
-
-                if not use_four_pixel_input_blocks:
-                    rescale = Rescale(tuple([image_height, image_width]))
-                    # Rescale works on ndarrays, not on pytorch tensors
-                    # print("before: sample[\"image\"].dtype: " + str(sample["image"].dtype))
-
-                    sample = rescale(sample)
-            else:
-                image_height = image_height_original
-                image_width = image_width_original
-            image_rescaled = sample["image"]
-            # print("image_rescaled.dtype: " + str(image_rescaled.dtype))
-
-            # Sanity check that the image dtype remained the same
-            if image_original_dtype != image_rescaled.dtype:
-                raise RuntimeError("Error: the image dtype changed")
-
-            sample_pytorch = to_tensor(sample)
-
-            if use_four_pixel_input_blocks:
-
-                # Create a version of original image formed by stacking the input pixels within blocks of
-                # 2 by 2 along the third (=channel) dimension
-                four_pixel_block_image  = TensorBlockStacking.rescale_tensor_by_stacking_tensor_blocks(
-                    sample_pytorch['image'], SizeTwoDimensional.create_size_two_dimensional(2, 2),
-                    IamLinesDataset.UINT8_WHITE_VALUE)
-                sample_pytorch['image'] = four_pixel_block_image
-                image_height = four_pixel_block_image.size(1)
-                image_width = four_pixel_block_image.size(2)
-
-
-
-           # print("sample_pytorch: " + str(sample_pytorch))
-
-            image = sample_pytorch["image"]
-            # print(">>> image size: " + str(image.size()))
-
-            # Get the labels and labels length
-            labels = sample_pytorch["labels"]
-            labels_length = labels.size(0)
-
-            # print("image_height: " + str(image_height))
-            # print("image_width: " + str(image_width))
-            # print("labels_length: " + str(labels_length))
-
-            # Use the provided function "get_collumns_padding_required_fuction" to
-            # determine the columns of padding required
-            columns_padding_required = padding_strategy.get_columns_padding_required(image_width, max_image_width)
-            rows_padding_required = padding_strategy.get_rows_padding_required(image_height, max_image_height)
-            rows_padding_required_top = int(rows_padding_required / 2)
-            # Make sure no row gets lost through integer division
-            rows_padding_required_bottom = rows_padding_required - rows_padding_required_top
-
-            print("columns_padding_required: " + str(columns_padding_required))
-            print("rows_padding_required: " + str(rows_padding_required))
-
-            # See: https://pytorch.org/docs/stable/_modules/torch/nn/functional.html
-            # pad last dimension (width) by 0, columns_padding_required
-            # and one-but-last dimension (height) by 0, rows_padding_required
-            # p2d = (0, columns_padding_required, rows_padding_required, 0)
-
-            if use_four_pixel_input_blocks:
-                p3d = (0, columns_padding_required,
-                       rows_padding_required_top,
-                       rows_padding_required_bottom, 0, 0)
-                # We want to pad with the value for white, which is 255 for uint8
-                image_padded = torch.nn.functional. \
-                    pad(image, p3d, "constant", IamLinesDataset.UINT8_WHITE_VALUE)
+            if save_examples_to_individual_files and \
+                    SeparatelySavedExamplesDataset.nonempty_file_for_example_index_exists(individual_files_save_folder_path, sample_index):
+                # No need to create and save example, already exists
+                print("Example " + SeparatelySavedExamplesDataset.example_path(individual_files_save_folder_path, sample_index) + " was already saved " +
+                      "previously, so no using that and not recreating it")
+                sys.stdout.flush()
 
             else:
-
-                p2d = (0, columns_padding_required,
-                       rows_padding_required_top,
-                       rows_padding_required_bottom)
-                # We want to pad with the value for white, which is 255 for uint8
-                image_padded = torch.nn.functional. \
-                    pad(image, p2d, "constant", IamLinesDataset.UINT8_WHITE_VALUE)
-
-            # Show padded image: for debugging
-            # print("image: " + str(image))
-
-            # Show padded images with the least padding, to see if the
-            # padding is really necessary
-            visualization_cutoff = 0.90 * max_image_height
-            #if image_height > visualization_cutoff:
-            #     util.image_visualization.imshow_tensor_2d(image_padded)
-
-            #util.image_visualization.imshow_tensor_2d(image_padded)
-
-            # outputs_per_label = (image_width / float(self.width_required_per_network_output_column)) / labels.size(0)
-            # if outputs_per_label > 15:
-            #     print("outputs_per_label: " + str(outputs_per_label))
-            #     print("labels: " + str(labels))
-            #     util.image_visualization.imshow_tensor_2d(image)
-
-            # Add additional bogus channel dimension, since a channel dimension is expected by downstream
-            # users of this method
-            print("before: image.size(): " + str(image.size()))
-            if not use_four_pixel_input_blocks:
-                image_padded = image_padded.unsqueeze(0)
-            print("after padding: image_padded.size(): " + str(image_padded.size()))
-            # print("after padding: image_padded: " + str(image_padded))
-
-            if not keep_unsigned_int_format:
-                image_padded = IamLinesDataset.convert_unsigned_int_image_tensor_to_float_image_tensor(image_padded)
-            # print("after padding and type conversion: image_padded: " + str(image_padded))
-
-            digits_padding_required = max_labels_length - labels_length
-            p1d = (0, digits_padding_required)  # pad last dim by 1 on end side
-            labels_padded = torch.nn.functional. \
-                pad(labels, p1d, "constant", -2)
-            labels_padded = IamLinesDataset.\
-                get_labels_with_probabilities_length_and_real_sequence_length(labels_padded, image_width,
-                                                                              labels_length)
-
-            example =  tuple((image_padded, labels_padded))
-
-            if save_examples_to_individual_files:
-                SeparatelySavedExamplesDataset.save_example_to_file(individual_files_save_folder_path,
-                                                                    example, sample_index)
-            else:
-                train_set_pairs.append(example)
+                example = IamLinesDataset.create_example_for_sample(keep_unsigned_int_format, use_four_pixel_input_blocks,
+                                                         scale_reduction_factor, max_image_height, max_image_width, max_labels_length, padding_strategy, sample)
+                if save_examples_to_individual_files:
+                    SeparatelySavedExamplesDataset.save_example_to_file(individual_files_save_folder_path,
+                                                                        example, sample_index)
+                else:
+                    train_set_pairs.append(example)
 
             percentage_complete = int((float(sample_index) / len(data_set)) * 100)
 
@@ -535,6 +415,158 @@ class IamLinesDataset(Dataset):
         data_loader = padding_strategy.create_data_loader(train_set_pairs, batch_size,
                                                            shuffle)
         return data_loader
+
+    @staticmethod
+    def create_example_for_sample(keep_unsigned_int_format: bool,
+                                                 use_four_pixel_input_blocks: bool, scale_reduction_factor: int,
+                                  max_image_height: int,
+                                  max_image_width: int,
+                                  max_labels_length: int,
+                                  padding_strategy,
+                                  sample):
+
+        to_tensor = ToTensor()
+
+        # if sample_index >= 32:   # Hack for fast testing
+        #    break
+
+        image_original = sample["image"]
+        image_original_dtype = image_original.dtype
+
+        # print("image_original: " + str(image_original))
+        # print("image_original.dtype: " + str(image_original.dtype))
+
+        image_height_original, image_width_original = image_original.shape
+
+        # Only images with both dimensions larger than the scale reduction factor
+        # are rescaled, to avoid errors in scaling
+        if image_height_original > scale_reduction_factor and image_width_original > scale_reduction_factor:
+            image_height = int(image_height_original / scale_reduction_factor)
+            image_width = int(image_width_original / scale_reduction_factor)
+
+            if not use_four_pixel_input_blocks:
+                rescale = Rescale(tuple([image_height, image_width]))
+                # Rescale works on ndarrays, not on pytorch tensors
+                # print("before: sample[\"image\"].dtype: " + str(sample["image"].dtype))
+
+                sample = rescale(sample)
+        else:
+            image_height = image_height_original
+            image_width = image_width_original
+        image_rescaled = sample["image"]
+        # print("image_rescaled.dtype: " + str(image_rescaled.dtype))
+
+        # Sanity check that the image dtype remained the same
+        if image_original_dtype != image_rescaled.dtype:
+            raise RuntimeError("Error: the image dtype changed")
+
+        sample_pytorch = to_tensor(sample)
+
+        if use_four_pixel_input_blocks:
+            # Create a version of original image formed by stacking the input pixels within blocks of
+            # 2 by 2 along the third (=channel) dimension
+            four_pixel_block_image = TensorBlockStacking.rescale_tensor_by_stacking_tensor_blocks(
+                sample_pytorch['image'],
+                SizeTwoDimensional.create_size_two_dimensional(2, 2),
+                IamLinesDataset.UINT8_WHITE_VALUE)
+            sample_pytorch['image'] = four_pixel_block_image
+            image_height = four_pixel_block_image.size(1)
+            image_width = four_pixel_block_image.size(2)
+
+
+
+            # print("sample_pytorch: " + str(sample_pytorch))
+
+        image = sample_pytorch["image"]
+        # print(">>> image size: " + str(image.size()))
+
+        # Get the labels and labels length
+        labels = sample_pytorch["labels"]
+        labels_length = labels.size(0)
+
+        # print("image_height: " + str(image_height))
+        # print("image_width: " + str(image_width))
+        # print("labels_length: " + str(labels_length))
+
+        # Use the provided function "get_collumns_padding_required_fuction" to
+        # determine the columns of padding required
+        columns_padding_required = padding_strategy.get_columns_padding_required(
+            image_width, max_image_width)
+        rows_padding_required = padding_strategy.get_rows_padding_required(
+            image_height, max_image_height)
+        rows_padding_required_top = int(rows_padding_required / 2)
+        # Make sure no row gets lost through integer division
+        rows_padding_required_bottom = rows_padding_required - rows_padding_required_top
+
+        print("columns_padding_required: " + str(columns_padding_required))
+        print("rows_padding_required: " + str(rows_padding_required))
+
+        # See: https://pytorch.org/docs/stable/_modules/torch/nn/functional.html
+        # pad last dimension (width) by 0, columns_padding_required
+        # and one-but-last dimension (height) by 0, rows_padding_required
+        # p2d = (0, columns_padding_required, rows_padding_required, 0)
+
+        if use_four_pixel_input_blocks:
+            p3d = (0, columns_padding_required,
+                   rows_padding_required_top,
+                   rows_padding_required_bottom, 0, 0)
+            # We want to pad with the value for white, which is 255 for uint8
+            image_padded = torch.nn.functional. \
+                pad(image, p3d, "constant", IamLinesDataset.UINT8_WHITE_VALUE)
+
+        else:
+
+            p2d = (0, columns_padding_required,
+                   rows_padding_required_top,
+                   rows_padding_required_bottom)
+            # We want to pad with the value for white, which is 255 for uint8
+            image_padded = torch.nn.functional. \
+                pad(image, p2d, "constant", IamLinesDataset.UINT8_WHITE_VALUE)
+
+        # Show padded image: for debugging
+        # print("image: " + str(image))
+
+        # Show padded images with the least padding, to see if the
+        # padding is really necessary
+        visualization_cutoff = 0.90 * max_image_height
+        # if image_height > visualization_cutoff:
+        #     util.image_visualization.imshow_tensor_2d(image_padded)
+
+        # util.image_visualization.imshow_tensor_2d(image_padded)
+
+        # outputs_per_label = (image_width / float(self.width_required_per_network_output_column)) / labels.size(0)
+        # if outputs_per_label > 15:
+        #     print("outputs_per_label: " + str(outputs_per_label))
+        #     print("labels: " + str(labels))
+        #     util.image_visualization.imshow_tensor_2d(image)
+
+        # Add additional bogus channel dimension, since a channel dimension is expected by downstream
+        # users of this method
+        print("before: image.size(): " + str(image.size()))
+        if not use_four_pixel_input_blocks:
+            image_padded = image_padded.unsqueeze(0)
+        print(
+            "after padding: image_padded.size(): " + str(image_padded.size()))
+        # print("after padding: image_padded: " + str(image_padded))
+
+        if not keep_unsigned_int_format:
+            image_padded = IamLinesDataset.convert_unsigned_int_image_tensor_to_float_image_tensor(
+                image_padded)
+        # print("after padding and type conversion: image_padded: " + str(image_padded))
+
+        digits_padding_required = max_labels_length - labels_length
+        p1d = (0, digits_padding_required)  # pad last dim by 1 on end side
+        labels_padded = torch.nn.functional. \
+            pad(labels, p1d, "constant", -2)
+        labels_padded = IamLinesDataset. \
+            get_labels_with_probabilities_length_and_real_sequence_length(
+            labels_padded, image_width,
+            labels_length)
+
+        example = tuple((image_padded, labels_padded))
+
+        return example
+
 
     @staticmethod
     def check_fractions_add_up_to_one(fractions: list):
@@ -620,8 +652,9 @@ class IamLinesDataset(Dataset):
             use_on_demand_example_loading: bool
     ):
 
-        if os.path.isfile(dataset_save_or_load_file_path):
-            return IamLinesDataset.load_dataset_from_file(dataset_save_or_load_file_path)
+        dataset_save_or_load_file_path_with_batch_size = IamLinesDataset.get_dataset_save_or_load_file_path_with_batch_size(dataset_save_or_load_file_path, batch_size)
+        if os.path.isfile(dataset_save_or_load_file_path_with_batch_size):
+            return IamLinesDataset.load_dataset_from_file(dataset_save_or_load_file_path_with_batch_size)
 
         IamLinesDataset.check_fractions_add_up_to_one(list([train_examples_fraction,
                                                             validation_examples_fraction,
@@ -649,7 +682,7 @@ class IamLinesDataset(Dataset):
             save_examples_to_individual_files = use_on_demand_example_loading,
             dataset_save_or_load_file_path=dataset_save_or_load_file_path)
 
-        IamLinesDataset.save_dataset_to_file(dataset_save_or_load_file_path, train_loader, validation_loader, test_loader)
+        IamLinesDataset.save_dataset_to_file(dataset_save_or_load_file_path_with_batch_size, train_loader, validation_loader, test_loader)
 
         return train_loader, validation_loader, test_loader
 
@@ -741,6 +774,12 @@ class IamLinesDataset(Dataset):
             print(">>>Loading data from saved file \"" + dataset_load_file_path + "\"...")
             train_loader, validation_loader, test_loader = torch.load(dataset_load_file_path)
             print("done.")
+            print(">>> Showing dataset sizes for dataloaders... ")
+            print(">>>  len(train_loader.dataset): " + str(len(train_loader.dataset)))
+            print(">>>  len(validation_loader.dataset): " + str(
+                len(validation_loader.dataset)))
+            print(">>>  len(test_loader.dataset): " + str(
+                len(test_loader.dataset)))
             return train_loader, validation_loader, test_loader
 
     @staticmethod
@@ -763,8 +802,9 @@ class IamLinesDataset(Dataset):
             use_on_demand_example_loading: bool
     ):
 
-        if os.path.isfile(dataset_save_or_load_file_path):
-            return IamLinesDataset.load_dataset_from_file(dataset_save_or_load_file_path)
+        dataset_save_or_load_file_path_with_batch_size = IamLinesDataset.get_dataset_save_or_load_file_path_with_batch_size(dataset_save_or_load_file_path, batch_size)
+        if os.path.isfile(dataset_save_or_load_file_path_with_batch_size):
+            return IamLinesDataset.load_dataset_from_file(dataset_save_or_load_file_path_with_batch_size)
 
         train_example_ids_set = IamLinesDataset.get_iam_example_ids_set_from_split_file(train_examples_split_file_path)
         dev_example_ids_set = IamLinesDataset.get_iam_example_ids_set_from_split_file(dev_examples_split_file_path)
@@ -783,7 +823,7 @@ class IamLinesDataset(Dataset):
             dataset_save_or_load_file_path=dataset_save_or_load_file_path
         )
 
-        IamLinesDataset.save_dataset_to_file(dataset_save_or_load_file_path, train_loader, validation_loader, test_loader)
+        IamLinesDataset.save_dataset_to_file(dataset_save_or_load_file_path_with_batch_size, train_loader, validation_loader, test_loader)
 
         return train_loader, validation_loader, test_loader
 
