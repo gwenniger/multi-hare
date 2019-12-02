@@ -1,0 +1,21 @@
+This software includes the following libraries:
+ warp-ctc 
+ - Website: https://github.com/SeanNaren/warp-ctc
+ - Apache License 2.0
+ - Copyright (c) 2015--2018, Sean Naren. All rights reserved.
+  (an extension of)
+ - Website: https://github.com/baidu-research/warp-ctc
+ - Apache License 2.0
+ - Copyright (c)  2015-2016 Baidu USA LLC. All rights reserved.
+
+ ctc-decode
+ - Website: https://github.com/parlance/ctcdecode
+ - MIT License
+ - Copyright (c) 2017 Ryan Leary
+
+ KenLM
+ - Website: https://kheafield.com/code/kenlm/, https://github.com/kpu/kenlm
+ - (mostly) LGPL
+ - Copyright (c) Kenneth Heafield
+ -   
+ - 

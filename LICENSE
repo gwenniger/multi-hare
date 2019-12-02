@@ -1,62 +1,114 @@
-The efficient handwriting recognition with multi-dimensional long short-term recurrent neural networks (MULTI-HARE) License
+					Software License
 
-Copyright (c) 2019, Gideon Maillette de Buy Wenniger.
-All rights reserved.
+This licence agreement (the “Licence”) is a legal agreement between you (the “Licensee” or “you”) and Dublin City
+University of Collins Avenue, Glasnevin, Dublin 9, Ireland (the “Licensor”, “DCU”, “us” or “we”) for Handwriting
+Recognition (the “Software”).
 
-Contains third party code from other projects. See below.
+IMPORTANT NOTICE TO ALL USERS:
+BY USING THE SOFTWARE, YOU AGREE TO BE BOUND BY THE TERMS OF THIS LICENCE. IF YOU DO NOT AGREE TO THE
+TERMS OF THIS LICENCE, DO NOT USE THE SOFTWARE.
 
-This license is derived from the Q Public License v1.0 and the Qt Non-Commercial License v1.0 which are both Copyright by Trolltech AS, Norway.
-The aim of this license is to lay down the conditions enabling you to use, modify and circulate the SOFTWARE, use of third-party application programs based on the Software and publication of results obtained through the use of modified and unmodified versions of the SOFTWARE.
-However, Gideon Maillette de Buy Wenniger remains the author of the SOFTWARE and so retain property rights and the use of all ancillary rights.
-The SOFTWARE is defined as all successive versions of MULTI-HARE software and their documentation that have been developed by Gideon Maillette de Buy Wenniger.
-When you access and use the SOFTWARE, you are presumed to be aware of and to have accepted all the rights and obligations of the present license:
+Parties hereto agree as follows:
+Grant and scope of licence
 
- 1. You are granted the non-exclusive rights set forth in this license provided you agree to and comply with any and all conditions in this license. Whole or partial distribution of the Software, or software items that link with the Software, in any form signifies acceptance of this license for non-commercial use only.
- 2. You may copy and distribute the Software in unmodified form provided that the entire package, including - but not restricted to - copyright, trademark notices and disclaimers, as released by the initial developer of the Software, is distributed.
- 3. You may make modifications to the Software and distribute your modifications, in a form that is separate from the Software, such as patches. The following restrictions apply to modifications:
-    a. Modifications must not alter or remove any copyright notices in the Software.
-    b When modifications to the Software are released under this license, a non-exclusive royalty-free right is granted to the initial developer of the Software to distribute your modification in future versions of the Software provided such versions remain available under these terms in addition to any other license(s) of the initial developer.
- 4. You may distribute machine-executable forms of the Software or machine-executable forms of modified versions of the Software, provided that you meet these restrictions:
-    a. You must include this license document in the distribution.
-    b. You must ensure that all recipients of the machine-executable forms are also able to receive the complete machine-readable source code to the distributed Software, including all modifications, without any charge beyond the costs of data transfer, and place prominent notices in the distribution explaining this.
-    c. You must ensure that all modifications included in the machine-executable forms are available under the terms of this license.
- 5. You may use the original or modified versions of the Software to compile, link and run application programs legally developed by you or by others.
- 6. You may develop application programs, reusable components and other software items, in a non-commercial setting, that link with the original or modified versions of the Software. These items, when distributed, are subject to the following requirements:
-    a. You must ensure that all recipients of machine-executable forms of these items are also able to receive and use the complete machine-readable source code to the items without any charge beyond the costs of data transfer.
-    b. You must explicitly license all recipients of your items to use and re-distribute original and modified versions of the items in both machine-executable and source code forms. The recipients must be able to do so without any charges whatsoever, and they must be able to re-distribute to anyone they choose.
-    c. If an application program gives you access to functionality of the Software for development of application programs, reusable components or other software components (e.g. an application that is a scripting wrapper), usage of the application program is considered to be usage of the Software and is thus bound by this license.
-    d. If the items are not available to the general public, and the initial developer of the Software requests a copy of the items, then you must supply one.
- 7. Users must cite the authors of the Software upon publication of results obtained through the use of original or modified versions of the Software by referring to the following publication:
-    G. Maillette de Buy Wenniger, L. Schomaker, A. Way, “No Padding Please: Efficient Neural Handwriting Recognition”, submitted to ICDAR 2019.
+1. 	In consideration of your agreeing to abide by the terms of this Licence, the Licensor hereby grants to you a non-
+	exclusive, non-transferable, non-sub-licensable, revocable licence to use the Software for non-commercial
+	purposes on the terms of this Licence.
 
- 8. In no event shall the initial developers or copyright holders be liable for any damages whatsoever, including - but not restricted to - lost revenue or profits or other direct, indirect, special, incidental or consequential damages, even if they have been advised of the possibility of such damages, except to the extent invariable law, if any, provides otherwise.
-The Software and this license document are provided "AS IS" with NO EXPLICIT OR IMPLICIT WARRANTY OF ANY KIND, INCLUDING WARRANTY OF DESIGN, ADAPTION, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+2. 	If you intend on using the Software for commercial purposes, you must obtain a commercial licence from the DCU
+	Invent. For further information please contact info@invent.dcu.ie.
 
- 9. You assume all risks concerning the quality or the effects of the SOFTWARE and its use. If the SOFTWARE is defective, you will bear the costs of all required services, corrections or repairs.
- 10. This license has the binding value of a contract.
- 11. The present license and its effects are subject to Dutch law and the competent Dutch Courts.
+Restrictions
+
+3. 	Except as expressly set out in this Licence, you undertake:
+	3.1 	not to use the Software for commercial purposes;
+
+	3.2 	not to translate the Software into any computer language aside from the current source code language;
+		and
+	3.3 	not to rent, lease, sub-license or loan the Software.
+
+Obligations
+
+4. 	You undertake and warrant:
+	4.1 	To reference your use of the Software in any publications or academic research which is based or partly
+		based on findings obtained using the Software including where the Software is used to gather data or
+		information used in such publications or academic research. Your obligations under this clause will be met
+		where you include wording along the following lines in your publication or academic research: “This
+		publication has emanated from research supported in part by a research grant from Science Foundation
+		Ireland under Grant Number 13/RC/2106”.
+
+Intellectual property rights
+
+5. 	You acknowledge that all intellectual property rights in the Software throughout the world belong to the Licensor,
+	that rights in the Software are licensed (not sold) to you, and that you have no rights in, or to, the Software other
+	than the right to use them in accordance with the terms of this Licence.
+
+No Warranty
+
+6. 	You acknowledge that any the Software is provided to you on an &quot;as is&quot; basis now and in the future. All conditions,
+	warranties or other terms which might have effect between the parties or be implied or incorporated into this
+	licence or any collateral contract, whether by statute, common law or otherwise, are hereby excluded to the
+	maximum extent permitted by law, including the implied conditions, warranties or other terms as to satisfactory
+	quality, fitness for purpose or the use of reasonable skill and care in the preparation of the Software.
 
 
-=====================
 
-Includes the following libraries:
- warp-ctc 
- - Website: https://github.com/SeanNaren/warp-ctc
- - Apache License 2.0
- - Copyright (c) 2015--2018, Sean Naren. All rights reserved.
-  (an extension of)
- - Website: https://github.com/baidu-research/warp-ctc
- - Apache License 2.0
- - Copyright (c)  2015-2016 Baidu USA LLC. All rights reserved.
+7. 	You acknowledge that the Software may not be free of errors or bugs. DCU has no obligation to support or update
+	the Software in any way.
 
- ctc-decode
- - Website: https://github.com/parlance/ctcdecode
- - MIT License
- - Copyright (c) 2017 Ryan Leary
+Limitation of Liability
 
- KenLM
- - Website: https://kheafield.com/code/kenlm/, https://github.com/kpu/kenlm
- - (mostly) LGPL
- - Copyright (c) Kenneth Heafield
- -   
- - 
+8. 	You acknowledge that the Software has not been developed to meet your individual requirements and that it is
+	therefore your responsibility to ensure that the facilities and functions of the Software meet your requirements.
+
+9. 	We shall not under any circumstances whatever be liable to you, whether in contract, tort (including negligence),
+	breach of statutory duty, or otherwise, arising under or in connection with the Licence for loss of profits, sales,
+	business, or revenue, business interruption, loss of anticipated savings, loss or corruption of data or information,
+	loss of business opportunity, goodwill or reputation or any indirect or consequential loss or damage.
+
+10. 	Other than the losses set out in term 9 (for which we are not liable), our maximum aggregate liability under or in
+	connection with this Licence whether in contract, tort (including negligence) or otherwise, shall in all
+	circumstances be limited to a sum equal to the total fees paid by the Licensee to DCU. This maximum cap does not
+	apply to term 11.
+
+11. 	Nothing in this Licence shall limit or exclude our liability for death or personal injury resulting from our negligence,
+	fraud or fraudulent misrepresentation or any other liability that cannot be excluded or limited by Irish law.
+
+12. 	This Licence sets out the full extent of our obligations and liabilities in respect of the supply of the Software. Except
+	as expressly stated in this Licence, there are no conditions, warranties, representations or other terms, express or
+	implied, that are binding on us. Any condition, warranty, representation or other term concerning the supply of
+	the Software which might otherwise be implied into, or incorporated in, this Licence whether by statute, common
+	law or otherwise, is excluded to the fullest extent permitted by law.
+
+Termination
+
+13. 	We may terminate this Licence immediately by written notice to you if you commit a breach of this Licence which
+	you fail to remedy (if remediable) within 14 days after the service on you of written notice requiring you to do so.
+
+14. 	Upon termination for any reason:
+	14.1 	all rights granted to you under this Licence shall cease;
+	14.2 	you must cease all activities authorised by this Licence; and
+	14.3 	you must immediately delete or remove the Software from all computer equipment in your possession or
+		under your control.
+
+Other Important Terms
+
+15. 	We may transfer our rights and obligations under this Licence to another organisation, but this will not affect your
+	rights or our obligations under this Licence.
+
+16. 	You may only transfer your rights or your obligations under this Licence to another person if you obtain our prior
+	consent in writing to do so.
+
+17. 	This Licence constitutes the entire agreement between you and us. You acknowledge that you have not relied on
+	any statement, promise or representation made or given by or on behalf of us which is not set out in this Licence.
+
+18. 	If we fail to insist that you perform any of your obligations under this Licence, or if we do not enforce our rights
+	against you, or if we delay in doing so, that will not mean that we have waived our rights against you and will not
+	mean that you do not have to comply with those obligations. If we do waive a default by you, we will only do so in
+	writing, and that will not mean that we will automatically waive any later default by you.
+
+19. 	Each of the conditions of this Licence operates separately. If any court or competent authority decides that any of
+	them are unlawful or unenforceable, the remaining conditions will remain in full force and effect.
+
+20. 	This Licence, its subject matter and its formation, are governed by Irish law. You and we both agree to that the
+	courts of Ireland will have exclusive jurisdiction.
