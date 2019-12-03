@@ -42,11 +42,11 @@ Language Models
 
 The software uses KenLM language models, an interface for training language models is available at 
 language_model/kenlm_interface.py. For replicating the results on the IAM dataset, the use of a strong language
-model trained on the LOB and Brown corpus is important. However, the London__Oslo_Bergen (LOB) corpus, available from:
+model trained on the LOB and Brown corpus is important. However, the London_Oslo_Bergen (LOB) corpus, available from:
 http://ota.ox.ac.uk/desc/0167 is in a somewhat archaic format. It therefore needs to be converted to be compatible with IAM. 
-The file monolingual_data_preprocessing/lob_original_preprocessor.py takes care of this.
+The file <em>monolingual_data_preprocessing/lob_original_preprocessor.py</em> takes care of this.
 The BROWN corpus is taken from NLTL: http://www.nltk.org/nltk_data/. It needs much less preprocessing, the file 
-to do the preprocessing. The file monolingual_data_preprocessing/brown_corpus_preprocessor.py.
+to do this preprocessing  is <em>monolingual_data_preprocessing/brown_corpus_preprocessor.py</em>.
 
  
 
