@@ -4,6 +4,11 @@ from data_preprocessing.iam_database_preprocessing.iam_dataset import IamLinesDa
 from data_preprocessing.monolingual_data_preprocessing.lob_original_preprocessor import LobOriginalPreprocessor
 from util.utils import Utils
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
 
 class FilteredLobCorpusCreator:
 

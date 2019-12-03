@@ -7,6 +7,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
+
 class HandwritingCenteringAndClipping:
     #TEST_IMAGE_PATH = "/datastore/data/handwriting-recognition/IAM-database/data/lines/a01/a01-000u/a01-000u-00.png"
     # TEST_IMAGE_PATH = "/datastore/data/handwriting-recognition/IAM-database/data/lines/a01/a01-000u/a01-000u-06.png"

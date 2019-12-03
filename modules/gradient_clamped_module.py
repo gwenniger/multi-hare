@@ -2,6 +2,11 @@ import torch
 from torch.nn.modules.module import Module
 from torch.autograd.function import Function
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
 
 # https://discuss.pytorch.org/t/defining-backward-function-in-nn-module/5047
 class GradientClampingFunction(Function):

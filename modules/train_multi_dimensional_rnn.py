@@ -19,6 +19,10 @@ import util.timing
 import modules.find_bad_gradients
 from graphviz import render
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
 
 
 def test_mdrnn_cell():

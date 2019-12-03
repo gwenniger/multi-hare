@@ -17,6 +17,12 @@ from modules.size_two_dimensional import SizeTwoDimensional
 from data_preprocessing.iam_database_preprocessing.seperately_saved_examples_dataset import SeparatelySavedExamplesDataset
 import math
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
+
 TRAIN_LABEL = "train"
 DEV_LABEL = "dev"
 TEST_LABEL = "test"

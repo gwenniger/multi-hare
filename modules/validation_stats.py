@@ -4,6 +4,10 @@ Validation stats class. Stores (exact match) accuracy, and perhaps in the future
 validation metrics
 """
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
 
 class ValidationStats:
 

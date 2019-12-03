@@ -1,4 +1,10 @@
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
+
 """
 This class implements the Levenshtein distance based on pseudo code adapted from Wikipedia
 https://en.wikipedia.org/wiki/Levenshtein_distance

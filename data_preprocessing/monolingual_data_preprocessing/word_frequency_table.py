@@ -3,6 +3,11 @@ import sys
 from collections import OrderedDict
 from util.utils import Utils
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
 
 class WordCasingGrouping:
 

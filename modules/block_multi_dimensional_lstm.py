@@ -4,6 +4,11 @@ from util.tensor_list_chunking import TensorListChunking
 from modules.size_two_dimensional import SizeTwoDimensional
 from torch.nn.modules.module import Module
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
 
 # A MultiDimensionalBlockLSTM is a neural network layer that applies a MultiDimensionalLSTM
 # to blocks of a 2 dimensional (4 dimensional including the batch and input channel dimensions)

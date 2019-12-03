@@ -32,6 +32,11 @@ from data_preprocessing.iam_database_preprocessing.string_to_index_mapping_table
 import os
 import opts
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
 
 parser = argparse.ArgumentParser(
     description='train.py',

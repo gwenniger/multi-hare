@@ -1,6 +1,12 @@
 from util.linux_interactor import LinuxInteractor
 import sys
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
+
 class KenlmInterface:
     KEN_LM_ROOT_DIR_SUFFIX = "libraries/ctcdecode/third_party/kenlm"
     BIN_SUFFIX = "/build/bin/"

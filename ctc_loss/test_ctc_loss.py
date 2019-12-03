@@ -5,6 +5,12 @@ import warpctc_pytorch
 import torch.optim as optim
 from util.tensor_utils import TensorUtils
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
+
 # This test class aims to clarify how to use the waprctc_pytorch interface
 # by different examples.
 # These are some important

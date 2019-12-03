@@ -6,6 +6,11 @@ import torch.nn as nn
 from modules.size_two_dimensional import SizeTwoDimensional
 from modules.multi_dimensional_lstm import MultiDimensionalLSTM
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
 
 class MDLSTMLayerPairSpecificParameters:
     def __init__(self, input_channels: int, mdlstm_hidden_states_size: int,

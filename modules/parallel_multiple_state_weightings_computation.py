@@ -8,6 +8,11 @@ from modules.gradient_clamped_module import GradientClampedModule
 from util.tensor_utils import TensorUtils
 from modules.xavier_weight_initialization_correction_for_grouping import XavierWeightInitializationCorrectionForGrouping
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
 
 class ParallelMultipleStateWeightingsComputationBase(Module):
     def __init__(self, hidden_states_size: int,

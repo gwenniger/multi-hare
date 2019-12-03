@@ -4,6 +4,11 @@ import cv2
 from data_preprocessing.rimes_data_preprocessing.xml_annotation_file_reader import XMLAnnotationFileReader
 from data_preprocessing.rimes_data_preprocessing.xml_annotation_file_reader import RimesLine
 
+__author__ = "Gideon Maillette de Buy Wenniger"
+__copyright__ = "Copyright 2019, Gideon Maillette de Buy Wenniger"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Apache License 2.0"
+
 LINE_STRIPS_OUTPUT_FOLDER_NAME = "line_strips"
 LINE_STRIPS_IMPROVED_OUTPUT_FOLDER_NAME = "line_strips_improved"
 

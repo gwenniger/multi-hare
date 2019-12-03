@@ -5,6 +5,11 @@ from util.utils import Utils
 import torch.nn.functional as F
 from modules.inside_model_gradient_clipping import InsideModelGradientClamping
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
 
 class StateUpdateBlock():
     def __init__(self, hidden_states_size: int):

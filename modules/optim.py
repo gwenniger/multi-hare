@@ -1,6 +1,11 @@
 import torch.optim as optim
 from modules.gradient_clipping import GradientClipping
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
 
 class MultipleOptimizer(object):
     def __init__(self, op):

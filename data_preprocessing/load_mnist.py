@@ -10,6 +10,12 @@ from random import randint
 import torch.nn.functional
 from data_preprocessing.padding_strategy import PaddingStrategy
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
+
 IMAGE_HEIGHT = 16
 IMAGE_WIDTH = 16
 HEIGHT_REQUIRED_PER_NETWORK_OUTPUT_COLUMN = 16

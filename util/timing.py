@@ -3,6 +3,11 @@ import time
 import math
 import datetime
 
+__author__ = "Gideon Maillette de Buy Wenniger"
+__copyright__ = "Copyright 2019, Gideon Maillette de Buy Wenniger"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Apache License 2.0"
+
 
 def as_minutes(s):
     m = math.floor(s / 60)

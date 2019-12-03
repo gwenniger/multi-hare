@@ -4,6 +4,12 @@ import util.image_visualization
 from modules.mdlstm_examples_packing import MDLSTMExamplesPacking
 from util.tensor_utils import TensorUtils
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
+
 """
 This test class tests multi-directional MDLSTM by comparing its output by the output 
 produced by four one-directional MDLSTMs that use the same weights, which are copied 

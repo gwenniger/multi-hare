@@ -17,6 +17,11 @@ from modules.parallel_multiple_state_weightings_computation import ParallelMulti
 from modules.size_two_dimensional import SizeTwoDimensional
 from util.tensor_chunking import TensorChunking
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
 
 class MDRNNCellBase(Module):
 

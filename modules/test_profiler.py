@@ -1,6 +1,11 @@
 import torch
 from torch.autograd import Variable
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
 
 def test_profiler():
     x = torch.randn((1, 1), requires_grad=True)

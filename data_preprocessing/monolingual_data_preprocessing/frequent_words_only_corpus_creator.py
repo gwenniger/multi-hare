@@ -2,6 +2,11 @@ from util.utils import Utils
 from data_preprocessing.monolingual_data_preprocessing.word_frequency_table import WordFrequencyTable
 import sys
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
 
 class FrequentWordsOnlyCorpusCreator:
     INFREQUENT_WORD_SYMBOL = "@@@-INFREQUENT-WORD-@@@"

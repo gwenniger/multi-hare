@@ -2,6 +2,11 @@ import torch.tensor
 from util.utils import Utils
 from modules.size_two_dimensional import SizeTwoDimensional
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
 
 # This class takes care of chunking a four-dimensional image tensor with dimensions
 # 1: batch_size, 2: channels, 3: height, 4: width

@@ -4,6 +4,14 @@ from ._functions_lists import ScatterList, GatherList
 from collections import OrderedDict
 import custom_data_parallel.comm_list
 
+__author__ = "Gideon Maillette de Buy Wenniger"
+__copyright__ = "Copyright 2019, Gideon Maillette de Buy Wenniger"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Apache License 2.0"
+"""
+Extended from the implementation at
+https://github.com/pytorch/pytorch/tree/master/torch/nn/parallel
+"""
 
 def scatter(inputs, target_gpus, dim=0):
     r"""

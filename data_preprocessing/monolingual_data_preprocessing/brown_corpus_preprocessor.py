@@ -4,6 +4,11 @@ from nltk.corpus import brown
 import nltk
 nltk.download('brown')
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
 
 class BrownCorpusPreprocessor:
 

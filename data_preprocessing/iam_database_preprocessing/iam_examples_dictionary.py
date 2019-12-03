@@ -3,6 +3,12 @@ from skimage import io
 from collections import OrderedDict
 from data_preprocessing.rimes_data_preprocessing.rimes_line_information import RimesLineInformation
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
+
 class BoundingBox():
     def __init__(self, x: int, y: int, w: int, h: int):
         self.x = x

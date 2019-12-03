@@ -2,6 +2,10 @@ import subprocess
 import os
 import sys
 
+__author__ = "Gideon Maillette de Buy Wenniger"
+__copyright__ = "Copyright 2019, Gideon Maillette de Buy Wenniger"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Apache License 2.0"
 
 # import subprocess
 # p = subprocess.Popen([command, argument1,...], cwd=working_directory)

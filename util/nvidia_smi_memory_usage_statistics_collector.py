@@ -4,6 +4,11 @@ import time
 import statistics
 import threading
 
+__author__ = "Gideon Maillette de Buy Wenniger"
+__copyright__ = "Copyright 2019, Gideon Maillette de Buy Wenniger"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Apache License 2.0"
+
 
 # See: https://stackoverflow.com/questions/19846332/python-threading-inside-a-class
 def threaded(fn):

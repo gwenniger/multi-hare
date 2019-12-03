@@ -9,6 +9,11 @@ from torch.nn.modules.module import Module
 import torch
 from util.tensor_utils import TensorUtils
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
 
 class MultiDimensionalLSTMParametersBase(Module):
     # https://github.com/pytorch/pytorch/issues/750

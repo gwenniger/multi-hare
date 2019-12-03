@@ -2,6 +2,11 @@ import torch
 import modules.multi_dimensional_lstm_parameters
 import torch.nn as nn
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
 
 class TestMultiDimensionalLSTMParameters:
     HIDDEN_STATES_SIZE = 50

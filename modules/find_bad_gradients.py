@@ -3,6 +3,12 @@ from graphviz import render
 import torch
 from torch.autograd import Variable, Function
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
+
 # See: https://discuss.pytorch.org/t/how-to-check-for-vanishing-exploding-gradients/9019/3
 
 

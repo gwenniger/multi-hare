@@ -3,6 +3,11 @@ from abc import ABC
 import torch
 from data_preprocessing.last_minute_padding import LastMinutePadding
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
 
 class PaddingStrategy(ABC):
     """

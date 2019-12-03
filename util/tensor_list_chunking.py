@@ -6,6 +6,13 @@ import util.timing
 from util.tensor_utils import TensorUtils
 from collections import OrderedDict
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
+
+
 # This class takes care of chunking a list of four-dimensional image tensors with
 # list elements of the dimensions
 # 1: channels, 2: height, 3: width

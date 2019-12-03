@@ -2,6 +2,15 @@ import torch
 import custom_data_parallel.comm_list as comm_list
 from torch.autograd import Function
 
+__author__ = "Gideon Maillette de Buy Wenniger"
+__copyright__ = "Copyright 2019, Gideon Maillette de Buy Wenniger"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Apache License 2.0"
+"""
+Extended from the implementation at
+https://github.com/pytorch/pytorch/tree/master/torch/nn/parallel
+"""
+
 """
 These list variants of Scatter and Gather are eventually not used in the 
 customized scatter_gather. 

@@ -3,6 +3,12 @@ from data_preprocessing.rimes_data_preprocessing.xml_annotation_file_reader impo
 from data_preprocessing.rimes_data_preprocessing.line_strip_extractor import LineStripExtractor
 from data_preprocessing.rimes_data_preprocessing.rimes_tokenize import CustomTreebankWordTokenizer
 
+__author__ = "Gideon Maillette de Buy Wenniger"
+__copyright__ = "Copyright 2019, Gideon Maillette de Buy Wenniger"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Apache License 2.0"
+
+
 class LineStripAnnotationCreator:
 
     def __init__(self, rimes_pages: list, line_strips_annotation_file_path: str,

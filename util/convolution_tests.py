@@ -4,6 +4,12 @@ import torch.autograd as autograd
 from torch.autograd import Variable
 import torch.nn.functional as F
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
+
 class ConvolutationTests:
 
     def __init__(self):

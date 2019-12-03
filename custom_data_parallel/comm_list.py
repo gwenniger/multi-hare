@@ -5,6 +5,14 @@ from torch._utils import _accumulate, _take_tensors, _flatten_dense_tensors, \
     _unflatten_sparse_tensors, _reorder_tensors_as
 from util.utils import Utils
 
+__author__ = "Gideon Maillette de Buy Wenniger"
+__copyright__ = "Copyright 2019, Gideon Maillette de Buy Wenniger"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Apache License 2.0"
+"""
+Extended from the implementation at
+https://github.com/pytorch/pytorch/tree/master/torch/nn/parallel
+"""
 
 def chunk_list(list_of_tensors: list, number_of_chunks: int):
     minimal_chunk_size = int(len(list_of_tensors) / number_of_chunks)

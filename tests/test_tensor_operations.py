@@ -1,5 +1,10 @@
 import torch
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
 
 def test_view():
     tensor_one = torch.Tensor([range(1, 49)]).view(2, 2, 2, 6)

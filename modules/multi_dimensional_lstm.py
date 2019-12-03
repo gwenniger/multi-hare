@@ -25,6 +25,11 @@ from modules.inside_model_gradient_clipping import InsideModelGradientClamping
 from util.tensor_utils import TensorUtils
 from modules.mdlstm_examples_packing import MDLSTMExamplesPacking
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
 
 def printgradnorm(self, grad_input, grad_output):
     print('Inside ' + self.__class__.__name__ + ' backward')

@@ -17,6 +17,11 @@ from modules.network_to_softmax_network import NetworkToSoftMaxNetwork
 import custom_data_parallel.data_parallel
 from util.tensor_utils import TensorUtils
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
 class ModelProperties:
 
     def __init__(self, image_input_is_unsigned_int, width_reduction_factor: int):

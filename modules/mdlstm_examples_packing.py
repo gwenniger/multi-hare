@@ -12,6 +12,11 @@ from util.utils import Utils
 import util.image_visualization
 from util.tensor_flipping import TensorFlipping
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
 
 class IndexedExampleSize:
 

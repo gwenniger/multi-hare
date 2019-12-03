@@ -3,6 +3,12 @@ import util.tensor_utils
 import inspect
 from util.tensor_utils import TensorUtils
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
+
 class InsideModelGradientClamping:
     # CLAMPING_BOUND = 0.05
     # CLAMPING_BOUND = 0.1

@@ -2,6 +2,11 @@ import torchvision.transforms as transforms
 import torch
 import torchvision
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
 
 def get_train_set():
     transform = transforms.Compose(

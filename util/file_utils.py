@@ -2,6 +2,11 @@ from os import listdir
 from os.path import isfile, join, abspath
 import os.path
 
+__author__ = "Gideon Maillette de Buy Wenniger"
+__copyright__ = "Copyright 2019, Gideon Maillette de Buy Wenniger"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Apache License 2.0"
+
 
 class FileUtils:
 

@@ -7,6 +7,14 @@ from custom_data_parallel.scatter_gather import scatter_kwargs, gather
 from torch.nn.parallel.replicate import replicate
 from torch.nn.parallel.parallel_apply import parallel_apply
 
+__author__ = "Gideon Maillette de Buy Wenniger"
+__copyright__ = "Copyright 2019, Gideon Maillette de Buy Wenniger"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Apache License 2.0"
+"""
+Extended from the implementation at
+https://github.com/pytorch/pytorch/tree/master/torch/nn/parallel
+"""
 
 def _check_balance(device_ids):
     imbalance_warn = """

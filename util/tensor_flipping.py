@@ -1,6 +1,11 @@
 import torch
 from  util.tensor_utils import TensorUtils
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
 # Code adapted from
 # https://github.com/pytorch/pytorch/issues/229
 

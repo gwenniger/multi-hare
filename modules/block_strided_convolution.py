@@ -10,6 +10,11 @@ from modules.module_io_structuring import ModuleIOStructuring
 import torch
 import util.timing
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
 
 class BlockStridedConvolution(Module):
 

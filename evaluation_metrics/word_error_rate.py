@@ -1,6 +1,11 @@
 import evaluation_metrics.levenshtein_distance as ld
 from data_preprocessing.iam_database_preprocessing.iam_examples_dictionary import IamLineInformation
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
 
 """
 The character error rate (CER is depfined based upon the

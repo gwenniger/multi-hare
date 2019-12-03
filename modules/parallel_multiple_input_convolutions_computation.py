@@ -7,6 +7,12 @@ from modules.inside_model_gradient_clipping import InsideModelGradientClamping
 from modules.gradient_clamped_module import GradientClampedModule
 from modules.xavier_weight_initialization_correction_for_grouping import XavierWeightInitializationCorrectionForGrouping
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
+
 # This class optimizes the computation of multiple 2d input convolutions
 # that are computed from the same input, by computing them as a single
 # convolution with more outputs, and then splitting the results.

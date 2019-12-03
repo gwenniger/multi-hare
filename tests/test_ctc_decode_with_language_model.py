@@ -4,6 +4,12 @@ from language_model.kenlm_interface import KenlmInterface
 import ctcdecode
 from modules.evaluator import Evaluator
 
+__author__ = "Dublin City University"
+__copyright__ = "Copyright 2019, Dublin City University"
+__credits__ = ["Gideon Maillette de Buy Wenniger"]
+__license__ = "Dublin City University Software License (enclosed)"
+
+
 class TestLanguageModelCreator:
     # HANDWRITING_RECOGNITION_ROOT_DIR = "~/AI/handwriting-recognition/"
     LANGUAGE_MODEL_OUTPUT_DIR_SUFFIX = "tests/language_models/"
