@@ -86,6 +86,10 @@ available from: https://github.com/baidu-research/warp-ctc.
 Note that the paper has also been accepted and presented at ICDAR 2019
 https://icdar2019.org/list-of-accepted-papers/.
 
+In addition to citing the paper, please see point 4.1 of the license 
+concerning how to credit Science Foundation Ireland for partly funding 
+the development of this software.
+
 <!---
 
 * Quick summary
