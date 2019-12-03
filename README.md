@@ -74,14 +74,14 @@ available from: https://github.com/baidu-research/warp-ctc.
 
 ### Citation ###
 
-@article{DBLP:journals/corr/abs-1902-11208,
-  author    = {Gideon Maillette de Buy Wenniger and Lambert Schomaker and Andy Way},
-  title     = {No Padding Please: Efficient Neural Handwriting Recognition},
-  journal   = {CoRR},
-  volume    = {abs/1902.11208},
-  year      = {2019},
-  url       = {http://arxiv.org/abs/1902.11208}
-}
+@article{no-padding-please,  
+  author    = {Gideon Maillette de Buy Wenniger and Lambert Schomaker and Andy Way},  
+  title     = {No Padding Please: Efficient Neural Handwriting Recognition},  
+  journal   = {CoRR},  
+  volume    = {abs/1902.11208},  
+  year      = {2019},  
+  url       = {http://arxiv.org/abs/1902.11208}  
+}  
 
 Note that the paper has also been accepted and presented at ICDAR 2019
 https://icdar2019.org/list-of-accepted-papers/.
