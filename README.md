@@ -4,7 +4,7 @@
 
 ### What is this repository for? ###
 
-This repository implements Multidimensional Long Short-Term Memory Recurrent Neural Networks for handwriting recogntion
+This repository implements Multidimensional Long Short-Term Memory Recurrent Neural Networks for handwriting recognition
 using PyTorch.
 
 Features include:
@@ -25,6 +25,30 @@ For running the pipeline code, you may need to execute:
 type of errors.
 Furthermore, this repository is written for python version3, you may need to 
 use a virtual environment to use it.
+
+The main file for running experiments is: "modules/train_multi_dimensional_rnn_ctc.py".
+The file "modules/opts.py" has been used for defining a range of options for training and evaluation.
+This pattern was copied from OpenNMT-py (https://github.com/OpenNMT/OpenNMT-py)
+which similarly uses the "opts" file extensively to define configuration options. The configuration options
+are typically specified as command arguments. A typical use case is to make a shell script for an experiment
+which contains the call of train_multi_dimensional_rnn_ctc.py and the required arguments.
+
+There is a special dataset called "variable_length_mnist" which can be used for testing the software.
+It generates random sequences of digits of variable length from the set of handwritten digit examples 
+from the MNIST dataset. This is useful for testing, as it is much faster than training on data from ICDAR 
+but still captures most though not all of the  properties of a real handwriting recognition task (i.e. ICDAR).
+
+Language Models
+
+The software uses KenLM language models, an interface for training language models is available at 
+language_model/kenlm_interface.py. For replicating the results on the IAM dataset, the use of a strong language
+model trained on the LOB and Brown corpus is important. However, the London__Oslo_Bergen (LOB) corpus, available from:
+http://ota.ox.ac.uk/desc/0167 is in a somewhat archaic format. It therefore needs to be converted to be compatible with IAM. 
+The file monolingual_data_preprocessing/lob_original_preprocessor.py takes care of this.
+The BROWN corpus is taken from NLTL: http://www.nltk.org/nltk_data/. It needs much less preprocessing, the file 
+to do the preprocessing. The file monolingual_data_preprocessing/brown_corpus_preprocessor.py.
+
+ 
 
 ### External libraries ###
 This repository uses several external libraries:
