@@ -19,6 +19,19 @@ Features include:
 While allured by the [March Hare](https://en.wikipedia.org/wiki/March_Hare)  from Alice in Wonderland,
 this software should not be confused by it. 
 
+### License notes ###
+
+Most of the software was developed as part of my EDGE fellowship at Dublin City University, and the 
+rights of the software are owned by Dublin City University. See LICENSE for the details of this license 
+for **non-commercial** use of the software. Importantly, if you intend on using the Software for commercial purposes, 
+you must obtain a commercial licence from the DCU Invent. 
+For further information please contact info@invent.dcu.ie (see LICENCSE). 
+The software makes use of certain third-party libraries, see Third_Party_Software_Notes.txt.
+A small number of source files that were written after my EDGE project and/or developed in other contexts 
+is released with the Apache License 2.0. The intention is that newly written and future added  source files 
+will be released with the Apache License 2.0 as well.
+ 
+
 ### Setup and use ###
 For running the pipeline code, you may need to execute:
 " export PYTHONPATH='.' "in the console where you are running the script, to avoid "no module named X"
