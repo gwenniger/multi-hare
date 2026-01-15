@@ -40,7 +40,7 @@ class MultiDirectionalMDLSTMTest:
             create_multi_dimensional_lstm_parallel_with_separate_input_convolution(
                 layer_index=0, input_channels=input_channels, hidden_states_size=hidden_states_size,
                 compute_multi_directional=True, clamp_gradients=False, use_dropout=False,
-                use_example_packing=True, nonlinearity="tanh")
+                use_example_packing=True, use_leaky_lp_cells=False, nonlinearity="tanh")
 
         return MultiDirectionalMDLSTMTest(multi_directional_mdlstm)
 

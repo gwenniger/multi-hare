@@ -169,8 +169,11 @@ class ImageInputTransformer:
                     # creating the zeros directly on the gpu, which is faster
                     # See: https://discuss.pytorch.org/t/creating-tensors-on-gpu-directly/2714/5
 
-                    leading_zeros_tensor = torch.cuda.FloatTensor(number_of_image_tensors, number_of_channels,
-                                                                  leading_zeros).fill_(0)
+                    # leading_zeros_tensor = torch.cuda.FloatTensor(number_of_image_tensors, number_of_channels,
+                    #                                               leading_zeros).fill_(0)
+                    leading_zeros_tensor = torch.zeros(size=[number_of_image_tensors, number_of_channels,
+                                                                  leading_zeros],dtype=torch.float, device=device)
+
             else:
 
                 leading_zeros_tensor = torch.zeros(number_of_image_tensors, number_of_channels,
@@ -194,8 +197,11 @@ class ImageInputTransformer:
                     # creating the zeros directly on the gpu, which is faster
                     # See: https://discuss.pytorch.org/t/creating-tensors-on-gpu-directly/2714/5
 
-                    tailing_zeros_tensor = torch.\
-                        cuda.FloatTensor(number_of_image_tensors, number_of_channels, tailing_zeros).fill_(0)
+                    # tailing_zeros_tensor = torch.\
+                    #     cuda.FloatTensor(number_of_image_tensors, number_of_channels, tailing_zeros).fill_(0)
+                    tailing_zeros_tensor = torch.zeros(size=[number_of_image_tensors, number_of_channels, tailing_zeros],
+                                dtype=torch.float, device=device)
+
             else:
                 tailing_zeros_tensor = torch.zeros(number_of_image_tensors,
                                                    number_of_channels, tailing_zeros)

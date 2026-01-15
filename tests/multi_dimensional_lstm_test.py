@@ -22,10 +22,12 @@ class MultiDimensionalLSTMTest:
         clamp_gradients = False
         use_dropout = False
         use_examples_packing = False
+        use_leaky_lp_cells = True
         return MultiDimensionalLSTMTest(MultiDimensionalLSTM.\
             create_multi_dimensional_lstm_fast(layer_index, input_channels,
                                                hidden_state_size, compute_multi_directional,
-                                               clamp_gradients, use_dropout, use_examples_packing
+                                               clamp_gradients, use_dropout, use_examples_packing,
+                                               use_leaky_lp_cells
                                                ).cuda())
 
     def get_mdlstm_activations_with_and_without_packing(self, input_tensor, input_tensor_list):

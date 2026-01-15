@@ -1,3 +1,6 @@
 torch
+torchvision
 python-Levenshtein
 graphviz
+sortedcontainers
+

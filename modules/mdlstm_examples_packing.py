@@ -376,7 +376,9 @@ class MDLSTMExamplesPacking:
         # print("create_horizontal_separator - device: " + str(device))
         # https://discuss.pytorch.org/t/creating-tensors-on-gpu-directly/2714
         with torch.cuda.device(device):
-            result = torch.cuda.FloatTensor(1, channels,  example_height, self.example_separator_width).fill_(0)
+            #result = torch.cuda.FloatTensor(1, channels,  example_height, self.example_separator_width).fill_(0)
+            result = torch.zeros(size=[1, channels,  example_height, self.example_separator_width],
+                        dtype=torch.float, device=device)
         # print("create_horizontal_separator - result: " + str(result))
         return result
 
@@ -384,13 +386,16 @@ class MDLSTMExamplesPacking:
         device = skewed_packed_example_row_tensor.get_device()
         with torch.cuda.device(device):
             # print("create_vertical_separator - device: " + str(device))
-            return torch.cuda.FloatTensor(1, skewed_packed_example_row_tensor.size(1), 1, self.max_example_width).fill_(0)
+            #return torch.cuda.FloatTensor(1, skewed_packed_example_row_tensor.size(1), 1, self.max_example_width).fill_(0)
+            return torch.zeros(size=[1, skewed_packed_example_row_tensor.size(1), 1, self.max_example_width],
+                    dtype=torch.float, device=device)
 
     def create_vertical_mask_separator(self, example):
         device = example.get_device()
         with torch.cuda.device(device):
             # print("create_vertical_separator - device: " + str(device))
-            return torch.cuda.FloatTensor(1, self.max_example_width).fill_(0)
+            #return torch.cuda.FloatTensor(1, self.max_example_width).fill_(0)
+            return torch.zeros(size=[1, self.max_example_width], dtype=torch.float, device=device)
 
     def create_extra_padding(self, row_cat_list, packed_examples_row):
         # Create and add extra padding needed to fill up the remaining columns
@@ -419,10 +424,13 @@ class MDLSTMExamplesPacking:
         device = row_cat_list[0].get_device()
         # print("device example 0: " + str(device))
         with torch.cuda.device(device):
-            extra_padding = torch.cuda. \
-                FloatTensor(1, channels, height,
+            # extra_padding = torch.cuda. \
+            #     FloatTensor(1, channels, height,
+            #
+            #                 columns_extra_padding_required).fill_(0)
+            extra_padding = torch.zeros(size=[1, channels, height, columns_extra_padding_required],
+                         dtype=torch.float, device=device)
 
-                            columns_extra_padding_required).fill_(0)
         return extra_padding
 
     def create_mask_extra_padding(self, mask_row_cat_list, packed_examples_row):
@@ -445,8 +453,11 @@ class MDLSTMExamplesPacking:
         device = mask_row_cat_list[0].get_device()
         # print("device example 0: " + str(device))
         with torch.cuda.device(device):
-            extra_padding = torch.cuda. \
-                FloatTensor(height, columns_extra_padding_required).fill_(0)
+            # extra_padding = torch.cuda. \
+            #     FloatTensor(height, columns_extra_padding_required).fill_(0)
+            extra_padding = torch.zeros(size=[height, columns_extra_padding_required],
+                        dtype=torch.float, device=device)
+
         return extra_padding
 
     def create_row_mask_packed_mdlstm_computation(self, packed_examples_row, device):

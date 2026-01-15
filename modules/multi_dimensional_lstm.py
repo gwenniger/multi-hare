@@ -53,12 +53,14 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                  use_dropout: bool, training: bool,
                  mdlstm_parameters,
                  use_example_packing: bool,
+                 use_leaky_lp_cells: bool = True,
                  nonlinearity="tanh"):
         super(MultiDimensionalLSTM, self).__init__(layer_index, input_channels, hidden_states_size,
                                                    compute_multi_directional,
                                                    nonlinearity)
 
         self.clamp_gradients = clamp_gradients
+        self.use_leaky_lp_cells = use_leaky_lp_cells
         if self.clamp_gradients:
             print("MultiDimensionalLSTM - clamp_gradients=" + str(self.clamp_gradients))
         else:
@@ -137,6 +139,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                       clamp_gradients: bool,
                                       use_dropout: bool,
                                       use_example_packing: bool,
+                                      use_leaky_lp_cells: bool,
                                       nonlinearity="tanh"):
 
         mdlstm_parameters = MultiDimensionalLSTM.create_mdlstm_paramters(
@@ -149,6 +152,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                     True,
                                     mdlstm_parameters,
                                     use_example_packing,
+                                    use_leaky_lp_cells,
                                     nonlinearity)
 
     @staticmethod
@@ -170,6 +174,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                     True,
                                     mdlstm_parameters,
                                     use_example_packing,
+                                    use_leaky_lp_cells,
                                     nonlinearity)
 
     @staticmethod
@@ -179,6 +184,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
             clamp_gradients: bool,
             use_dropout: bool,
             use_example_packing: bool,
+            use_leaky_lp_cells: bool,
             nonlinearity="tanh"):
 
         if compute_multi_directional:
@@ -197,6 +203,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                     True,
                                     mdlstm_parameters,
                                     use_example_packing,
+                                    use_leaky_lp_cells,
                                     nonlinearity)
 
     @staticmethod
@@ -229,6 +236,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                     True,
                                     mdlstm_parameters,
                                     use_example_packing,
+                                    use_leaky_lp_cells,
                                     nonlinearity)
 
     def create_one_directional_mdlstms_from_multi_directional_mdlstm(self):
@@ -964,9 +972,13 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         # result = activations_combined
         # return result
 
-        # activations_unskewed = self.compute_multi_dimensional_lstm(self.mdlstm_parameters,
-        #                                                           x)
-        activations_unskewed = self.compute_leaky_lp_cell(self.mdlstm_parameters, x)
+        if self.use_leaky_lp_cells:
+            activations_unskewed = self.compute_leaky_lp_cell(self.mdlstm_parameters, x)
+
+        else:
+            activations_unskewed = self.compute_multi_dimensional_lstm(self.mdlstm_parameters,
+                                                                  x)
+
 
         # print("len(activations_unskewed: " + str(len(activations_unskewed)))
         # print("activations_unskewed.size(): " + str(activations_unskewed.size()))
@@ -1029,12 +1041,14 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                            forget_gate_memory_state_column,
                                            forget_gate_input_column):
 
+        print("forget_gate_memory_state_column: " + str(forget_gate_memory_state_column))
+        print("forget_gate_hidden_state_column: " + str(forget_gate_hidden_state_column))
+        print("forget_gate_input_column: " + str(forget_gate_input_column))
+
         forget_gate_weighted_states_plus_weighted_input = forget_gate_input_column + forget_gate_hidden_state_column + \
             forget_gate_memory_state_column
 
-        # print("forget_gate_memory_state_column: " + str(forget_gate_memory_state_column))
-        # print("forget_gate_hidden_state_column: " + str(forget_gate_hidden_state_column))
-        # print("forget_gate_input_column: " + str(forget_gate_input_column))
+
 
         # print("forget_gate_weighted_states_plus_weighted_input: " + str(forget_gate_weighted_states_plus_weighted_input))
 
@@ -1090,7 +1104,7 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
         if self.compute_multi_directional_flag:
             # With distinct parameters for every direction
             return self.forward_multi_directional_multi_dimensional_lstm(x)
-            # With same paramters for every direction
+            # With same parameters for every direction
             #return self.forward_multi_directional_multi_dimensional_function_fast(x)
         else:
             # print(">>> Execute forward_one_directional_multi_dimensional_lstm")

@@ -40,7 +40,7 @@ class MultiDirectionalMDLSTMTest:
         multi_directional_mdlstm = MultiDimensionalLSTM.create_multi_dimensional_lstm_fully_parallel(
             layer_index=0, input_channels=input_channels, hidden_states_size=hidden_states_size,
             compute_multi_directional=True, clamp_gradients=False, use_dropout=False,
-            use_example_packing=True, nonlinearity="tanh")
+            use_example_packing=True, nonlinearity="tanh",use_leaky_lp_cells=False)
 
         return MultiDirectionalMDLSTMTest(multi_directional_mdlstm)
 

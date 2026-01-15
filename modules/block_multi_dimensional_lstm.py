@@ -29,10 +29,13 @@ class BlockMultiDimensionalLSTM(Module):
                                             use_dropout: bool,
                                             nonlinearity="tanh"):
         multi_dimensional_lstm = MultiDimensionalLSTM.\
-            create_multi_dimensional_lstm_fast(input_channels, hidden_states_size,
+            create_multi_dimensional_lstm_fast(0,
+                                               input_channels, hidden_states_size,
                                                compute_multi_directional,
                                                clamp_gradients,
                                                use_dropout,
+                                               True,
+                                               True,
                                                nonlinearity)
 
         return BlockMultiDimensionalLSTM(multi_dimensional_lstm, block_size)

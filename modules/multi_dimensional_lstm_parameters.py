@@ -207,7 +207,6 @@ class MDLSTMParametersPrecomputedInputMatricesBase(MultiDimensionalLSTMParameter
     def get_output_gate_input_column(self, column_index):
         return self.get_output_gate_input_matrix()[:, :, :, column_index]
 
-
 class OneDirectionalMultiDimensionalLSTMParametersBase(MDLSTMParametersPrecomputedInputMatricesBase):
     def __init__(self, hidden_states_size,
                  input_channels: int, use_dropout: bool):
@@ -716,6 +715,9 @@ class MultiDimensionalLSTMParametersOneDirectionFullyParallel(OneDirectionalMult
 
     def forward(self, x):
         raise NotImplementedError
+
+    def reset_next_input_column_index(self):
+        pass
 
 
 class MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputConvolution(
@@ -1226,16 +1228,17 @@ class MultiDirectionalMultiDimensionalLSTMParametersParallelWithSeparateInputCon
             self, mdlstm_parameters_one_direction, direction_index):
         relative_start_index = 0
         relative_end_index = self.hidden_states_size
-        for one_directional_mdlstm_index in range(relative_start_index, relative_end_index):
-            multi_directional_mdlstm_index = \
-                self.hidden_states_size * direction_index + one_directional_mdlstm_index
+        with torch.no_grad():
+            for one_directional_mdlstm_index in range(relative_start_index, relative_end_index):
+                multi_directional_mdlstm_index = \
+                    self.hidden_states_size * direction_index + one_directional_mdlstm_index
 
-            mdlstm_parameters_one_direction.output_gate_memory_state_convolution.bias[one_directional_mdlstm_index] = \
-                self.output_gate_memory_state_convolution.bias[multi_directional_mdlstm_index]
+                mdlstm_parameters_one_direction.output_gate_memory_state_convolution.bias[one_directional_mdlstm_index] = \
+                    self.output_gate_memory_state_convolution.bias[multi_directional_mdlstm_index]
 
-            mdlstm_parameters_one_direction.output_gate_memory_state_convolution.\
-                weight[one_directional_mdlstm_index, :, :] = \
-                self.output_gate_memory_state_convolution.weight[multi_directional_mdlstm_index, :, :]
+                mdlstm_parameters_one_direction.output_gate_memory_state_convolution.\
+                    weight[one_directional_mdlstm_index, :, :] = \
+                    self.output_gate_memory_state_convolution.weight[multi_directional_mdlstm_index, :, :]
 
     """
     This methods extracts/creates  a list of one-directional MDLSTM parameters based on the
@@ -1777,16 +1780,17 @@ class MultiDirectionalMultiDimensionalLSTMParametersFullyParallel(
             self, mdlstm_parameters_one_direction, direction_index):
         relative_start_index = 0
         relative_end_index = self.hidden_states_size
-        for one_directional_mdlstm_index in range(relative_start_index, relative_end_index):
-            multi_directional_mdlstm_index = \
-                self.hidden_states_size * direction_index + one_directional_mdlstm_index
+        with torch.no_grad():
+            for one_directional_mdlstm_index in range(relative_start_index, relative_end_index):
+                multi_directional_mdlstm_index = \
+                    self.hidden_states_size * direction_index + one_directional_mdlstm_index
 
-            mdlstm_parameters_one_direction.output_gate_memory_state_convolution.bias[one_directional_mdlstm_index] = \
-                self.output_gate_memory_state_convolution.bias[multi_directional_mdlstm_index]
+                mdlstm_parameters_one_direction.output_gate_memory_state_convolution.bias[one_directional_mdlstm_index] = \
+                    self.output_gate_memory_state_convolution.bias[multi_directional_mdlstm_index]
 
-            mdlstm_parameters_one_direction.output_gate_memory_state_convolution.\
-                weight[one_directional_mdlstm_index, :, :] = \
-                self.output_gate_memory_state_convolution.weight[multi_directional_mdlstm_index, :, :]
+                mdlstm_parameters_one_direction.output_gate_memory_state_convolution.\
+                    weight[one_directional_mdlstm_index, :, :] = \
+                    self.output_gate_memory_state_convolution.weight[multi_directional_mdlstm_index, :, :]
 
     """
     This methods extracts/creates  a list of one-directional MDLSTM parameters based on the

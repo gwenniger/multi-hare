@@ -1,4 +1,4 @@
-import torch.tensor
+import torch
 from util.utils import Utils
 from modules.size_two_dimensional import SizeTwoDimensional
 
