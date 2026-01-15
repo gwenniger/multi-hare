@@ -1,8 +1,8 @@
 import torch
 from torch.cuda import nccl
-from torch._utils import _accumulate, _take_tensors, _flatten_dense_tensors, \
-    _flatten_sparse_tensors, _unflatten_dense_tensors, \
-    _unflatten_sparse_tensors, _reorder_tensors_as
+# from torch._utils import _take_tensors, _flatten_dense_tensors, \
+#     _flatten_sparse_tensors, _unflatten_dense_tensors, \
+#     _unflatten_sparse_tensors, _reorder_tensors_as
 from util.utils import Utils
 
 __author__ = "Gideon Maillette de Buy Wenniger"
@@ -13,6 +13,23 @@ __license__ = "Apache License 2.0"
 Extended from the implementation at
 https://github.com/pytorch/pytorch/tree/master/torch/nn/parallel
 """
+
+# Code copied from https://github.com/pytorch/pytorch/blob/v2.2.0/torch/_utils.py#L497
+# See: https://github.com/JaidedAI/EasyOCR/issues/1243
+def _accumulate(iterable, fn=lambda x, y: x + y):
+    "Return running totals"
+    # _accumulate([1,2,3,4,5]) --> 1 3 6 10 15
+    # _accumulate([1,2,3,4,5], operator.mul) --> 1 2 6 24 120
+    it = iter(iterable)
+    try:
+        total = next(it)
+    except StopIteration:
+        return
+    yield total
+    for element in it:
+        total = fn(total, element)
+        yield total
+
 
 def chunk_list(list_of_tensors: list, number_of_chunks: int):
     minimal_chunk_size = int(len(list_of_tensors) / number_of_chunks)

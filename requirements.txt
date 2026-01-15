@@ -3,4 +3,7 @@ torchvision
 python-Levenshtein
 graphviz
 sortedcontainers
+scikit-image
+cffi
+
 

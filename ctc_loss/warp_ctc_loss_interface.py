@@ -1,6 +1,7 @@
 
 import warpctc_pytorch
-import torch.tensor
+#import warp-ctc
+import torch
 from util.utils import Utils
 from torch.autograd import Variable
 import util.tensor_utils

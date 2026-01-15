@@ -253,7 +253,8 @@ def main():
 
     lob_input_files_directory = sys.argv[1]
     output_file_path = sys.argv[2]
-    lob_original_preprocessor = LobOriginalPreprocessor.create_lob_original_preprocessor(lob_input_files_directory)
+    lob_original_preprocessor = LobOriginalPreprocessor.create_lob_original_preprocessor(
+        lob_input_files_directory, keep_newlines_within_fragments=True)
     lob_original_preprocessor.process_lob_original_file_lines_and_write_to_file(output_file_path)
 
 

@@ -215,7 +215,8 @@ class TestCTCDecodeWithLanguageModel:
             beam_results_sequence = beam_results[example_index][0]
             # print("beam_results_sequence: \"" + str(beam_results_sequence) + "\"")
             output_string = Evaluator.convert_to_string(
-                beam_results_sequence, vocab_list, out_seq_len[example_index][0])
+                beam_results_sequence, vocab_list, out_seq_len[example_index][0],
+                use_nonzero_language_model_weight)
             print("output_string: " + str(output_string))
             output_strings.append(output_string)
         return output_strings
