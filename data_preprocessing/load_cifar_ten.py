@@ -28,11 +28,11 @@ def get_test_set():
 
 def get_train_loader(batch_size: int):
     train_loader = torch.utils.data.DataLoader(get_train_set(), batch_size=batch_size,
-                                               shuffle=True, num_workers=2)
+                                               shuffle=True, num_workers=0)
     return train_loader
 
 
 def get_test_loader(batch_size: int):
     test_loader = torch.utils.data.DataLoader(get_test_set(), batch_size=batch_size,
-                                              shuffle=True, num_workers=2)
+                                              shuffle=True, num_workers=0)
     return test_loader

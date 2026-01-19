@@ -214,7 +214,10 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
     block_strided_convolution_block_size = SizeTwoDimensional.create_size_two_dimensional(4, 2)
     multi_dimensional_rnn = MultiDimensionalLSTMLayerPairStacking.\
         create_two_layer_pair_network(hidden_states_size, mdlstm_block_size,
-                                      block_strided_convolution_block_size, False)
+                                      block_strided_convolution_block_size,
+                                      True,
+                                      False,
+                                      True)
 
     network = MultiDimensionalRNNToSingleClassNetwork.\
         create_multi_dimensional_rnn_to_single_class_network(multi_dimensional_rnn, input_size)

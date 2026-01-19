@@ -30,7 +30,7 @@ import data_preprocessing.padding_strategy
 from util.nvidia_smi_memory_usage_statistics_collector import NvidiaSmiMemoryStatisticsCollector
 from data_preprocessing.iam_database_preprocessing.string_to_index_mapping_table import StringToIndexMappingTable
 import os
-import opts
+from modules import opts
 
 __author__ = "Dublin City University"
 __copyright__ = "Copyright 2019, Dublin City University"
@@ -47,7 +47,8 @@ parser = argparse.ArgumentParser(
 opts.add_md_help_argument(parser)
 opts.model_opts(parser)
 opts.train_opts(parser)
-opt = parser.parse_args()
+#opt = parser.parse_args()
+opt = None
 
 
 def test_mdrnn_cell():
@@ -880,7 +881,7 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     max_num_digits = 3
     # In MNIST there are the digits 0-9, and we also add a symbol for blanks
     # This vocab_list will be used by the decoder
-    vocab_list = list(['_', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'])
+    vocab_list = list([StringToIndexMappingTable.get_blank_symbol(), '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'])
     minimize_horizontal_padding = True
     train_loader = data_preprocessing.load_mnist.\
         get_multi_digit_train_loader_random_length(batch_size, min_num_digits, max_num_digits,
@@ -1319,7 +1320,19 @@ def iam_word_recognition(model_opt, checkpoint):
     # train_mdrnn_no_ctc(train_loader, test_loader, input_channels, input_size, hidden_states_size, batch_size,
     #                 compute_multi_directional, use_dropout, vocab_list)
 
-def main():
+def main(argv: list = None):
+    if argv is not None:
+        # See: https://stackoverflow.com/questions/71667650/overwrite-a-global-variable
+        # This is a bit of a hack to allow to specifically provide argv as a list, and if this is done
+        # re-parse it using argparse and then update the global variable opt with the new result.
+        # This is motivated by the desire to write automated tests for this class, which is not
+        # really possible if we cannot provide a list of arguments.
+        global opt
+        opt = parser.parse_args(argv)
+    else:
+        # Otherwise, parse without argument specified, defaulting to sys.argv
+        opt = parser.parse_args()
+
     # Load checkpoint if we resume from a previous training.
     if opt.train_from:
         print('Loading checkpoint from %s' % opt.train_from)

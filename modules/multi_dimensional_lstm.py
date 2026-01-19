@@ -1041,9 +1041,9 @@ class MultiDimensionalLSTM(MultiDimensionalRNNBase):
                                            forget_gate_memory_state_column,
                                            forget_gate_input_column):
 
-        print("forget_gate_memory_state_column: " + str(forget_gate_memory_state_column))
-        print("forget_gate_hidden_state_column: " + str(forget_gate_hidden_state_column))
-        print("forget_gate_input_column: " + str(forget_gate_input_column))
+        # print("forget_gate_memory_state_column: " + str(forget_gate_memory_state_column))
+        # print("forget_gate_hidden_state_column: " + str(forget_gate_hidden_state_column))
+        # print("forget_gate_input_column: " + str(forget_gate_input_column))
 
         forget_gate_weighted_states_plus_weighted_input = forget_gate_input_column + forget_gate_hidden_state_column + \
             forget_gate_memory_state_column

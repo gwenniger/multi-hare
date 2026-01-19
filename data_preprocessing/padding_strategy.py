@@ -9,6 +9,9 @@ __credits__ = ["Gideon Maillette de Buy Wenniger"]
 __license__ = "Dublin City University Software License (enclosed)"
 
 
+#NUM_WORKERS = 8
+NUM_WORKERS = 0
+
 class PaddingStrategy(ABC):
     """
     This strategy class will determine how the padding of the training examples is
@@ -80,7 +83,7 @@ class FullPaddingStrategy(PaddingStrategy):
             dataset=train_set_pairs,
             batch_size=batch_size,
             shuffle=shuffle,
-            num_workers=8)
+            num_workers=NUM_WORKERS)
         return train_loader
 
 
@@ -134,7 +137,7 @@ class MinimalHorizontalPaddingStrategyBase(PaddingStrategy):
             shuffle=shuffle,
             collate_fn=self.get_collate_function(),
             pin_memory=False,
-            num_workers=8)
+            num_workers=NUM_WORKERS)
 
         return train_loader
 
