@@ -217,6 +217,8 @@ def train_mdrnn(train_loader, test_loader, input_channels: int,  input_size: Siz
                                       block_strided_convolution_block_size,
                                       True,
                                       False,
+                                      True,
+                                      True,
                                       True)
 
     network = MultiDimensionalRNNToSingleClassNetwork.\

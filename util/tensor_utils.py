@@ -116,7 +116,7 @@ class TensorUtils:
 
             # print("result before addition: " + str(result))
             # print("to add: list_of_tensors[" + str(index) + "]:" + str(list_of_tensors[index]))
-            result += list_of_tensors[index]
+            result = result + list_of_tensors[index]
             # print("result after addition: " + str(result))
         return result
 

@@ -203,7 +203,8 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
 
         pair_one_specific_parameters = BlockMDLSTMLayerPairSpecificParameters.create_block_mdlstm_layer_pair_specific_parameters(
             input_channels, first_mdlstm_hidden_states_size, output_channels, mdlstm_block_size,
-            block_strided_convolution_block_size)
+            block_strided_convolution_block_size,
+            False)
 
         # Layer pair two
         input_channels = output_channels
@@ -215,7 +216,7 @@ class MultiDimensionalLSTMLayerPairStacking(Module):
 
         pair_two_specific_parameters = BlockMDLSTMLayerPairSpecificParameters.create_block_mdlstm_layer_pair_specific_parameters(
             input_channels, second_mdlstm_hidden_states_size, output_channels, mdlstm_block_size,
-            block_strided_convolution_block_size)
+            block_strided_convolution_block_size, False)
 
         layer_pairs_specific_parameters_list = list([pair_one_specific_parameters, pair_two_specific_parameters])
         return MultiDimensionalLSTMLayerPairStacking.\

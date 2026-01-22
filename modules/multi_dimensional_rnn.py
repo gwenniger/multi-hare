@@ -188,6 +188,9 @@ class MultiDimensionalRNNToSingleClassNetwork(torch.nn.Module):
 
     def forward(self, x):
         mdrnn_activations = self.multi_dimensional_rnn(x)
+        print("mdrnn_activations: " + str(mdrnn_activations))
+        for activation in mdrnn_activations:
+            print("activation.size(): " + str(activation.size()))
         activations_one_dimensional = mdrnn_activations.view(-1, self.number_of_output_dimensions)
         return self.fc3(activations_one_dimensional)
 

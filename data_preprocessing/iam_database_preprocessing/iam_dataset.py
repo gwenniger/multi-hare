@@ -1,3 +1,4 @@
+from sympy import false
 from torch.utils.data import Dataset
 from data_preprocessing.iam_database_preprocessing.iam_examples_dictionary import IamExamplesDictionary
 from data_preprocessing.iam_database_preprocessing.string_to_index_mapping_table import StringToIndexMappingTable
@@ -726,7 +727,7 @@ class IamLinesDataset(Dataset):
 
     @staticmethod
     def get_relevant_part_line_id(iam_line_information):
-        line_id_parts = iam_line_information.line_id.split("-")
+        line_id_parts = iam_line_information.get_line_id.split("-")
         relevant_part_line_id = line_id_parts[0] + "-" + line_id_parts[1]
         return relevant_part_line_id
 
@@ -749,16 +750,16 @@ class IamLinesDataset(Dataset):
             set_containing_id = IamLinesDataset.get_set_containing_element_and_check_it_is_unique(
                 sets_list, relevant_part_line_id)
             if set_containing_id is train_example_ids_set:
-                print("Assigning example with id" + str(iam_line_information.line_id) + " to training set")
+                print("Assigning example with id" + str(iam_line_information.get_line_id) + " to training set")
                 examples_line_information_train.append(iam_line_information)
             elif set_containing_id is dev_example_ids_set:
-                print("Assigning example with id" + str(iam_line_information.line_id) + " to validation set")
+                print("Assigning example with id" + str(iam_line_information.get_line_id) + " to validation set")
                 examples_line_information_validation.append(iam_line_information)
             elif set_containing_id is test_example_ids_set:
-                print("Assigning example with id" + str(iam_line_information.line_id) + " to test set")
+                print("Assigning example with id" + str(iam_line_information.get_line_id) + " to test set")
                 examples_line_information_test.append(iam_line_information)
             else:
-                print("Warning: did not find a valid ids set for the example " + iam_line_information.line_id +
+                print("Warning: did not find a valid ids set for the example " + iam_line_information.get_line_id +
                       " - omitting this example ")
                 examples_line_information_omitted.append(iam_line_information)
         print(">>> number of training examples: " + str(len(examples_line_information_train)))
@@ -778,7 +779,7 @@ class IamLinesDataset(Dataset):
     @staticmethod
     def load_dataset_from_file(dataset_load_file_path: str):
             print(">>>Loading data from saved file \"" + dataset_load_file_path + "\"...")
-            train_loader, validation_loader, test_loader = torch.load(dataset_load_file_path)
+            train_loader, validation_loader, test_loader = torch.load(dataset_load_file_path, weights_only=False)
             print("done.")
             print(">>> Showing dataset sizes for dataloaders... ")
             print(">>>  len(train_loader.dataset): " + str(len(train_loader.dataset)))

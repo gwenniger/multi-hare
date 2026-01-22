@@ -30,27 +30,20 @@ class BoundingBox():
         if isinstance(other, BoundingBox):
             return (self.x == other.x) and (self.y == other.y) and (self.w == other.w) and (self.h == other.h)
 
-
 class IamDataPointInformation():
-    def __init__(self, line_id: str, ok: bool, gray_level: int, bounding_box):
+    def __init__(self, line_id: str, is_okay: bool, gray_level: int, bounding_box):
         self.line_id = line_id
-        self.ok = ok
+        self.is_okay = is_okay
         self.gray_level = gray_level
         self.bounding_box = bounding_box
-
-    def is_ok(self):
-        return self.ok
-
-    def line_id(self):
-        return self.line_id
 
 
 class IamWordInformation(IamDataPointInformation):
 
-    def __init__(self, line_id: str, ok: bool, gray_level: int, bounding_box,
+    def __init__(self, line_id: str, is_okay: bool, gray_level: int, bounding_box,
                  tag: str, word: str):
 
-        super(IamWordInformation, self).__init__(line_id, ok, gray_level, bounding_box)
+        super(IamWordInformation, self).__init__(line_id, is_okay, gray_level, bounding_box)
 
         self.tag = tag
         self.word = word
@@ -90,7 +83,7 @@ class IamWordInformation(IamDataPointInformation):
     def __str__(self):
         result = "<word_information>\n"
         result += "line_id: " + self.line_id + "\n"
-        result += "ok: " + str(self.ok) + "\n"
+        result += "ok: " + str(self.is_okay) + "\n"
         result += "gray_level: " + str(self.gray_level) + "\n"
         result += str(self.bounding_box) + "\n"
         result += "tag: " + str(self.tag) + "\n"
@@ -113,10 +106,10 @@ class IamWordInformation(IamDataPointInformation):
 class IamLineInformation(IamDataPointInformation):
     WORD_SEPARATOR_SYMBOL = "|"
 
-    def __init__(self, line_id: str, ok: bool, gray_level: int, bounding_box,
-                number_of_components: int, words: list):
+    def __init__(self, line_id: str, is_okay: bool, gray_level: int, bounding_box,
+                 number_of_components: int, words: list):
 
-        super(IamLineInformation, self).__init__(line_id, ok, gray_level, bounding_box)
+        super(IamLineInformation, self).__init__(line_id, is_okay, gray_level, bounding_box)
         self.number_of_components = number_of_components
         self.words = words
 
@@ -162,7 +155,7 @@ class IamLineInformation(IamDataPointInformation):
     def __str__(self):
         result = "<line_information>\n"
         result += "line_id: " + self.line_id + "\n"
-        result += "ok: " + str(self.ok) + "\n"
+        result += "ok: " + str(self.is_okay) + "\n"
         result += "gray_level: " + str(self.gray_level) + "\n"
         result += "number_of_components: " + str(self.number_of_components) + "\n"
         result += str(self.bounding_box) + "\n"
@@ -173,7 +166,7 @@ class IamLineInformation(IamDataPointInformation):
 
     def __eq__(self, other):
         if isinstance(other, IamLineInformation):
-            return (self.line_id == other.line_id) and (self.ok == other.ok) \
+            return (self.line_id == other.line_id) and (self.is_okay == other.is_okay) \
                    and (self.gray_level == other.gray_level) and \
                    (self.number_of_components == other.number_of_components) and \
                    (self.bounding_box == other.bounding_box) and \
@@ -286,20 +279,21 @@ class IamExamplesDictionary():
                         image_is_acceptable = IamExamplesDictionary.image_has_minimal_dimensions(
                             line_information, iam_database_line_images_root_folder_path, get_file_path_part_function)
 
-                    if line_information.is_ok():
+                    if line_information.is_okay:
 
                         if not image_is_acceptable:
-                            size_rejected_images_lines_dictionary[line_information.line_id()] = line_information
+                            size_rejected_images_lines_dictionary[line_information.line_id] = line_information
                             number_of_rejected_images_labeled_ok += 1
                         else:
-                            ok_lines_dictionary[line_information.line_id()] = line_information
+                            print("line_information: "  + str(line_information))
+                            ok_lines_dictionary[line_information.line_id] = line_information
                         total_ok_images += 1
                     else:
                         if not image_is_acceptable:
-                            size_rejected_images_lines_dictionary[line_information.line_id()] = line_information
+                            size_rejected_images_lines_dictionary[line_information.line_id] = line_information
                             number_of_rejected_images_labeled_error += 1
                         else:
-                            error_lines_dictionary[line_information.line_id()] = line_information
+                            error_lines_dictionary[line_information.line_id] = line_information
                         total_error_images += 1
 
             print("Rejected in total " + str(number_of_rejected_images_labeled_ok) + " of the " +
@@ -440,8 +434,8 @@ def test_iam_line_information():
     if not line_one_information.line_id == "a01-000x-04":
         raise RuntimeError("Error: expected line_id == " + "a01-000x-04")
     
-    if not line_one_information.is_ok() is True:
-        raise RuntimeError("Error: expected is_ok() == " + str(True))
+    if not line_one_information.is_okay is True:
+        raise RuntimeError("Error: expected is_okay == " + str(True))
 
     reference_bounding_box = BoundingBox.create_bounding_box(397, 1458, 1647, 148)
     if not line_one_information.bounding_box == reference_bounding_box:

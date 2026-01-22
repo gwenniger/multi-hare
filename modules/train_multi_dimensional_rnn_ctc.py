@@ -252,7 +252,7 @@ def train_mdrnn_no_ctc(train_loader, test_loader, input_channels: int, input_siz
             # log_string = prof.table(sort_by="cpu_time")
             # print("Done...")
             # print("Saving to log file...")
-            # text_file = open('/home/gemaille/AI/handwriting-recognition/log_iam_test.txt', 'w')
+            # text_file = open('log_iam_test.txt', 'w')
             # text_file.write(log_string)
             # text_file.close()
             # print("Finished...")
@@ -870,25 +870,35 @@ def mnist_recognition_fixed_length():
                     compute_multi_directional, use_dropout, vocab_list, "MNIST_FIXED_LENGTH")
     #print(prof)
 
+def get_variable_length_mnist_dataloaders(batch_size: int, minimize_horizontal_padding: bool):
+
+    min_num_digits = 1
+    #max_num_digits = 3
+    max_num_digits = 1
+
+    train_loader = data_preprocessing.load_mnist. \
+        get_multi_digit_train_loader_random_length(batch_size, min_num_digits, max_num_digits,
+                                                   minimize_horizontal_padding)
+    test_loader = data_preprocessing.load_mnist. \
+        get_multi_digit_test_loader_random_length(batch_size, min_num_digits, max_num_digits,
+                                                  minimize_horizontal_padding)
+    return train_loader, test_loader
+
 
 def mnist_recognition_variable_length(model_opt, checkpoint):
     # batch_size = 128
     # batch_size = 32
     # batch_size = 64
-    batch_size = 256
+    # batch_size = 256
+    batch_size = opt.batch_size
     # batch_size = 1024
-    min_num_digits = 1
-    max_num_digits = 3
+    minimize_horizontal_padding = True
+    train_loader, test_loader = get_variable_length_mnist_dataloaders(batch_size, minimize_horizontal_padding)
+
     # In MNIST there are the digits 0-9, and we also add a symbol for blanks
     # This vocab_list will be used by the decoder
-    vocab_list = list([StringToIndexMappingTable.get_blank_symbol(), '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'])
-    minimize_horizontal_padding = True
-    train_loader = data_preprocessing.load_mnist.\
-        get_multi_digit_train_loader_random_length(batch_size, min_num_digits, max_num_digits,
-                                                   minimize_horizontal_padding)
-    test_loader = data_preprocessing.load_mnist.\
-        get_multi_digit_test_loader_random_length(batch_size, min_num_digits, max_num_digits,
-                                                  minimize_horizontal_padding)
+    blank_symbol = StringToIndexMappingTable.get_blank_symbol()
+    vocab_list = list([blank_symbol, '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'])
 
     # test_mdrnn_cell()
     #test_mdrnn()
@@ -911,7 +921,6 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191
 
     #with torch.autograd.profiler.profile(use_cuda=False) as prof:
-    blank_symbol = StringToIndexMappingTable.get_blank_symbol()
     image_input_is_unsigned_int = False
     use_block_mdlstm = False
     perform_horizontal_batch_padding_in_data_loader = False
@@ -1337,7 +1346,8 @@ def main(argv: list = None):
     if opt.train_from:
         print('Loading checkpoint from %s' % opt.train_from)
         checkpoint = torch.load(opt.train_from,
-                                map_location=lambda storage, loc: storage)
+                                map_location=lambda storage, loc: storage,
+                                weights_only=False)
         model_opt = checkpoint['opt']
 
     else:

@@ -56,7 +56,7 @@ class FilteredLobCorpusCreator:
         validation_and_test_set.extend(validation_set.examples_line_information)
         validation_and_test_set.extend(test_set.examples_line_information)
         for item in validation_and_test_set:
-            line_id = item.line_id
+            line_id = item.get_line_id
             iam_framgment_id = line_id.split("-")[0]
             validation_and_test_set_iam_ids.add(iam_framgment_id)
         return validation_and_test_set_iam_ids

@@ -8,7 +8,7 @@ import torchvision
 from util.image_input_transformer import ImageInputTransformer
 from random import randint
 import torch.nn.functional
-from data_preprocessing.padding_strategy import PaddingStrategy
+from data_preprocessing.padding_strategy import PaddingStrategy, FullPaddingStrategy
 
 __author__ = "Dublin City University"
 __copyright__ = "Copyright 2019, Dublin City University"
@@ -232,6 +232,8 @@ def get_multi_digit_test_loader_random_length(batch_size, min_num_digits, max_nu
                                                                True,
                                                                minimize_horizontal_padding,
                                                                False)
+    # padding_strategy = FullPaddingStrategy(
+    #     HEIGHT_REQUIRED_PER_NETWORK_OUTPUT_COLUMN, WIDTH_REQUIRED_PER_NETWORK_OUTPUT_COLUMN,)
 
     return get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_digits,
                                                 get_test_set(), padding_strategy)

@@ -104,6 +104,7 @@ class Trainer:
         time_start = time.time()
         for i, data in enumerate(train_loader, 0):
 
+
             time_start_batch = time.time()
 
             # get the inputs
@@ -302,6 +303,7 @@ class Trainer:
             'epoch': epoch,
             'optim': self.optimizer,
         }
+        # See: https://github.com/pytorch/pytorch/issues/118092
         torch.save(checkpoint,
                    '%s_acc_%.2f_cer_%.3f_wer_%.3f_e%d.pt'
                    % (opt.save_model, valid_stats.get_accuracy(),
