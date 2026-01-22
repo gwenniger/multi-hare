@@ -1,4 +1,3 @@
-from sympy import false
 from torch.utils.data import Dataset
 from data_preprocessing.iam_database_preprocessing.iam_examples_dictionary import IamExamplesDictionary
 from data_preprocessing.iam_database_preprocessing.string_to_index_mapping_table import StringToIndexMappingTable
@@ -6,9 +5,9 @@ from skimage import io, transform
 import torch
 import numpy
 import os
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import sys
-import util.image_visualization
+# import util.image_visualization
 from data_preprocessing.iam_database_preprocessing.data_permutation import DataPermutation
 import os.path
 from data_preprocessing.padding_strategy import PaddingStrategy
