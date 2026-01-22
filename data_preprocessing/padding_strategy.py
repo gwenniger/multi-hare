@@ -9,9 +9,9 @@ __credits__ = ["Gideon Maillette de Buy Wenniger"]
 __license__ = "Dublin City University Software License (enclosed)"
 
 
-NUM_WORKERS = 8
+#NUM_WORKERS = 8
 #NUM_WORKERS = 2
-#NUM_WORKERS = 0
+NUM_WORKERS = 0
 
 class PaddingStrategy(ABC):
     """

@@ -1,7 +1,7 @@
 import torch
 import modules.train_multi_dimensional_rnn_ctc
 # Setting the sharing strategy to "file_system" is necessary to make the test succeed
-torch.multiprocessing.set_sharing_strategy('file_system')
+#torch.multiprocessing.set_sharing_strategy('file_system')
 
 def main():
     batch_size = 256

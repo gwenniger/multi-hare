@@ -2,6 +2,8 @@ import argparse
 import torch
 import torch.nn
 import torch.nn as nn
+from torch.utils.data import DataLoader
+
 import custom_data_parallel.data_parallel
 import time
 from modules.multi_dimensional_rnn import MDRNNCell
@@ -1032,8 +1034,8 @@ def check_data_loader_has_right_collate_function_and_replace_if_necessary(
                 MinimalHorizontalPaddingStrategy.collate_horizontal_last_minute_data_padding
 
 
-def get_use_example_packing_and_perform_horizontal_batch_packing_in_data_loader():
-    use_example_packing = opt.use_example_packing   #True
+def get_use_example_packing_and_perform_horizontal_batch_packing_in_data_loader(opt_instance):
+    use_example_packing = opt_instance.use_example_packing   #True
 
     if use_example_packing:
         perform_horizontal_batch_padding_in_data_loader = False
@@ -1043,8 +1045,50 @@ def get_use_example_packing_and_perform_horizontal_batch_packing_in_data_loader(
         print(">>> Don't use example packing, perform (last-minute) horizontal batch padding in data loader...")
     return use_example_packing, perform_horizontal_batch_padding_in_data_loader
 
+class LinesDatasetExperimentsConfigProperties:
+    """
+    Convenience class for saving the properties for the IAM lines dataset,
+    to facilitate sharing the properties between the dataloader creation
+    and the model creation
+    """
 
-def line_recognition(model_opt, checkpoint, lines_dataset: IamLinesDataset):
+    def __init__(self, opt_instance):
+        self.dataset_save_or_load_file_path = opt_instance.dataset_save_or_load_file_path
+        self.use_on_demand_example_loading = opt_instance.use_on_demand_example_loading
+        self.batch_size = opt_instance.batch_size
+        print("Using batch_size: " + str(self.batch_size))
+
+        self.permutation_save_or_load_file_path = opt_instance.data_permutation_file_path
+
+        self.image_input_is_unsigned_int = False
+        self.minimize_vertical_padding = True
+        self.minimize_horizontal_padding = True
+
+        # perform_horizontal_batch_padding_in_data_loader = False
+        self.use_example_packing, self.perform_horizontal_batch_padding_in_data_loader = \
+            get_use_example_packing_and_perform_horizontal_batch_packing_in_data_loader(
+                opt_instance)
+        self.use_four_pixel_input_blocks = opt_instance.use_four_pixel_input_blocks
+
+
+def create_lines_dataloaders(opt_instance, lines_dataset):
+    config_properties = LinesDatasetExperimentsConfigProperties(opt_instance)
+
+    train_loader, validation_loader, test_loader = create_iam_data_loaders(
+                opt_instance, lines_dataset, config_properties.batch_size, config_properties.minimize_vertical_padding,
+                config_properties.minimize_horizontal_padding,
+                config_properties.image_input_is_unsigned_int,
+                config_properties.perform_horizontal_batch_padding_in_data_loader,
+                config_properties.use_four_pixel_input_blocks,
+                config_properties.permutation_save_or_load_file_path,
+                config_properties.dataset_save_or_load_file_path,
+                config_properties.use_on_demand_example_loading)
+
+    return train_loader, validation_loader, test_loader
+
+
+def line_recognition(model_opt, checkpoint, lines_dataset: IamLinesDataset,
+                     train_loader: DataLoader, validation_loader: DataLoader, test_loader: DataLoader):
         print("opt.language_model_file_path: " + str(opt.language_model_file_path))
 
         # With the improved padding, the height of the images is 128,
@@ -1054,8 +1098,7 @@ def line_recognition(model_opt, checkpoint, lines_dataset: IamLinesDataset):
         # 40 gives out of memory error with initial hidden states size 2
         # batch_size = 30 # 32 gave out of memory error with Leaky LP cells, which have one more gate
 
-        batch_size = opt.batch_size
-        print("Using batch_size: " + str(batch_size))
+
 
         device_ids = get_device_ids_from_opt(opt)
 
@@ -1068,33 +1111,12 @@ def line_recognition(model_opt, checkpoint, lines_dataset: IamLinesDataset):
             vocab_list = lines_dataset.get_vocabulary_list()
             blank_symbol = lines_dataset.get_blank_symbol()
 
-            permutation_save_or_load_file_path = opt.data_permutation_file_path
+            config_properties = LinesDatasetExperimentsConfigProperties(opt)
 
-            image_input_is_unsigned_int = False
-            minimize_vertical_padding = True
-            minimize_horizontal_padding = True
-            
-          
-            # perform_horizontal_batch_padding_in_data_loader = False
-            use_example_packing, perform_horizontal_batch_padding_in_data_loader =\
-                get_use_example_packing_and_perform_horizontal_batch_packing_in_data_loader()
-  
-            use_four_pixel_input_blocks = opt.use_four_pixel_input_blocks
-
-            if use_four_pixel_input_blocks:
+            if config_properties.use_four_pixel_input_blocks:
                 input_channels = 4
             else:
                 input_channels = 1
-
-            dataset_save_or_load_file_path = opt.dataset_save_or_load_file_path
-            use_on_demand_example_loading = opt.use_on_demand_example_loading
-
-            train_loader, validation_loader, test_loader = create_iam_data_loaders(
-                opt, lines_dataset, batch_size, minimize_vertical_padding, minimize_horizontal_padding,
-                image_input_is_unsigned_int, perform_horizontal_batch_padding_in_data_loader,
-                use_four_pixel_input_blocks, permutation_save_or_load_file_path, dataset_save_or_load_file_path,
-                use_on_demand_example_loading)
-
 
 
             print("Loading IAM dataset: DONE")
@@ -1130,33 +1152,32 @@ def line_recognition(model_opt, checkpoint, lines_dataset: IamLinesDataset):
             #with torch.autograd.profiler.profile(use_cuda=False) as prof:
             train_mdrnn_ctc(checkpoint, train_loader, validation_loader, test_loader, input_channels,
                             hidden_states_size,
-                            batch_size, compute_multi_directional, use_dropout, vocab_list, blank_symbol,
-                            image_input_is_unsigned_int, "IAM",
-                            minimize_horizontal_padding,
-                            use_example_packing,
+                            config_properties.batch_size, compute_multi_directional, use_dropout, vocab_list, blank_symbol,
+                            config_properties.image_input_is_unsigned_int, "IAM",
+                            config_properties.minimize_horizontal_padding,
+                            config_properties.use_example_packing,
                             use_block_mdlstm,
                             use_leaky_lp_cells,
                             use_network_structure_bluche,
                             mdlstm_layer_sizes,
                             share_weights_across_directions_in_fully_connected_layer,
                             block_strided_convolution_layers_using_weight_sharing,
-                            perform_horizontal_batch_padding_in_data_loader,
+                            config_properties.perform_horizontal_batch_padding_in_data_loader,
                             device_ids
                             )
 
+def create_iam_lines_dataset_and_dataloaders(opt_instance):
+    print("opt.language_model_file_path: " + str(opt_instance.language_model_file_path))
 
-def iam_line_recognition(model_opt, checkpoint):
-    print("opt.language_model_file_path: " + str(opt.language_model_file_path))
-
-    batch_size = opt.batch_size
+    batch_size = opt_instance.batch_size
     print("Using batch_size: " + str(batch_size))
 
     # lines_file_path = "/datastore/data/iam-database/ascii/lines.txt"
-    lines_file_path = opt.iam_database_lines_file_path
+    lines_file_path = opt_instance.iam_database_lines_file_path
     print("lines_file_path: " + str(lines_file_path))
     # iam_database_line_images_root_folder_path = "/datastore/data/iam-database/lines"
-    iam_database_line_images_root_folder_path = opt.iam_database_line_images_root_folder_path
-    device_ids = get_device_ids_from_opt(opt)
+    iam_database_line_images_root_folder_path = opt_instance.iam_database_line_images_root_folder_path
+    device_ids = get_device_ids_from_opt(opt_instance)
 
     # Change the default cuda device to device_ids[0]
     # So that if for example gpus 2 and 3 are used, gpu 2 will become the default gpu
@@ -1168,10 +1189,17 @@ def iam_line_recognition(model_opt, checkpoint):
 
         lines_dataset = IamLinesDataset.create_iam_lines_dataset_from_input_files(
             lines_file_path, iam_database_line_images_root_folder_path,
-            opt.vocabulary_file_path,
+            opt_instance.vocabulary_file_path,
             block_strided_convolution_block_size,
             number_of_block_strided_convolution_layers_for_computing_padding)
-        return line_recognition(model_opt, checkpoint, lines_dataset)
+        train_loader, validation_loader, test_loader = create_lines_dataloaders(opt_instance, lines_dataset)
+        return lines_dataset, train_loader, validation_loader, test_loader
+
+
+def iam_line_recognition(model_opt, checkpoint):
+    lines_dataset, train_loader, validation_loader, test_loader = create_iam_lines_dataset_and_dataloaders(opt)
+    return line_recognition(model_opt, checkpoint, lines_dataset,
+                                train_loader, validation_loader, test_loader)
 
 
 def rimes_line_recognition(model_opt, checkpoint):
@@ -1200,14 +1228,16 @@ def rimes_line_recognition(model_opt, checkpoint):
             opt.vocabulary_file_path,
             block_strided_convolution_block_size,
             number_of_block_strided_convolution_layers_for_computing_padding)
-        return line_recognition(model_opt, checkpoint, lines_dataset)
+        train_loader, validation_loader, test_loader = create_lines_dataloaders(lines_dataset)
+        return line_recognition(model_opt, checkpoint, lines_dataset,
+                                train_loader, validation_loader, test_loader)
 
 
 
-def get_device_ids_from_opt(opts):
-    if opts.gpuid is not None and len(opt.gpuid) > 0:
-        print("Running on the following gpus: " + str(opts.gpuid))
-        return opts.gpuid
+def get_device_ids_from_opt(opt):
+    if opt.gpuid is not None and len(opt.gpuid) > 0:
+        print("Running on the following gpus: " + str(opt.gpuid))
+        return opt.gpuid
     else:
         raise RuntimeError("opt.gpuid is not defined or has empty list. Please specify"
                            "-gpuid GPU1 ... GPUn as a flag. For example \"-gpuid 0 1\" for using"
