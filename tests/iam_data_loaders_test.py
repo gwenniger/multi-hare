@@ -2,6 +2,17 @@ import argparse
 from modules import opts
 import modules.train_multi_dimensional_rnn_ctc
 import sys
+#import torch
+#torch.multiprocessing.set_sharing_strategy('file_system')
+
+"""
+This test class tests the dataloader for the IAM data. The motivation is that there are can be problems
+with DataLoader when it is ran with multiple workers and without setting:
+"torch.multiprocessing.set_sharing_strategy('file_system')"
+These problems are due to too many file descriptors being created. This test serves to exclude
+the DataLoader generation and looping over the IAM batch examples as the cause for these problems.
+This test succeeds even without  "torch.multiprocessing.set_sharing_strategy('file_system')"
+"""
 
 
 parser = argparse.ArgumentParser(
@@ -50,11 +61,11 @@ def main():
             "-share_weights_across_directions_in_fully_connected_layer",
             "-dataset_save_or_load_file_path", experiment_folder + "lines_dataset_prepared",
             "-iam_database_line_images_root_folder_path", iam_data_root_folder + "lines/",
-            "-iam_database_lines_file_path", iam_data_root_folder + "ascii/lines.txt",
+            "-iam_database_lines_file_path", iam_data_root_folder + "ascii/lines-small.txt",
             "-use_fractions_based_data_split",
             "-gpuid", "0",
             "-epochs", "50",
-            "-batch_size", "8",
+            "-batch_size", "2",
             "-save_model", experiment_folder +"model"
             ]
 
@@ -63,12 +74,15 @@ def main():
         modules.train_multi_dimensional_rnn_ctc.create_iam_lines_dataset_and_dataloaders(opt))
 
     for i, data in enumerate(train_loader, 0):
+        print(">>validation batch " + str(i))
         continue
 
     for i, data in enumerate(validation_loader, 0):
-            continue
+        print(">>validation batch " + str(i))
+        continue
 
     for i, data in enumerate(test_loader, 0):
+        print(">>test batch " + str(i))
         continue
 
 if __name__ == "__main__":

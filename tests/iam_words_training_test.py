@@ -39,7 +39,7 @@ def main():
             "-share_weights_across_directions_in_fully_connected_layer",
             "-dataset_save_or_load_file_path", experiment_folder + "words_dataset_prepared",
             "-iam_database_line_images_root_folder_path", iam_data_root_folder + "words/",
-            "-iam_database_lines_file_path", iam_data_root_folder + "ascii/words.txt",
+            "-iam_database_lines_file_path", iam_data_root_folder + "ascii/words-small.txt",
             "-use_fractions_based_data_split",
             "-gpuid", "0",
             "-epochs", "50",
@@ -49,7 +49,8 @@ def main():
             # on a single one of these GPUs so memory requirements remain the same with
             # either one or two GPUs (though speed of course increases with two GPUs)
             "-batch_size", "128",
-            "-save_model", experiment_folder +"model"
+            "-save_model", experiment_folder +"model"#,
+            "-use_mock_ctc_loss"
             ]
 
     modules.train_multi_dimensional_rnn_ctc.main(argv)

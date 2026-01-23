@@ -1,7 +1,7 @@
 import sys
 import modules.train_multi_dimensional_rnn_ctc
 import torch
-#torch.multiprocessing.set_sharing_strategy('file_system')
+torch.multiprocessing.set_sharing_strategy('file_system')
 
 
 
@@ -46,6 +46,7 @@ def main():
             "-epochs", "50",
             "-batch_size", "8",
             "-save_model", experiment_folder +"model"
+            #"-use_mock_ctc_loss"
             ]
 
     modules.train_multi_dimensional_rnn_ctc.main(argv)

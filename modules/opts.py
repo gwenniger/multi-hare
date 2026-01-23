@@ -250,6 +250,13 @@ def train_opts(parser):
                        action='store_true')
     group.add_argument('-no_language_model', dest='use_language_model',
                        action='store_false')
+    # Option to use mock CTC loss function for debugging purposes
+    group = parser.add_mutually_exclusive_group(required=False)
+    group.add_argument('-use_mock_ctc_loss', dest='use_mock_ctc_loss',
+                       action='store_true')
+    group.add_argument('-use_real_ctc_loss', dest='use_mock_ctc_loss',
+                       action='store_false')
+    parser.set_defaults(use_mock_ctc_loss=False)
 
     # Data split options
     group = parser.add_argument_group('data-split')

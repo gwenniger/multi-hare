@@ -1,3 +1,4 @@
+import copy
 import os.path
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
@@ -9,6 +10,7 @@ from util.image_input_transformer import ImageInputTransformer
 from random import randint
 import torch.nn.functional
 from data_preprocessing.padding_strategy import PaddingStrategy, FullPaddingStrategy
+
 
 __author__ = "Dublin City University"
 __copyright__ = "Copyright 2019, Dublin City University"
@@ -189,7 +191,9 @@ def get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_dig
         # print("item_labels_combined_padded.size(): " + str(item_labels_combined_padded.size()))
         # print("item_labels_combined_padded: " + str(item_labels_combined_padded))
 
-        train_set_pairs.append(tuple((item_tensors_combined_padded, item_labels_combined_padded)))
+        train_set_pairs.append(
+            tuple((copy.deepcopy(item_tensors_combined_padded),
+                   copy.deepcopy(item_labels_combined_padded))))
 
         percentage_complete = (i*100) / len(data_set)
         if (percentage_complete % 10) == 0:

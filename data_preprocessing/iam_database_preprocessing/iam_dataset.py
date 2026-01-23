@@ -1,3 +1,5 @@
+import copy
+
 from torch.utils.data import Dataset
 from data_preprocessing.iam_database_preprocessing.iam_examples_dictionary import IamExamplesDictionary
 from data_preprocessing.iam_database_preprocessing.string_to_index_mapping_table import StringToIndexMappingTable
@@ -259,7 +261,8 @@ class IamLinesDataset(Dataset):
                     # print("convert_unsigned_int_image_tensor_or_list_to_float_image_tensor_or_list" +
                     #      " element.device: " + str(element.device))
                     element_converted = IamLinesDataset.convert_unsigned_int_image_tensor_to_float_image_tensor(element)
-                    result.append(element_converted)
+                    #result.append(element_converted)
+                    result.append(copy.deepcopy(element_converted))
             return result
 
     @staticmethod

@@ -18,6 +18,7 @@ from data_preprocessing.iam_database_preprocessing.iam_examples_dictionary impor
 from util.utils import Utils
 from modules.size_two_dimensional import SizeTwoDimensional
 from ctc_loss.warp_ctc_loss_interface import WarpCTCLossInterface
+from modules.mock_ctc_loss import MockWarpCTCLossInterface
 import util.timing
 import data_preprocessing
 import util.tensor_utils
@@ -740,7 +741,12 @@ def train_mdrnn_ctc(checkpoint, train_loader, validation_loader, test_loader, in
         start = time.time()
 
         #ctc_loss = warpctc_pytorch.CTCLoss()
-        warp_ctc_loss_interface = WarpCTCLossInterface.create_warp_ctc_loss_interface()
+        if opt.use_mock_ctc_loss:
+            print("Warning: using mock ctc loss interface, producing mock ctc loss.\n"
+                  "Note that this is only meant to be used for debugging purposes.")
+            warp_ctc_loss_interface = MockWarpCTCLossInterface()
+        else:
+            warp_ctc_loss_interface = WarpCTCLossInterface.create_warp_ctc_loss_interface()
         # Get the width reduction factor which will be needed to compute the real widths
         # in the output from the real input width information in the warp_ctc_loss function
 
@@ -874,9 +880,9 @@ def mnist_recognition_fixed_length():
 
 def get_variable_length_mnist_dataloaders(batch_size: int, minimize_horizontal_padding: bool):
 
-    min_num_digits = 1
-    #max_num_digits = 3
-    max_num_digits = 1
+    min_num_digits = 6
+    max_num_digits = 6
+    #max_num_digits = 1
 
     train_loader = data_preprocessing.load_mnist. \
         get_multi_digit_train_loader_random_length(batch_size, min_num_digits, max_num_digits,
@@ -1289,7 +1295,7 @@ def iam_word_recognition(model_opt, checkpoint):
         minimize_horizontal_padding = True
         image_input_is_unsigned_int = False
         use_example_packing, perform_horizontal_batch_padding_in_data_loader =\
-            get_use_example_packing_and_perform_horizontal_batch_packing_in_data_loader()
+            get_use_example_packing_and_perform_horizontal_batch_packing_in_data_loader(opt)
 
         dataset_save_or_load_file_path = opt.dataset_save_or_load_file_path
         use_four_pixel_input_blocks = opt.use_four_pixel_input_blocks

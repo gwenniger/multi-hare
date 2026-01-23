@@ -1,3 +1,4 @@
+import copy
 from abc import abstractmethod
 from abc import ABC
 import torch
@@ -9,9 +10,9 @@ __credits__ = ["Gideon Maillette de Buy Wenniger"]
 __license__ = "Dublin City University Software License (enclosed)"
 
 
-#NUM_WORKERS = 8
+NUM_WORKERS = 8
 #NUM_WORKERS = 2
-NUM_WORKERS = 0
+#NUM_WORKERS = 0
 
 class PaddingStrategy(ABC):
     """
@@ -80,15 +81,28 @@ class FullPaddingStrategy(PaddingStrategy):
     def create_data_loader(self, train_set_pairs, batch_size,
                            shuffle: bool):
 
+        print(">>>Creating dataloader using full padding strategy.")
+
         train_loader = torch.utils.data.DataLoader(
             dataset=train_set_pairs,
             batch_size=batch_size,
             shuffle=shuffle,
             num_workers=NUM_WORKERS)
+
+        raise RuntimeError("Here!")
+
         return train_loader
 
 
 class MinimalHorizontalPaddingStrategyBase(PaddingStrategy):
+    EXAMPLES_ARE_PRE_PADDED = True
+    # Last minute padding that will exploit the fact that the examples are already pre-padded, to avoid
+    # having to provide height_required_per_network_output_row and width_required_per_network_output_column
+    # as arguments
+    LAST_MINUTE_PADDING = LastMinutePadding(EXAMPLES_ARE_PRE_PADDED)
+
+    # print("my_collate - batch: " + str(batch))
+
 
     def __init__(self, height_required_per_network_row,
                  width_required_per_network_output_column,
@@ -116,15 +130,29 @@ class MinimalHorizontalPaddingStrategyBase(PaddingStrategy):
     """
     @staticmethod
     def simple_collate_no_data_padding(batch):
-        # print("my_collate - batch: " + str(batch))
-        data = [item[0] for item in batch]
+        # print(">>>simple_collate_no_data_padding")
+        # # print("my_collate - batch: " + str(batch))
+        # data = [copy.deepcopy(item[0]) for item in batch]
+        #
+        # # print("my_collate - data: " + str(data))
+        # target_list = [copy.deepcopy(item[1].unsqueeze(0)) for item in batch]
+        # target = torch.cat(target_list, 0)
+        # # print("my_collate - target: " + str(target))
+        # # target = torch.LongTensor(target)
+        # return [data, target]
 
-        # print("my_collate - data: " + str(data))
-        target_list = [item[1].unsqueeze(0) for item in batch]
-        target = torch.cat(target_list, 0)
-        # print("my_collate - target: " + str(target))
-        # target = torch.LongTensor(target)
-        return [data, target]
+
+
+        #### More optimized implementation ###
+        # 1. Efficiently unpack the list of (data, target) tuples
+        data, labels_lists = zip(*batch)
+
+        # 2. Convert the tuple of labels_lists into a single batch tensor
+        labels_tensor = torch.stack(labels_lists, dim=0)
+
+        #return [list(data), target]
+        return [data, labels_tensor]
+
 
         # a simple custom collate function
 
@@ -144,22 +172,20 @@ class MinimalHorizontalPaddingStrategyBase(PaddingStrategy):
 
     def get_collate_function(self):
         if self.perform_horizontal_batch_padding_in_data_loader:
+            print(">>>Use \"collate_horizontal_last_minute_data_padding\" collate function ")
             return MinimalHorizontalPaddingStrategy.collate_horizontal_last_minute_data_padding
         else:
+            print(">>>Use \"simple_collate_no_data_padding\" collate function ")
             return MinimalHorizontalPaddingStrategyBase.simple_collate_no_data_padding
 
     @staticmethod
     def collate_horizontal_last_minute_data_padding(batch):
-        examples_are_pre_padded = True
-        # Last minute padding that will exploit the fact that the examples are already pre-padded, to avoid
-        # having to provide height_required_per_network_output_row and width_required_per_network_output_column
-        # as arguments
-        last_minute_padding = \
-            LastMinutePadding(examples_are_pre_padded)
-        # print("my_collate - batch: " + str(batch))
+        print(">>>collate_horizontal_last_minute_data_padding")
+
         data = [item[0] for item in batch]
 
-        data_padded_and_concatenated, required_width = last_minute_padding.pad_and_cat_list_of_examples(data)
+        data_padded_and_concatenated, required_width = (
+            MinimalHorizontalPaddingStrategyBase.LAST_MINUTE_PADDING.pad_and_cat_list_of_examples(data))
 
         # print("my_collate - data: " + str(data))
         target_list = [item[1].unsqueeze(0) for item in batch]
