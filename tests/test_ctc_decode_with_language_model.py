@@ -80,6 +80,7 @@ class TestLanguageModelCreator:
 
 class TestCTCDecodeWithLanguageModel:
     BLANK_SYMBOL = "_"
+    SPACE_SYMBOL = "|"
     BEAM_SIZE = 10
     NONZERO_LANGUAGE_MODEL_WEIGHT = 0.05 #2.15
     WORD_INSERTION_WEIGHT = 0 #0.35
@@ -89,7 +90,9 @@ class TestCTCDecodeWithLanguageModel:
 
     @staticmethod
     def create_test_vocab_list():
-        vocab_list = list(['_', 'a', 'b', 'c', 'd', '.'])
+        vocab_list = list([TestCTCDecodeWithLanguageModel.BLANK_SYMBOL,
+                           'a', 'b', 'c', 'd', '.',
+                           TestCTCDecodeWithLanguageModel.SPACE_SYMBOL])
         return vocab_list
 
     @staticmethod
@@ -113,6 +116,7 @@ class TestCTCDecodeWithLanguageModel:
                                            alpha=language_model_weight,
                                            beta=TestCTCDecodeWithLanguageModel.WORD_INSERTION_WEIGHT,
                                            blank_id=vocab_list.index(TestCTCDecodeWithLanguageModel.BLANK_SYMBOL),
+                                           space_symbol=TestCTCDecodeWithLanguageModel.SPACE_SYMBOL,
                                            num_processes=16)
         return decoder, vocab_list
 
@@ -122,14 +126,14 @@ class TestCTCDecodeWithLanguageModel:
         # probs = torch.zeros(2, 3, 6)
         probs = torch.FloatTensor([
                            [
-                             [0, 0, 1, 0, 0, 0],
-                             [0, 0, 0, 0, 1, 0],
-                             [0, 0, 1, 0, 0, 0]
+                             [0, 0, 1, 0, 0, 0, 0],
+                             [0, 0, 0, 0, 1, 0, 0],
+                             [0, 0, 1, 0, 0, 0, 0]
                            ],
                            [
-                             [0, 1, 0, 0, 0, 0],
-                             [0, 1, 0, 0, 0, 0],
-                             [0, 0.1, 0, 0.9, 0, 0]
+                             [0, 1, 0, 0, 0, 0, 0],
+                             [0, 1, 0, 0, 0, 0, 0],
+                             [0, 0.1, 0, 0.9, 0, 0, 0]
                            ],
                           ])
         print("probabilities: " + str(probs))
@@ -144,22 +148,22 @@ class TestCTCDecodeWithLanguageModel:
         # probs = torch.zeros(2, 4, 6)
         probs = torch.FloatTensor([
                            [
-                             [0, 0, 0, 0, 1, 0],
-                             [1, 0, 0, 0, 0, 0],
-                             [0, 0, 0, 0, 1, 0],
-                             [1, 0, 0, 0, 0, 0],
-                             [0, 0, 0, 0, 1, 0],
-                             [1, 0, 0, 0, 0, 0],
-                             [0, 0.999, 0, 0, 0.001, 0]
+                             [0, 0, 0, 0, 1, 0, 0],
+                             [1, 0, 0, 0, 0, 0, 0],
+                             [0, 0, 0, 0, 1, 0, 0],
+                             [1, 0, 0, 0, 0, 0, 0],
+                             [0, 0, 0, 0, 1, 0, 0],
+                             [1, 0, 0, 0, 0, 0, 0],
+                             [0, 0.999, 0, 0, 0.001, 0, 0]
                            ],
                            [
-                             [0, 0, 1, 0, 0, 0],
-                             [1, 0, 0, 0, 0, 0],
-                             [0, 0, 1, 0, 0, 0],
-                             [1, 0, 0, 0, 0, 0],
-                             [0, 0, 1, 0, 0, 0],
-                             [1, 0, 0, 0, 0, 0],
-                             [0, 0.999, 0.001, 0, 0, 0]
+                             [0, 0, 1, 0, 0, 0, 0],
+                             [1, 0, 0, 0, 0, 0, 0],
+                             [0, 0, 1, 0, 0, 0, 0],
+                             [1, 0, 0, 0, 0, 0, 0],
+                             [0, 0, 1, 0, 0, 0, 0],
+                             [1, 0, 0, 0, 0, 0, 0],
+                             [0, 0.99, 0.01, 0, 0, 0, 0]
                            ],
                           ])
         print("probabilities: " + str(probs))
@@ -174,25 +178,23 @@ class TestCTCDecodeWithLanguageModel:
         # probs = torch.zeros(1, 8, 6)
         probs = torch.FloatTensor([
             [
-                [0, 0, 0, 0, 1, 0],
-                [1, 0, 0, 0, 0, 0],
-                [0, 0, 0, 0, 1, 0],
-                [1, 0, 0, 0, 0, 0],
-                [0, 0, 0, 0, 1, 0],
-                [1, 0, 0, 0, 0, 0],
-                [0, 1, 0, 0, 0.0000, 0],
-                [1, 0, 0, 0, 0, 0],
-                [0, 0, 0, 1, 0, 0],
-                [1, 0, 0, 0, 0, 0],
-                [0, 0, 1, 0, 0, 0],
-                [1, 0, 0, 0, 0, 0],
-                [0, 0, 1, 0, 0, 0],
-                [1, 0, 0, 0, 0, 0],
-                [0, 0, 1, 0, 0, 0],
-                [1, 0, 0, 0, 0, 0],
-                [0, 0.999, 0.001, 0, 0, 0]
-            ],
-        ])
+                [0, 1, 0, 0, 0, 0, 0],  # a
+                [1, 0, 0, 0, 0, 0, 0],
+                [0, 1, 0, 0, 0, 0, 0], # a
+                [1, 0, 0, 0, 0, 0, 0],
+                [0, 1, 0, 0, 0, 0, 0], # a
+                [1, 0, 0, 0, 0, 0, 0],
+                [0, 0.2, 0.8, 0, 0, 0, 0], #a,b
+                [0, 0, 0, 0, 0, 0, 1],  # | (space symbol)
+                [0, 0, 1, 0, 0, 0, 0], # b
+                [1, 0, 0, 0, 0, 0, 0],
+                [0, 0, 1, 0, 0, 0, 0],  # b
+                [1, 0, 0, 0, 0, 0, 0],
+                [0, 0, 1, 0, 0, 0, 0],  # b
+                [1, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0.2, 0.8, 0, 0, 0],  # b,c
+            ]
+            ])
         print("probabilities: " + str(probs))
         print("probabilities.size(): " + str(probs.size()))
         sequence_lengths = torch.LongTensor([17])
@@ -271,9 +273,9 @@ class TestCTCDecodeWithLanguageModel:
 
         # With active language model, the decoder should just produce the most likely sequences
         # but also make them consistent with the observed sequences used for training the language model.
-        # This leads to the sequence "dddccbbba" being most likely, even though the "c" in the fourth position
-        # actually has zero support in the probabilities
-        expected_outputs = list(["dddccbbba"])
+        # This leads to the sequence "aaaa|bbbb" being most likely,
+        # since "aaaa bbbb" was literally seen in the training data.
+        expected_outputs = list(["aaaa|bbbb"])
 
         if not outputs == expected_outputs:
             raise RuntimeError("Error: expected the outputs to be " + str(expected_outputs) + " but got:  " +
@@ -283,9 +285,9 @@ class TestCTCDecodeWithLanguageModel:
     def test_decoder_without_active_language_model_artificial_data_two(handwriting_recognition_root_dir):
         outputs = TestCTCDecodeWithLanguageModel. \
             test_decoder_with_language_model_artificial_data_two(handwriting_recognition_root_dir, False)
-        # Without active language model, the decoder should just produce the most likely sequences
-        # which are dda and bbba
-        expected_outputs = list(["dddacbbba"])
+        # Without active language model, the decoder should just produce the most likely sequence
+        # which is aaab|bbbc
+        expected_outputs = list(["aaab|bbbc"])
 
         if not outputs == expected_outputs:
             raise RuntimeError("Error: expected the outputs to be " + str(expected_outputs) + " but got:  " +
@@ -304,14 +306,24 @@ def create_test_language_model(handwriting_recognition_root_dir: str):
 def main():
     handwriting_recognition_root_dir = sys.argv[1]
     # create_test_language_model(handwriting_recognition_root_dir)
-    TestCTCDecodeWithLanguageModel.\
-        test_decoder_with_active_language_model_artificial_data(handwriting_recognition_root_dir)
+    """
+    Below tests contrast the decoding without an active language model for a certain input 
+    with those for the same input but with an active language model. These test show that 
+    using the language model will help to produce sequences that are more plausible given the 
+    language model training data, if the language model is used, while otherwise just producing 
+    the most likely character sequences given just the ctc probabilities. 
+    """
+    # Test pair one, without and with language model
     TestCTCDecodeWithLanguageModel. \
         test_decoder_without_active_language_model_artificial_data(handwriting_recognition_root_dir)
     TestCTCDecodeWithLanguageModel. \
-        test_decoder_with_active_language_model_artificial_data_two(handwriting_recognition_root_dir)
+        test_decoder_with_active_language_model_artificial_data(handwriting_recognition_root_dir)
+
+    # Test pair two, without and with language model
     TestCTCDecodeWithLanguageModel. \
         test_decoder_without_active_language_model_artificial_data_two(handwriting_recognition_root_dir)
+    TestCTCDecodeWithLanguageModel. \
+        test_decoder_with_active_language_model_artificial_data_two(handwriting_recognition_root_dir)
 
 
 if __name__ == "__main__":
