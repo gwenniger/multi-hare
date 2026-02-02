@@ -6,4 +6,4 @@ sortedcontainers
 scikit-image
 cffi
 numpy
-
+matplotlib

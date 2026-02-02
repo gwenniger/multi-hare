@@ -1,5 +1,6 @@
+import torch
 import modules.train_multi_dimensional_rnn_ctc
-#torch.multiprocessing.set_sharing_strategy('file_system')
+torch.multiprocessing.set_sharing_strategy('file_system')
 
 
 
@@ -38,7 +39,7 @@ def main():
             "-gpuid", "0",
             "-epochs", "50",
             "-batch_size", "256",
-            "-train_from", "model_acc_42.25_cer_57.750_wer_57.750_e10.pt"
+            #"-train_from", "MODEL_PATH"   #Specify your model path here if you want to resume from an earlier checkpoint
             ]
 
     modules.train_multi_dimensional_rnn_ctc.main(argv)
