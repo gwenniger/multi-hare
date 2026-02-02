@@ -880,8 +880,8 @@ def mnist_recognition_fixed_length():
 
 def get_variable_length_mnist_dataloaders(batch_size: int, minimize_horizontal_padding: bool):
 
-    min_num_digits = 6
-    max_num_digits = 6
+    min_num_digits = 1
+    max_num_digits = 3
     #max_num_digits = 1
 
     train_loader = data_preprocessing.load_mnist. \
@@ -1366,6 +1366,22 @@ def iam_word_recognition(model_opt, checkpoint):
     #                 compute_multi_directional, use_dropout, vocab_list)
 
 def main(argv: list = None):
+    """
+    This is the main function for running the experiments. One thing deserving mentioning is the
+    use of both "opt" and "model_opt". "opt" is a global variable of configuration options,
+    that can be provided either as a list to the call of main (for testing purposes)
+    , or else is read from sys.arg.
+    "model_opt" is the list of configurations that is associated to a model checkpoint,
+    and saved/loaded together with that checkpoint. The reason for using both these configuration
+    versions is that we want to use/preserve some of the configuration from the model checkpoint,
+    while also allowing some things to be overwritten by the configuration provided as arguments
+    when using the program.
+    It should be noted that function that have  no "opt" argument but refer to "opt"
+    in fact use the global variable "opt", and this is not a bug but intentional.
+
+    """
+
+
     if argv is not None:
         # See: https://stackoverflow.com/questions/71667650/overwrite-a-global-variable
         # This is a bit of a hack to allow to specifically provide argv as a list, and if this is done
