@@ -1,7 +1,7 @@
 import sys
 import modules.train_multi_dimensional_rnn_ctc
 import torch
-#torch.multiprocessing.set_sharing_strategy('file_system')
+torch.multiprocessing.set_sharing_strategy('file_system')
 
 
 
