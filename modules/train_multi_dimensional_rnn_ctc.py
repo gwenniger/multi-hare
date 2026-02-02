@@ -931,8 +931,11 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     #with torch.autograd.profiler.profile(use_cuda=False) as prof:
     image_input_is_unsigned_int = False
     use_block_mdlstm = False
-    perform_horizontal_batch_padding_in_data_loader = False
-    use_example_packing = False
+    # perform_horizontal_batch_padding_in_data_loader = False
+    # use_example_packing = opt.use_example_packing
+    use_example_packing, perform_horizontal_batch_padding_in_data_loader = \
+        get_use_example_packing_and_perform_horizontal_batch_packing_in_data_loader(
+            opt)
     use_leaky_lp_cells = opt.use_leaky_lp_cells
     use_network_structure_bluche = opt.use_network_structure_bluche
     share_weights_across_directions_in_fully_connected_layer = \

@@ -38,13 +38,13 @@ def main():
             "-learning_rate", "0.005",
             "-use_leaky_lp_cells",
             "-use_dropout",
-            #"-use_four_pixel_input_blocks",
+            #"-use_four_pixel_input_blocks",  # Gives better results in principle, but is slower
             "-use_resolution_halving",
             "-use_regular_mdlstm_layers",
             "-load_entire_dataset_beforehand",
             #"-use_on_demand_example_loading",
-            #"-use_example_packing",
-            "-no_example_packing",
+            "-use_example_packing",   # With example packing it should be more efficient
+            #"-no_example_packing",
             "-no_bias_in_block_strided_convolution",
             "-save_score_table_file_path","mnist-ctr-results-table.txt",
             "-use_network_structure_bluche",

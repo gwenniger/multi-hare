@@ -670,7 +670,7 @@ class MDLSTMExamplesPacking:
                                " and generated mask " + str(mask_result.size()) +
                                " are not compatible")
 
-            # print("Percentage of real (non-padding) cells: " + str(100 * self.get_non_padding_fraction()) + "%")
+        print("Percentage of real (non-padding) cells: " + str(100 * self.get_non_padding_fraction()) + "%")
 
         return result, mask_result
 
@@ -736,7 +736,7 @@ class MDLSTMExamplesPacking:
                                " and generated mask " + str(mask_result.size()) +
                                " are not compatible")
 
-        # print("Percentage of real (non-padding) cells: " + str(100 * self.get_non_padding_fraction()) + "%")
+        print("Percentage of real (non-padding) cells: " + str(100 * self.get_non_padding_fraction()) + "%")
 
         return result, mask_result
 
