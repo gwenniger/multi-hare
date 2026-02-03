@@ -2,6 +2,8 @@ import copy
 from abc import abstractmethod
 from abc import ABC
 import torch
+from torch.utils.data import Dataset
+
 from data_preprocessing.last_minute_padding import LastMinutePadding
 
 __author__ = "Dublin City University"
@@ -78,7 +80,7 @@ class FullPaddingStrategy(PaddingStrategy):
     def get_columns_padding_required(self, image_width, max_image_width):
         return max_image_width - image_width
 
-    def create_data_loader(self, train_set_pairs, batch_size,
+    def create_data_loader(self, train_set_pairs: Dataset, batch_size,
                            shuffle: bool):
 
         print(">>>Creating dataloader using full padding strategy.")
@@ -88,8 +90,6 @@ class FullPaddingStrategy(PaddingStrategy):
             batch_size=batch_size,
             shuffle=shuffle,
             num_workers=NUM_WORKERS)
-
-        raise RuntimeError("Here!")
 
         return train_loader
 

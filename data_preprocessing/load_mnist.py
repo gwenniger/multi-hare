@@ -3,6 +3,8 @@ import os.path
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
 import torch
+from torch.utils.data import Dataset
+
 import util.image_visualization
 import matplotlib.pyplot as plt
 import torchvision
@@ -146,6 +148,9 @@ def get_item_labels_with_probabilities_length_and_real_sequence_length(item_labe
 # This data loader creates examples with elements that are concatenated
 # sequences of a random length of min_num_digits (including)
 # to max_num_digits (including) elements
+# This implementation stores the examples as a list. This is more efficient, because it saves
+# the work of combining MNIST examples into concatenated examples. However, it causes problems
+# with Dataloader unless "torch.multiprocessing.set_sharing_strategy('file_system')" is set.
 # https://discuss.pytorch.org/t/solved-training-lstm-by-using-samples-of-various-sequence-length/9641
 def get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_digits,
                                          data_set, padding_strategy: PaddingStrategy):
@@ -205,6 +210,100 @@ def get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_dig
         i += sequence_length
 
     train_loader = padding_strategy.create_data_loader(train_set_pairs, batch_size, True)
+    return train_loader
+
+
+class VariableLengthMNISDataset(torch.utils.data.Dataset):
+    """
+    Rather than pre-concatenating MNIST example tensors and storing them in a list of tensors,
+    this dataloader does the example creation on the fly. Doing so avoids problems with
+    "too many fds" when "torch.multiprocessing.set_sharing_strategy('file_system')" is not set.
+    Apparently torch Dataloader runs into problems when working with a large list of tensors
+    or alternatively a dataset that explicitly stores a large list of examples. On-the-fly
+    example creation based on only the minimally required information, in the form of a
+    saved list of integer pairs that stores the start index and length of the examples,
+    works it appears.
+    """
+    def __init__(self, max_num_digits: int, data_set: Dataset,
+                 example_information_list: list, padding_strategy: PaddingStrategy):
+        self.data_set = data_set
+        self.example_information_list = example_information_list
+        self.max_num_digits = max_num_digits
+        self.padding_strategy = padding_strategy
+
+    def __len__(self):
+        return len(self.example_information_list)
+
+    def __getitem__(self, idx):
+        i, sequence_length = self.example_information_list[idx]
+        return self.create_example_from_dataset(i, sequence_length)
+
+    def create_example_from_dataset(self, i: int, sequence_length: int):
+        item_tensors_combined, item_labels_combined = get_item_tensors_and_labels_combined(
+            self.data_set, i, sequence_length)
+        # print("item_tensors_combined.size(): " + str(item_tensors_combined.size()))
+        # print("item_labels_combined.size(): " + str(item_labels_combined.size()))
+
+        digits_padding_required = self.max_num_digits - sequence_length
+
+        image_width = sequence_length * IMAGE_WIDTH
+        max_image_width = self.max_num_digits * IMAGE_WIDTH
+        columns_padding_required = self.padding_strategy.get_columns_padding_required(image_width, max_image_width)
+        p1d = (0, columns_padding_required)  # pad last dim by 1 on end side
+        item_tensors_combined_padded = torch.nn.functional. \
+            pad(item_tensors_combined, p1d, "constant", 0)
+
+        # https://pytorch.org/docs/master/nn.html#torch.nn.functional.pad
+
+        p1d = (0, digits_padding_required)  # pad last dim by 1 on end side
+        item_labels_combined_padded = torch.nn.functional. \
+            pad(item_labels_combined, p1d, "constant", -2)
+        # Add the (negative) probabilities length at the end of the padded labels, so it can later
+        # be retrieved as the last item
+        item_labels_combined_padded = \
+            get_item_labels_with_probabilities_length_and_real_sequence_length(item_labels_combined_padded,
+                                                                               sequence_length)
+        # print("item_tensors_combined_padded.size(): " + str(item_tensors_combined_padded.size()))
+        # print("item_labels_combined_padded.size(): " + str(item_labels_combined_padded.size()))
+        # print("item_labels_combined_padded: " + str(item_labels_combined_padded))
+
+        # train_set_pairs.append(
+        #     tuple((copy.deepcopy(item_tensors_combined_padded),
+        #            copy.deepcopy(item_labels_combined_padded))))
+
+        # Not sure how necessary the clone or deepcopy is really
+        return tuple((item_tensors_combined_padded.detach().clone(),
+                      item_labels_combined_padded.detach().clone()))
+
+
+# This data loader creates examples with elements that are concatenated
+# sequences of a random length of min_num_digits (including)
+# to max_num_digits (including) elements
+# This implementation does the example creation on the fly, avoiding "too many fds" problems
+# with Dataloader, but at the cost of being slower by redoing the work of concatenating examples
+# again every time.
+# https://discuss.pytorch.org/t/solved-training-lstm-by-using-samples-of-various-sequence-length/9641
+def get_multi_digit_loader_random_length_on_the_fly_example_creation(batch_size, min_num_digits, max_num_digits,
+                                         data_set, padding_strategy: PaddingStrategy):
+    example_information_list = list()
+
+    print("data_set: " + str(data_set))
+    i = 0
+    while i < len(data_set):
+        sequence_length = randint(min_num_digits, max_num_digits)
+
+        if i + sequence_length - 1 >= len(data_set):
+            print("Selected sequence  length " + str(sequence_length) +
+                  " is no longer available in remaining items... " +
+                  "skipping last items")
+            break
+
+        example_information_list.append(tuple([i, sequence_length]))
+        i += 1
+
+    data = VariableLengthMNISDataset(max_num_digits, data_set, example_information_list, padding_strategy)
+    train_loader = padding_strategy.create_data_loader(data, batch_size, True)
+    # train_loader = padding_strategy.create_data_loader(train_set_pairs, batch_size, True)
     return train_loader
 
 

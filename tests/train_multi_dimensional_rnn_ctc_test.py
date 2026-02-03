@@ -1,8 +1,11 @@
 import torch
 import modules.train_multi_dimensional_rnn_ctc
 torch.multiprocessing.set_sharing_strategy('file_system')
+from pathlib import Path
+import os
 
-
+cwd = os.getcwd()
+EXPERIMENT_FOLDER = cwd + "/VariableLengthMnistExperiment/"
 
 def main():
     """
@@ -18,6 +21,8 @@ def main():
     (file) names for the case where these arguments are actually used.
     """
 
+
+    Path(EXPERIMENT_FOLDER).mkdir(parents=True, exist_ok=True)
 
 
     argv = ["-examples_database_data_type","variable_length_mnist",
@@ -39,7 +44,7 @@ def main():
             #"-use_example_packing",
             "-no_example_packing",
             "-no_bias_in_block_strided_convolution",
-            "-save_score_table_file_path","mnist-ctr-results-table.txt",
+            "-save_score_table_file_path",EXPERIMENT_FOLDER + "mnist-ctr-results-table.txt",
             "-use_network_structure_bluche",
             #"-use_unique_weights_for_each_directions_in_fully_connected_layer",
             # Weight sharing across directions in fully connected layer, as used in the paper
@@ -54,7 +59,9 @@ def main():
             # but note that to properly learn quite some epochs are required.
             "-epochs", "50",
             "-batch_size", "512",
+            "-save_model", EXPERIMENT_FOLDER + "model",  # ,
             #"-train_from", "MODEL_PATH"   #Specify your model path here if you want to resume from an earlier checkpoint
+            #"-train_from", EXPERIMENT_FOLDER + "model_acc_0.00_cer_92.229_wer_100.000_e5.pt"
             ]
 
     modules.train_multi_dimensional_rnn_ctc.main(argv)
