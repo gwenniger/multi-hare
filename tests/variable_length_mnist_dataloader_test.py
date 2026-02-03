@@ -32,7 +32,7 @@ def main():
     batch_size = 2
     minimize_horizontal_padding = True
     train_loader, test_loader = modules.train_multi_dimensional_rnn_ctc.get_variable_length_mnist_dataloaders(
-        batch_size, minimize_horizontal_padding)
+        batch_size, minimize_horizontal_padding, False)
 
     print("Completed creating dataloaders")
     for i, data in enumerate(train_loader, 0):

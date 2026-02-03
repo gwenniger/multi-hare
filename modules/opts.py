@@ -161,11 +161,15 @@ def train_opts(parser):
                        help="A list specifying the sizes of the MDLSTM (or Leak-LP) cell layers."
                             "For examples \"-mdlstm_layer_sizes 2 10 50\"")
 
-    group = parser.add_mutually_exclusive_group(required=True)
+    # Use of four pixel input blocks or resolution halving. Note that this is not used for the
+    # variable-length MNIST dataset
+    group = parser.add_mutually_exclusive_group(required=False)
     group.add_argument('-use_four_pixel_input_blocks', dest='use_four_pixel_input_blocks',
                        action='store_true')
     group.add_argument('-use_resolution_halving', dest='use_four_pixel_input_blocks',
                        action='store_false')
+    # Set the default value to True
+    parser.set_defaults(use_four_pixel_input_blocks=True)
 
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('-use_leaky_lp_cells', dest='use_leaky_lp_cells',

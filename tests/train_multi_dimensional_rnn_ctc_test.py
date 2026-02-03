@@ -12,14 +12,9 @@ def main():
     This test uses the variable length mnist data, which is automatically generated from the
     built-in torch MNIST dataset.
     Note that below in the arguments there are some odd looking values "A" --"G"
-    These names are chose deliberately as such for debugging purposes. Some of them need to be
-    specified but are not actually used for the variable_length_mnist experiment, that is
-     "-iam_database_line_images_root_folder_path","F",
-     "-iam_database_lines_file_path","G",
-     whereas others are dynamically generated, for example
-    "-data_permutation_file_path","A",
-    By using these slightly unusual capital letter names, it is easier to see quickly what
-    is generated for which argument. Note that "iam_words_training_test.py" gives more sensible
+    These names are chose deliberately as such for debugging purposes. These arguments need to be
+    specified but are not actually used for the variable_length_mnist experiment.
+    Note that "iam_words_training_test.py" gives more sensible
     (file) names for the case where these arguments are actually used.
     """
 
@@ -38,13 +33,11 @@ def main():
             "-learning_rate", "0.005",
             "-use_leaky_lp_cells",
             "-use_dropout",
-            #"-use_four_pixel_input_blocks",  # Gives better results in principle, but is slower
-            "-use_resolution_halving",
             "-use_regular_mdlstm_layers",
             "-load_entire_dataset_beforehand",
             #"-use_on_demand_example_loading",
-            "-use_example_packing",   # With example packing it should be more efficient
-            #"-no_example_packing",
+            #"-use_example_packing",
+            "-no_example_packing",
             "-no_bias_in_block_strided_convolution",
             "-save_score_table_file_path","mnist-ctr-results-table.txt",
             "-use_network_structure_bluche",
@@ -60,7 +53,7 @@ def main():
             # You should lower the number of epochs if you just want to quickly test all the steps,
             # but note that to properly learn quite some epochs are required.
             "-epochs", "50",
-            "-batch_size", "256",
+            "-batch_size", "512",
             #"-train_from", "MODEL_PATH"   #Specify your model path here if you want to resume from an earlier checkpoint
             ]
 

@@ -118,6 +118,7 @@ class Trainer:
             # If minimize_horizontal_padding is used, inputs will be a list
             if Utils.use_cuda():
                 if not inputs_is_list:
+                    print("inputs: " + str(inputs))
                     inputs = inputs.to(device)
                 else:
                     inputs = Utils.move_tensor_list_to_device(inputs, device)

@@ -219,23 +219,24 @@ def get_multi_digit_test_loader_fixed_length(batch_size, sequence_length):
 
 
 def get_multi_digit_train_loader_random_length(batch_size, min_num_digits, max_num_digits,
-                                               minimize_horizontal_padding: bool):
-    padding_strategy = PaddingStrategy.create_padding_strategy(HEIGHT_REQUIRED_PER_NETWORK_OUTPUT_COLUMN,
-                                                               WIDTH_REQUIRED_PER_NETWORK_OUTPUT_COLUMN,
-                                                               True, minimize_horizontal_padding,
-                                                               False)
+                                               minimize_horizontal_padding: bool,
+                                               perform_horizontal_batch_padding_in_data_loader: bool):
+    padding_strategy = PaddingStrategy.create_padding_strategy(
+        HEIGHT_REQUIRED_PER_NETWORK_OUTPUT_COLUMN, WIDTH_REQUIRED_PER_NETWORK_OUTPUT_COLUMN,
+        True, minimize_horizontal_padding, perform_horizontal_batch_padding_in_data_loader)
 
     return get_multi_digit_loader_random_length(batch_size, min_num_digits, max_num_digits,
                                                 get_train_set(), padding_strategy)
 
 
 def get_multi_digit_test_loader_random_length(batch_size, min_num_digits, max_num_digits,
-                                              minimize_horizontal_padding: bool):
+                                              minimize_horizontal_padding: bool,
+                                              perform_horizontal_batch_padding_in_data_loader: bool):
     padding_strategy = PaddingStrategy.create_padding_strategy(HEIGHT_REQUIRED_PER_NETWORK_OUTPUT_COLUMN,
                                                                WIDTH_REQUIRED_PER_NETWORK_OUTPUT_COLUMN,
                                                                True,
                                                                minimize_horizontal_padding,
-                                                               False)
+                                                               perform_horizontal_batch_padding_in_data_loader)
     # padding_strategy = FullPaddingStrategy(
     #     HEIGHT_REQUIRED_PER_NETWORK_OUTPUT_COLUMN, WIDTH_REQUIRED_PER_NETWORK_OUTPUT_COLUMN,)
 

@@ -878,7 +878,9 @@ def mnist_recognition_fixed_length():
                     compute_multi_directional, use_dropout, vocab_list, "MNIST_FIXED_LENGTH")
     #print(prof)
 
-def get_variable_length_mnist_dataloaders(batch_size: int, minimize_horizontal_padding: bool):
+def get_variable_length_mnist_dataloaders(
+        batch_size: int, minimize_horizontal_padding: bool,
+        perform_horizontal_batch_padding_in_data_loader: bool):
 
     min_num_digits = 1
     max_num_digits = 3
@@ -886,10 +888,10 @@ def get_variable_length_mnist_dataloaders(batch_size: int, minimize_horizontal_p
 
     train_loader = data_preprocessing.load_mnist. \
         get_multi_digit_train_loader_random_length(batch_size, min_num_digits, max_num_digits,
-                                                   minimize_horizontal_padding)
+            minimize_horizontal_padding, perform_horizontal_batch_padding_in_data_loader)
     test_loader = data_preprocessing.load_mnist. \
         get_multi_digit_test_loader_random_length(batch_size, min_num_digits, max_num_digits,
-                                                  minimize_horizontal_padding)
+            minimize_horizontal_padding, perform_horizontal_batch_padding_in_data_loader)
     return train_loader, test_loader
 
 
@@ -901,7 +903,13 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     batch_size = opt.batch_size
     # batch_size = 1024
     minimize_horizontal_padding = True
-    train_loader, test_loader = get_variable_length_mnist_dataloaders(batch_size, minimize_horizontal_padding)
+    # perform_horizontal_batch_padding_in_data_loader = False
+    # use_example_packing = opt.use_example_packing
+    use_example_packing, perform_horizontal_batch_padding_in_data_loader = \
+        get_use_example_packing_and_perform_horizontal_batch_packing_in_data_loader(
+            opt)
+    train_loader, test_loader = get_variable_length_mnist_dataloaders(
+        batch_size, minimize_horizontal_padding, perform_horizontal_batch_padding_in_data_loader)
 
     # In MNIST there are the digits 0-9, and we also add a symbol for blanks
     # This vocab_list will be used by the decoder
@@ -931,11 +939,8 @@ def mnist_recognition_variable_length(model_opt, checkpoint):
     #with torch.autograd.profiler.profile(use_cuda=False) as prof:
     image_input_is_unsigned_int = False
     use_block_mdlstm = False
-    # perform_horizontal_batch_padding_in_data_loader = False
-    # use_example_packing = opt.use_example_packing
-    use_example_packing, perform_horizontal_batch_padding_in_data_loader = \
-        get_use_example_packing_and_perform_horizontal_batch_packing_in_data_loader(
-            opt)
+
+
     use_leaky_lp_cells = opt.use_leaky_lp_cells
     use_network_structure_bluche = opt.use_network_structure_bluche
     share_weights_across_directions_in_fully_connected_layer = \
