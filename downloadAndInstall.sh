@@ -1,9 +1,14 @@
+#!/bin/bash
+## This is necessary, see https://github.com/conda/conda/issues/7980
+# https://stackoverflow.com/questions/61915607/commandnotfounderror-your-shell-has-not-been-properly-configured-to-use-conda
+source ~/anaconda3/etc/profile.d/conda.sh
+
 # A script to install the required submodules, run the installation steps and test the installed software
 # Tested for ubnutu linux. Requires boost-dev to be installed by the package manager
 # Also requires anaconda to be installed 
 
 # Step 0. Create a new conda environment for the project
-conda create --name multi-hare2
+conda create --name multi-hare
 conda activate multi-hare
 
 
@@ -20,8 +25,11 @@ mkdir build
 cd build
 cmake ..
 make -j8 -d
-cd ../../
+cd ..
+cd pytorch_binding
 python3 setup.py install
+cd ../../..
+
 
 # Step 4: install ctcdecode
 # # Go into the ctcdecode folder
