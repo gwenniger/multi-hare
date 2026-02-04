@@ -806,17 +806,21 @@ def train_mdrnn_ctc(checkpoint, train_loader, validation_loader, test_loader, in
 
         print('Finished Training')
 
-        print('Evaluation on validation set with language model...')
+        if opt.use_language_model:
+            print('Evaluation on validation set with language model...')
 
-        print("<validation evaluation, model epoch " + str(opt.epochs) + " >")
-        Evaluator.evaluate_mdrnn(validation_loader, network, device, vocab_list, blank_symbol,
-                                 width_reduction_factor, image_input_is_unsigned_int,
-                                 inputs_and_outputs_are_lists,
-                                 LanguageModelParameters(opt.language_model_file_path,
-                                                         opt.language_model_weight,
-                                                         opt.word_insertion_penalty), None, None, None)
+            print("<validation evaluation, model epoch " + str(opt.epochs) + " >")
+            Evaluator.evaluate_mdrnn(validation_loader, network, device, vocab_list, blank_symbol,
+                                     width_reduction_factor, image_input_is_unsigned_int,
+                                     inputs_and_outputs_are_lists,
+                                     LanguageModelParameters(opt.language_model_file_path,
+                                                             opt.language_model_weight,
+                                                             opt.word_insertion_penalty), None, None, None)
 
-        print("</validation evaluation, model epoch " + str(opt.epochs) + " >")
+            print("</validation evaluation, model epoch " + str(opt.epochs) + " >")
+        else:
+            print("\nWarning: use_language_model is set to false. Not evaluating with language model.")
+
 
         print('Evaluation on test set...')
 
@@ -830,14 +834,20 @@ def train_mdrnn_ctc(checkpoint, train_loader, validation_loader, test_loader, in
         Evaluator.evaluate_mdrnn(test_loader, network, device, vocab_list, blank_symbol,
                                  width_reduction_factor, image_input_is_unsigned_int,
                                  inputs_and_outputs_are_lists, None, None, None, None)
-        # Test evaluation with language model
-        print("Perform test evaluation with language model...")
-        Evaluator.evaluate_mdrnn(test_loader, network, device, vocab_list, blank_symbol,
-                                 width_reduction_factor, image_input_is_unsigned_int,
-                                 inputs_and_outputs_are_lists,
-                                 LanguageModelParameters(opt.language_model_file_path,
-                                                         opt.language_model_weight,
-                                                         opt.word_insertion_penalty), None, None, None)
+
+        if opt.use_language_model:
+            # Test evaluation with language model
+            print("Perform test evaluation with language model...")
+
+            language_model_parameters = LanguageModelParameters(opt.language_model_file_path,
+                                                             opt.language_model_weight,
+                                                             opt.word_insertion_penalty)
+
+            Evaluator.evaluate_mdrnn(test_loader, network, device, vocab_list, blank_symbol,
+                                     width_reduction_factor, image_input_is_unsigned_int,
+                                     inputs_and_outputs_are_lists,
+                                     language_model_parameters,
+                                     None, None, None)
         real_model.set_training(True)  # When using DataParallel
         print("</test evaluation, model epoch " + str(opt.epochs) + " >")
 

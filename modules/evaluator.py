@@ -58,7 +58,7 @@ class Evaluator:
 
     # Note that if seq_len=0 then the result will always be the empty String
     @staticmethod
-    def convert_to_string(tokens, vocab, seq_len, use_language_model_in_decoder: bool):
+    def convert_to_string(tokens, vocab, seq_len):
         # print("convert_to_string - tokens: " + str(tokens))
         # print("convert_to_string - vocab: " + str(vocab))
         # print("convert_to_string - seq_len: " + str(seq_len))
@@ -304,8 +304,7 @@ class Evaluator:
                     # print("beam_results_sequence: \"" + str(beam_results_sequence) + "\"")
                     use_language_model_in_decoder = language_model_parameters is not None
                     output_string = Evaluator.convert_to_string(
-                        beam_results_sequence, vocab_list, out_seq_len[example_index][0],
-                        use_language_model_in_decoder)
+                        beam_results_sequence, vocab_list, out_seq_len[example_index][0])
                     example_labels_with_padding = labels[example_index]
                     # Extract the real example labels, removing the padding labels
                     reference_labels = example_labels_with_padding[0:label_sizes[example_index]]

@@ -71,7 +71,7 @@ def get_test_set():
 
 
 # We want labels to start from 1, so we increase the original label by 1
-# so that 0 can reserved for blanks
+# so that 0 is reserved for blanks
 def get_item_label_with_labels_starting_from_one(item_label):
     return item_label + 1
 

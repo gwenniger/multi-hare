@@ -57,11 +57,15 @@ def main():
             "-gpuid", "0",
             # You should lower the number of epochs if you just want to quickly test all the steps,
             # but note that to properly learn quite some epochs are required.
-            "-epochs", "50",
-            "-batch_size", "512",
+            #"-epochs", "160",
+            "-epochs", "80",
+            #"-batch_size", "512",
+            "-batch_size", "256",
             "-save_model", EXPERIMENT_FOLDER + "model",  # ,
+            "-start_decay_at", "1000000",  # Don't use learning rate decay
             #"-train_from", "MODEL_PATH"   #Specify your model path here if you want to resume from an earlier checkpoint
-            #"-train_from", EXPERIMENT_FOLDER + "model_acc_0.00_cer_92.229_wer_100.000_e5.pt"
+            # "-train_from", EXPERIMENT_FOLDER +  "model_acc_58.07_cer_26.520_wer_41.932_e86.pt"#,
+            #"-reset_adam_state"
             ]
 
     modules.train_multi_dimensional_rnn_ctc.main(argv)
