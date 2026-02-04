@@ -5,7 +5,7 @@ from pathlib import Path
 import os
 
 cwd = os.getcwd()
-EXPERIMENT_FOLDER = cwd + "/VariableLengthMnistExperiment/"
+EXPERIMENT_FOLDER = cwd + "/VariableLengthMnistExperimentBatchSize256/"
 
 def main():
     """
@@ -35,7 +35,18 @@ def main():
             "-language_model_weight","0",
             "-word_insertion_penalty","0",
             # Learning rate as used in the paper "No Padding Please: Efficient Neural Handwriting Recognition"
-            "-learning_rate", "0.005",
+            #"-learning_rate", "0.005",
+            # Because of a larger batch size, a ten times larger learning works more effectively
+            # causing the learning to go a lot faster. For other experiments it is recommended
+            # to try different learning rates, and if the batch size is much higher than usual,
+            # try to see if learning still works well if the learning rate is also increased
+            # proportionally. If so, that may speed up the efficiency of training a lot, while
+            # also optimally using the power/memory of the GPU.
+            # https://arxiv.org/abs/1711.00489
+            # See also for example this discussion:
+            # https://stats.stackexchange.com/questions/308424/how-does-batch-size-affect-adam-optimizer
+            # https://stats.stackexchange.com/questions/164876/what-is-the-trade-off-between-batch-size-and-number-of-iterations-to-train-a-neu
+            "-learning_rate", "0.05",
             "-use_leaky_lp_cells",
             "-use_dropout",
             "-use_regular_mdlstm_layers",
@@ -57,14 +68,15 @@ def main():
             "-gpuid", "0",
             # You should lower the number of epochs if you just want to quickly test all the steps,
             # but note that to properly learn quite some epochs are required.
-            #"-epochs", "160",
-            "-epochs", "80",
+            "-epochs", "160",
+            #"-epochs", "80",
             #"-batch_size", "512",
             "-batch_size", "256",
+            #"-batch_size", "32",
             "-save_model", EXPERIMENT_FOLDER + "model",  # ,
             "-start_decay_at", "1000000",  # Don't use learning rate decay
             #"-train_from", "MODEL_PATH"   #Specify your model path here if you want to resume from an earlier checkpoint
-            # "-train_from", EXPERIMENT_FOLDER +  "model_acc_58.07_cer_26.520_wer_41.932_e86.pt"#,
+            #"-train_from", EXPERIMENT_FOLDER +  "model_acc_73.12_cer_15.272_wer_26.879_e121.pt",#,
             #"-reset_adam_state"
             ]
 
