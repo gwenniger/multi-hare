@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import torch
 import sys
 from language_model.kenlm_interface import KenlmInterface
@@ -60,17 +62,23 @@ class TestLanguageModelCreator:
     def get_language_model_binary_file_path(self):
         return self.language_model_output_directory + self.language_model_binary_file_name
 
+    def create_language_model_output_dir_if_not_existing(self):
+        Path(self.language_model_output_directory).mkdir(parents=True, exist_ok=True)
+
     def create_language_model_train_file(self, language_model_text: str):
+        self.create_language_model_output_dir_if_not_existing()
         with open(self.get_language_model_train_file_path(), "w") as text_file:
             text_file.write(language_model_text)
 
     def create_language_model_arpa_file(self, ngram_order: int):
+        self.create_language_model_output_dir_if_not_existing()
         kenlm_interface = KenlmInterface.create_kenlm_interface(
             self.handwriting_recognition_root_dir)
         kenlm_interface.create_arpa_language_model_for_file(
             ngram_order, self.get_language_model_train_file_path(), self.get_language_model_arpa_file_path())
 
     def create_language_model_binary_file(self):
+        self.create_language_model_output_dir_if_not_existing()
         kenlm_interface = KenlmInterface.create_kenlm_interface(
             self.handwriting_recognition_root_dir)
         kenlm_interface.build_binary_language_model_for_file(
@@ -303,8 +311,13 @@ def create_test_language_model(handwriting_recognition_root_dir: str):
 
 
 def main():
-    handwriting_recognition_root_dir = sys.argv[1]
-    # create_test_language_model(handwriting_recognition_root_dir)
+    if len(sys.argv) != 2:
+        raise RuntimeError("Usage: >>> test_ctc_decode_with_language_model PROJECT_ROOT_DIR_PATH")
+
+    project_root_dir = sys.argv[1]
+
+
+
     """
     Below tests contrast the decoding without an active language model for a certain input 
     with those for the same input but with an active language model. These test show that 
@@ -314,15 +327,15 @@ def main():
     """
     # Test pair one, without and with language model
     TestCTCDecodeWithLanguageModel. \
-        test_decoder_without_active_language_model_artificial_data(handwriting_recognition_root_dir)
+        test_decoder_without_active_language_model_artificial_data(project_root_dir)
     TestCTCDecodeWithLanguageModel. \
-        test_decoder_with_active_language_model_artificial_data(handwriting_recognition_root_dir)
+        test_decoder_with_active_language_model_artificial_data(project_root_dir)
 
     # Test pair two, without and with language model
     TestCTCDecodeWithLanguageModel. \
-        test_decoder_without_active_language_model_artificial_data_two(handwriting_recognition_root_dir)
+        test_decoder_without_active_language_model_artificial_data_two(project_root_dir)
     TestCTCDecodeWithLanguageModel. \
-        test_decoder_with_active_language_model_artificial_data_two(handwriting_recognition_root_dir)
+        test_decoder_with_active_language_model_artificial_data_two(project_root_dir)
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ echo "TEST 2: testing the ctc decoder with and without language model"
 python tests/test_ctc_decode_with_language_model.py "$PWD/"
 
 
-echo "TEST 3: training on eht IAM words dataset, using ctc loss"
+echo "TEST 3: training on the IAM words dataset, using ctc loss"
 # This test requires the IAM words dataset 
 IAM_DATA_ROOT_FOLDER=""    # Change this to the actual path to the IAM data folder
 EXPERIMENT_ROOT_FOLDER="" # Change to this the path of the folder where you want to experiment output to be written to 
