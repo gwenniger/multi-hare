@@ -57,8 +57,8 @@ def main():
             # either one or two GPUs (though speed of course increases with two GPUs)
             "-batch_size", "128",
             "-save_model", experiment_folder +"model",#,
-            "-train_from", experiment_folder +  "model_acc_14.92_cer_72.530_wer_85.085_e12.pt",#,
-            "-reset_adam_state"
+            #"-train_from", experiment_folder +  "model_acc_14.92_cer_72.530_wer_85.085_e12.pt",#,
+            #"-reset_adam_state"
             ]
 
     modules.train_multi_dimensional_rnn_ctc.main(argv)

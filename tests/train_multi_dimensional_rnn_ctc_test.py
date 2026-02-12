@@ -5,7 +5,7 @@ from pathlib import Path
 import os
 
 cwd = os.getcwd()
-EXPERIMENT_FOLDER = cwd + "/VariableLengthMnistExperimentRegularMDLSTMs/"
+EXPERIMENT_FOLDER = cwd + "/VariableLengthMnistExperimentAdamOptimizer/"
 
 def main():
     """
@@ -49,8 +49,8 @@ def main():
             # https://stats.stackexchange.com/questions/308424/how-does-batch-size-affect-adam-optimizer
             # https://stats.stackexchange.com/questions/164876/what-is-the-trade-off-between-batch-size-and-number-of-iterations-to-train-a-neu
             #"-learning_rate", "0.05",
-            #"-use_leaky_lp_cells",
-            "-use_normal_mdlstm_cells",
+            "-use_leaky_lp_cells",
+            #"-use_normal_mdlstm_cells",
             "-max_grad_norm", "1000",
             "-use_dropout",
             "-use_regular_mdlstm_layers",
