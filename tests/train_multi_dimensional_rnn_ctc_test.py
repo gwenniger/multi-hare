@@ -35,8 +35,9 @@ def main():
             "-language_model_weight","0",
             "-word_insertion_penalty","0",
             # Learning rate as used in the paper "No Padding Please: Efficient Neural Handwriting Recognition"
-            #"-learning_rate", "0.005",
-            "-learning_rate", "0.0005", #Corrected learning rate
+            "-learning_rate", "0.005",
+            "-optim", "adam",
+            #"-learning_rate", "0.005", #Corrected learning rate
             # Because of a larger batch size, a ten times larger learning works more effectively
             # causing the learning to go a lot faster. For other experiments it is recommended
             # to try different learning rates, and if the batch size is much higher than usual,

@@ -287,9 +287,9 @@ def train_opts(parser):
                        help='Maximum batch size for validation')
     group.add_argument('-epochs', type=int, default=80,
                        help='Number of training epochs')
-    group.add_argument('-optim', default='sgd',
+    group.add_argument('-optim', default='adam',
                        choices=['sgd', 'adagrad', 'adadelta', 'adam',
-                                'sparseadam'],
+                                'sparseadam','adamw'],
                        help="""Optimization method.""")
     group.add_argument('-adagrad_accumulator_init', type=float, default=0,
                        help="""Initializes the accumulator values in adagrad.

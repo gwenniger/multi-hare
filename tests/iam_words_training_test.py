@@ -27,6 +27,7 @@ def main():
             # Learning rate as used in the paper "No Padding Please: Efficient Neural Handwriting Recognition"
             #"-learning_rate", "0.005",
             "-learning_rate", "0.05",
+            "-optim", "adam",
             "-start_decay_at", "1000000",  # Don't use learning rate decay
             "-use_leaky_lp_cells",
             "-use_dropout",
