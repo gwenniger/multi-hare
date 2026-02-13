@@ -35,7 +35,12 @@ def main():
             "-language_model_weight","0",
             "-word_insertion_penalty","0",
             # Learning rate as used in the paper "No Padding Please: Efficient Neural Handwriting Recognition"
+            # Note: smaller learning rates may also work well, alternatively manually reset to a lower
+            # value once validation scores start to increase, while also resetting Adam state
             "-learning_rate", "0.005",
+            #"-learning_rate", "0.0025",
+            # IMPORTANT NOTE: Use of the Adam optimizer as opposed to sgd is crucial
+            # for obtaining good performance in a reasonable amount of time!
             "-optim", "adam",
             #"-learning_rate", "0.005", #Corrected learning rate
             # Because of a larger batch size, a ten times larger learning works more effectively
@@ -74,13 +79,13 @@ def main():
             # but note that to properly learn quite some epochs are required.
             "-epochs", "250",
             #"-epochs", "80",
-            "-batch_size", "512",
-            #"-batch_size", "256",
+            #"-batch_size", "512",
+            "-batch_size", "256",
             #"-batch_size", "32",
             "-save_model", EXPERIMENT_FOLDER + "model",  # ,
-            "-start_decay_at", "1000000"  # Don't use learning rate decay
+            "-start_decay_at", "1000000",  # Don't use learning rate decay
             #"-train_from", "MODEL_PATH"   #Specify your model path here if you want to resume from an earlier checkpoint
-            #"-train_from", EXPERIMENT_FOLDER +  "model_acc_92.44_cer_3.901_wer_7.564_e190.pt"#,
+            #"-train_from", EXPERIMENT_FOLDER +  "model_acc_81.35_cer_10.361_wer_18.645_e20.pt",#,
             #"-reset_adam_state"
             ]
 

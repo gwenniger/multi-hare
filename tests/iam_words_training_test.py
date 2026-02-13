@@ -25,8 +25,12 @@ def main():
             "-language_model_weight","0",
             "-word_insertion_penalty","0",
             # Learning rate as used in the paper "No Padding Please: Efficient Neural Handwriting Recognition"
-            #"-learning_rate", "0.005",
-            "-learning_rate", "0.05",
+            # Note: smaller learning rates may also work well, alternatively manually reset to a lower
+            # value once validation scores start to increase, while also resetting Adam state
+            "-learning_rate", "0.005",
+            #"-learning_rate", "0.05",
+            # IMPORTANT NOTE: Use of the Adam optimizer as opposed to sgd is crucial
+            # for obtaining good performance in a reasonable amount of time!
             "-optim", "adam",
             "-start_decay_at", "1000000",  # Don't use learning rate decay
             "-use_leaky_lp_cells",

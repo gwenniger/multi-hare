@@ -86,6 +86,10 @@ class Optim(object):
                 else:
                     self.sparse_params.append(p)
         if self.method == 'sgd':
+            print(">>> WARNING: The SGD optimizer was selected. This optimizer may not work "
+                  "well for the provided handwriting recognition models, causing training to be very slow."
+                  "It is recommended to select another optimizer, in particularly Adam, which was confirmed to"
+                  "work well for training the provided models.")
             self.optimizer = optim.SGD(self.params, lr=self.lr)
         elif self.method == 'adagrad':
             self.optimizer = optim.Adagrad(self.params, lr=self.lr)
@@ -96,6 +100,7 @@ class Optim(object):
         elif self.method == 'adadelta':
             self.optimizer = optim.Adadelta(self.params, lr=self.lr)
         elif self.method == 'adam':
+            print(">>> Using the Adam optimizer. ")
             self.optimizer = optim.Adam(self.params, lr=self.lr, betas=self.betas, eps=1e-9)
         elif self.method == 'adamw':
             self.optimizer = optim.AdamW(self.params, lr=self.lr)
